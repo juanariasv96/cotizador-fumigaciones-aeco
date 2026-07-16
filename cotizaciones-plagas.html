@@ -436,6 +436,29 @@
     font-size:12px;
     color:#7a5b00;
   }
+  .sugerencia-columnas{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .sugerencia-col{
+    flex:1 1 220px;
+    min-width:220px;
+    border-right:1px dashed var(--verde-claro);
+    padding-right:14px;
+  }
+  .sugerencia-col:last-child{
+    border-right:none;
+    padding-right:0;
+  }
+  .sugerencia-col-titulo{
+    font-size:11px;
+    font-weight:600;
+    color:#666;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    margin-bottom:4px;
+  }
   .toolbar input[type=text]{max-width:280px;}
   .logo-upload{
     display:flex;
@@ -656,6 +679,11 @@
       <div class="folio-banner">
         <span class="folio-banner-label">No. de cotización / folio</span>
         <span class="folio-banner-value" id="folioPreview">00001</span>
+      </div>
+
+      <div class="alerta-margen" id="editandoBanner" style="display:none;margin-bottom:14px;">
+        Editando cotización folio <strong id="editandoFolioTexto"></strong>. Al guardar se actualizará esta cotización (no se creará una nueva).
+        <button type="button" class="btn secondary small" id="btnCancelarEdicion" style="margin-left:10px;">Cancelar edición</button>
       </div>
 
       <div class="panel">
@@ -1354,12 +1382,18 @@
   // tabla cotizaciones (columnas sueltas + el JSON completo en "datos").
   function mapFilaCotizacionADatos(fila){
     const datos = fila.datos || {};
+    const fechaCreacionCompleta = fila.fecha_creacion || datos.fechaCreacion || "";
+    const fechaActualizacion = fila.fecha_actualizacion || "";
+    const editada = !!(fechaActualizacion && fechaCreacionCompleta &&
+      fechaActualizacion !== fechaCreacionCompleta);
     return {
       ...datos,
       id: fila.id,
       folio: fila.folio,
       estado: fila.estado,
-      fechaCreacion: (fila.fecha_creacion || datos.fechaCreacion || "").slice(0,10),
+      fechaCreacion: fechaCreacionCompleta.slice(0,10),
+      fechaActualizacion: fechaActualizacion,
+      editada: editada,
       cliente: fila.clientes ? {
         nombre: fila.clientes.nombre || "",
         telefono: fila.clientes.telefono || "",
@@ -1455,6 +1489,34 @@
 
     if(error){
       alert('No se pudo guardar la cotización en Supabase: ' + error.message);
+      return null;
+    }
+
+    cotizacion.id = data.id;
+    cotizacion.folio = data.folio;
+    await cargarCotizaciones();
+    return cotizacion;
+  }
+
+  // Actualiza una cotización existente (mismo id/folio). fecha_actualizacion
+  // se refresca sola por el trigger de Postgres; con eso sabemos que fue editada.
+  async function actualizarCotizacion(id, cotizacion){
+    const clienteId = await upsertCliente(cotizacion.cliente, cotizacion.categoriaServicio);
+
+    const { data, error } = await supabaseClient
+      .from('cotizaciones')
+      .update({
+        cliente_id: clienteId,
+        estado: cotizacion.estado || 'Pendiente',
+        vendedor: cotizacion.generadoPorNombre || cotizacion.generadoPorRol || null,
+        datos: cotizacion,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if(error){
+      alert('No se pudo actualizar la cotización en Supabase: ' + error.message);
       return null;
     }
 
@@ -1596,15 +1658,15 @@
     empresa: document.getElementById('tab-empresa'),
     accesos: document.getElementById('tab-accesos'),
   };
+  function activarTab(nombre){
+    tabButtons.forEach(b=>b.classList.toggle('active', b.dataset.tab === nombre));
+    Object.values(tabs).forEach(s=>s.classList.add('hidden'));
+    tabs[nombre].classList.remove('hidden');
+    if(nombre === 'lista') renderLista();
+    if(nombre === 'accesos') cargarRegistroAccesos();
+  }
   tabButtons.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      tabButtons.forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      Object.values(tabs).forEach(s=>s.classList.add('hidden'));
-      tabs[btn.dataset.tab].classList.remove('hidden');
-      if(btn.dataset.tab === 'lista') renderLista();
-      if(btn.dataset.tab === 'accesos') cargarRegistroAccesos();
-    });
+    btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
   });
 
   // ---------- Áreas dinámicas ----------
@@ -1807,6 +1869,61 @@
     return categoriaServicio === 'Residencial' && p.familia === 'rastrero';
   }
 
+  // Precio real Empresarial (insecto rastrero) por m², calibrado con casos reales del negocio.
+  // No usa la fórmula de costo+margen: esa fórmula sugería precios muy por encima de lo que
+  // realmente se cobra a clientes empresariales (ej. 50 m² sugería ~$4,000 en vez de ~$800 real).
+  const TABLA_EMPRESARIAL_RASTRERO = [
+    { m2: 50, precio: 800 },
+    { m2: 100, precio: 900 },
+    { m2: 200, precio: 1100 },
+    { m2: 300, precio: 1300 }, // punto medio del rango real $1,200-$1,400 (varía según el caso)
+  ];
+  function buscarPrecioEmpresarial(m2){
+    const tabla = TABLA_EMPRESARIAL_RASTRERO;
+    if(m2 <= 0) return { precio: null, motivo: 'sin-m2' };
+    if(m2 <= tabla[0].m2) return { precio: tabla[0].precio, motivo: 'piso-minimo' };
+    if(m2 > tabla[tabla.length - 1].m2) return { precio: null, motivo: 'fuera-de-tabla' };
+    for(let i = 0; i < tabla.length - 1; i++){
+      const a = tabla[i], b = tabla[i + 1];
+      if(m2 >= a.m2 && m2 <= b.m2){
+        const t = (m2 - a.m2) / (b.m2 - a.m2);
+        const precio = a.precio + t * (b.precio - a.precio);
+        return { precio, motivo: 'interpolado' };
+      }
+    }
+    return { precio: null, motivo: 'fuera-de-tabla' };
+  }
+
+  function esServicioRastreroEmpresarial(p){
+    const categoriaServicio = document.getElementById('categoriaServicio').value;
+    return categoriaServicio === 'Empresarial' && p.familia === 'rastrero';
+  }
+
+  // Precio sugerido por tiempo real de trabajo, para Empresarial/Industrial.
+  // El $800/hora ya es precio final (incluye ganancia); no se le suma margen adicional.
+  const TARIFA_HORA_EMPRESARIAL = 800;
+  function calcularPrecioTiempo(p){
+    const tiempoServicio = parseFloat(p.tiempoServicio) || 0;
+    const tiempoTraslado = parseFloat(p.tiempoTraslado) || 0;
+    const casetas = parseFloat(p.casetas) || 0;
+    if(!tiempoServicio || !tiempoTraslado) return null;
+    const precio = ((tiempoServicio + tiempoTraslado) / 60) * TARIFA_HORA_EMPRESARIAL + casetas;
+    return { tiempoServicio, tiempoTraslado, casetas, precio };
+  }
+
+  function boxTiempoHtml(p){
+    const calc = calcularPrecioTiempo(p);
+    if(!calc){
+      return `<div class="sugerencia-col-titulo">Precio sugerido (tiempo × $${TARIFA_HORA_EMPRESARIAL}/hr)</div><div class="hint">Captura tiempo de servicio y tiempo de traslado para ver este precio.</div>`;
+    }
+    return `
+      <div class="sugerencia-col-titulo">Precio sugerido (tiempo × $${TARIFA_HORA_EMPRESARIAL}/hr)</div>
+      <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precio)}</strong></div>
+      ${calc.casetas ? `<div class="hint">Incluye $${calc.casetas.toFixed(2)} de casetas.</div>` : ''}
+      <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precio.toFixed(2)}">Usar este precio</button>
+    `;
+  }
+
   function costoBasePorLitro(quimico, emp){
     const mapa = {
       'Biothrine': emp.costoBiothrine != null ? emp.costoBiothrine : 900,
@@ -1927,23 +2044,67 @@
       return;
     }
 
-    const calc = calcularCostoServicio(p);
-    if(!calc){
-      caja.innerHTML = `<div class="hint">Captura los m² del área para calcular el costo real y el precio sugerido.</div>`;
+    if(esServicioRastreroEmpresarial(p)){
+      const m2 = parseFloat(p.metrosCuadrados) || 0;
+      let boxM2;
+      if(!m2){
+        boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Captura los m² del área para ver este precio.</div>`;
+      } else {
+        const resultado = buscarPrecioEmpresarial(m2);
+        if(resultado.precio == null){
+          boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla Empresarial (máx. 300 m²). Cotiza manualmente.</div>`;
+        } else {
+          const comboAplica = hayComboRastreroRoedor();
+          const bono = comboAplica ? 200 : 0;
+          const precioSugerido = resultado.precio + bono;
+          boxM2 = `
+            <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
+            <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
+            ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
+            ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
+            <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
+          `;
+        }
+      }
+      caja.innerHTML = `
+        <div class="sugerencia-columnas">
+          <div class="sugerencia-col">${boxM2}</div>
+          <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
+        </div>
+      `;
       return;
     }
 
-    const precioActual = parseFloat(p.precioServicio) || 0;
-    const oportunidad = precioActual > 0 && precioActual < calc.precioMeta;
+    const esEmpresarialOIndustrial = categoriaServicio === 'Empresarial' || categoriaServicio === 'Industrial';
 
-    caja.innerHTML = `
-      <div class="sugerencia-linea"><span>Costo real estimado:</span><strong>${formatMoney(calc.costoTotal)}</strong></div>
-      <div class="sugerencia-linea"><span>Factor de margen aplicado:</span><strong>${calc.factor.toFixed(1)}x</strong></div>
-      <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precioSugerido)}</strong></div>
-      ${calc.comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
-      <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precioSugerido.toFixed(2)}">Usar precio sugerido</button>
-      ${oportunidad ? `<div class="alerta-margen">⚠ Oportunidad de mejora de margen: el precio meta (factor ${calc.factorMeta.toFixed(1)}x) sería ${formatMoney(calc.precioMeta)}. Uso interno, no se imprime al cliente.</div>` : ''}
-    `;
+    const calc = calcularCostoServicio(p);
+    let boxCosto;
+    if(!calc){
+      boxCosto = `${esEmpresarialOIndustrial ? '<div class="sugerencia-col-titulo">Precio sugerido (costo + margen)</div>' : ''}<div class="hint">Captura los m² del área para calcular el costo real y el precio sugerido.</div>`;
+    } else {
+      const precioActual = parseFloat(p.precioServicio) || 0;
+      const oportunidad = precioActual > 0 && precioActual < calc.precioMeta;
+      boxCosto = `
+        ${esEmpresarialOIndustrial ? '<div class="sugerencia-col-titulo">Precio sugerido (costo + margen)</div>' : ''}
+        <div class="sugerencia-linea"><span>Costo real estimado:</span><strong>${formatMoney(calc.costoTotal)}</strong></div>
+        <div class="sugerencia-linea"><span>Factor de margen aplicado:</span><strong>${calc.factor.toFixed(1)}x</strong></div>
+        <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precioSugerido)}</strong></div>
+        ${calc.comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
+        <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precioSugerido.toFixed(2)}">Usar ${esEmpresarialOIndustrial ? 'este precio' : 'precio sugerido'}</button>
+        ${oportunidad ? `<div class="alerta-margen">⚠ Oportunidad de mejora de margen: el precio meta (factor ${calc.factorMeta.toFixed(1)}x) sería ${formatMoney(calc.precioMeta)}. Uso interno, no se imprime al cliente.</div>` : ''}
+      `;
+    }
+
+    if(esEmpresarialOIndustrial){
+      caja.innerHTML = `
+        <div class="sugerencia-columnas">
+          <div class="sugerencia-col">${boxCosto}</div>
+          <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
+        </div>
+      `;
+    } else {
+      caja.innerHTML = boxCosto;
+    }
   }
 
   function recalcularTodasLasSugerencias(){
@@ -1994,10 +2155,16 @@
       precioServicio: 0,
       precioAplicacion1: 0,
       precioAplicacion2: 0,
+      tiempoServicio: '',
+      distanciaTraslado: '',
+      tiempoTraslado: '',
+      casetas: '',
     };
   }
 
   function plagaCardHtml(p){
+    const categoriaServicio = document.getElementById('categoriaServicio').value;
+    const esEmpresarialOIndustrial = categoriaServicio === 'Empresarial' || categoriaServicio === 'Industrial';
     return `
       <div class="plaga-card" data-id="${p.id}">
         <div class="plaga-card-header">
@@ -2064,6 +2231,29 @@
           </div>
           ` : ''}
         </div>
+        ${esEmpresarialOIndustrial ? `
+        <div class="grid" style="margin-top:10px;">
+          <div class="field">
+            <label>Tiempo de servicio (min) *</label>
+            <input type="number" min="0" step="1" data-field="tiempoServicio" value="${escapeHtml(p.tiempoServicio)}" placeholder="Ej. 100">
+          </div>
+          <div class="field">
+            <label>Tiempo de traslado (min) *</label>
+            <input type="number" min="0" step="1" data-field="tiempoTraslado" value="${escapeHtml(p.tiempoTraslado)}" placeholder="Ej. 20">
+          </div>
+        </div>
+        <div class="grid" style="margin-top:10px;">
+          <div class="field">
+            <label>Distancia de traslado (km) *</label>
+            <input type="number" min="0" step="0.1" data-field="distanciaTraslado" value="${escapeHtml(p.distanciaTraslado)}" placeholder="Ej. 15">
+            <div class="hint">Solo de referencia; no afecta el cálculo del precio sugerido.</div>
+          </div>
+          <div class="field">
+            <label>Casetas ($)</label>
+            <input type="number" min="0" step="0.01" data-field="casetas" value="${escapeHtml(p.casetas)}" placeholder="0.00 (opcional)">
+          </div>
+        </div>
+        ` : ''}
         <div class="sugerencia-box" id="sugerencia-${p.id}"></div>
         <div class="field" style="margin-top:10px;max-width:260px;">
           <label>Precio por visita *</label>
@@ -2123,7 +2313,7 @@
       p[campo] = parseFloat(e.target.value) || 0;
       calcularTotales();
       if(campo === 'precioServicio') actualizarSugerenciaCard(p);
-    } else if(campo === 'metrosCuadrados'){
+    } else if(campo === 'metrosCuadrados' || campo === 'tiempoServicio' || campo === 'tiempoTraslado' || campo === 'casetas'){
       p[campo] = e.target.value;
       actualizarSugerenciaCard(p);
     } else {
@@ -2365,7 +2555,98 @@
     renderPlagasSeleccionadas();
   }
 
+  // ---------- Editar cotización existente ----------
+  let cotizacionEditandoId = null;
+  const editandoBanner = document.getElementById('editandoBanner');
+  const btnGuardarCotizacion = document.getElementById('btnGuardarCotizacion');
+
+  function entrarModoEdicion(cot){
+    cotizacionEditandoId = cot.id;
+
+    document.getElementById('generadoPor').value = cot.generadoPorRol || '';
+    document.getElementById('generadoPorNombre').value = cot.generadoPorNombre || '';
+
+    document.getElementById('clienteNombre').value = cot.cliente.nombre || '';
+    document.getElementById('clienteTelefono').value = cot.cliente.telefono || '';
+    document.getElementById('clienteEmail').value = cot.cliente.email || '';
+    document.getElementById('clienteDireccion').value = cot.cliente.direccion || '';
+    document.getElementById('clienteContacto').value = cot.cliente.contacto || '';
+    document.getElementById('clienteZona').value = cot.cliente.zona || '';
+
+    document.getElementById('categoriaServicio').value = cot.categoriaServicio || '';
+
+    areas = (cot.areas || []).slice();
+    renderAreas();
+
+    plagasSeleccionadas = (cot.plagas || []).map(p => ({
+      id: 'plaga_' + (++plagaIdCounter),
+      tipoPlaga: p.tipoPlaga,
+      familia: p.familia,
+      descripcion: p.descripcion || '',
+      productos: p.productos || '',
+      garantia: p.garantia || '',
+      mostrarAdvertencia: !!p.mostrarAdvertencia,
+      advertenciaTexto: p.advertenciaTexto || '',
+      esCucarachaAlemana: !!p.esCucarachaAlemana,
+      esTermitas: !!p.esTermitas,
+      metrosCuadrados: p.metrosCuadrados || '',
+      quimico: p.quimico || 'Combinación',
+      precioServicio: p.precioServicio || 0,
+      precioAplicacion1: p.precioAplicacion1 || 0,
+      precioAplicacion2: p.precioAplicacion2 || 0,
+      tiempoServicio: p.tiempoServicio || '',
+      distanciaTraslado: p.distanciaTraslado || '',
+      tiempoTraslado: p.tiempoTraslado || '',
+      casetas: p.casetas || '',
+    }));
+    renderPlagasSeleccionadas();
+
+    const esPoliza = cot.tipoContratacion === 'Póliza';
+    document.getElementById('tipoContratacionUnico').checked = !esPoliza;
+    document.getElementById('tipoContratacionPoliza').checked = esPoliza;
+    if(esPoliza){
+      duracionPoliza.value = cot.duracionPoliza || '';
+      poblarFrecuenciasServicio();
+      frecuenciaServicio.value = cot.frecuenciaServicio || '';
+    }
+    actualizarVisibilidadPoliza();
+
+    document.getElementById('incluirRecomendaciones').checked = !!cot.incluirRecomendaciones;
+    document.getElementById('recomendacionesTexto').value = cot.recomendacionesTexto || '';
+    document.getElementById('vigencia').value = cot.vigencia || '';
+    document.getElementById('notas').value = cot.notas || '';
+
+    const folioTexto = String(cot.folio).padStart(5, '0');
+    folioPreview.textContent = folioTexto;
+    document.getElementById('editandoFolioTexto').textContent = folioTexto;
+    editandoBanner.style.display = 'block';
+    btnGuardarCotizacion.textContent = 'Guardar cambios';
+
+    calcularTotales();
+    activarTab('nueva');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function salirModoEdicion(){
+    cotizacionEditandoId = null;
+    editandoBanner.style.display = 'none';
+    btnGuardarCotizacion.textContent = 'Guardar y ver resumen imprimible';
+    renderFolioPreview();
+  }
+
+  document.getElementById('btnCancelarEdicion').addEventListener('click', ()=>{
+    salirModoEdicion();
+    form.reset();
+    areas = [];
+    renderAreas();
+    tipoPlagaOtroWrap.style.display = 'none';
+    reiniciarPlagas();
+    actualizarVisibilidadPoliza();
+    calcularTotales();
+  });
+
   document.getElementById('btnLimpiar').addEventListener('click', ()=>{
+    salirModoEdicion();
     form.reset();
     areas = [];
     renderAreas();
@@ -2429,6 +2710,10 @@
       precioServicio: p.esCucarachaAlemana ? null : p.precioServicio,
       precioAplicacion1: p.esCucarachaAlemana ? p.precioAplicacion1 : null,
       precioAplicacion2: p.esCucarachaAlemana ? p.precioAplicacion2 : null,
+      tiempoServicio: p.tiempoServicio,
+      distanciaTraslado: p.distanciaTraslado,
+      tiempoTraslado: p.tiempoTraslado,
+      casetas: p.casetas,
     }));
     const subtotal = plagasSeleccionadas.reduce((s,p) => s + importePlaga(p, visitasGlobal), 0);
     const iva = subtotal * IVA_TASA;
@@ -2466,15 +2751,27 @@
 
     const btnGuardar = document.getElementById('btnGuardarCotizacion');
     btnGuardar.disabled = true;
-    btnGuardar.textContent = 'Guardando...';
 
-    const guardada = await guardarCotizacion(cotizacion);
+    let guardada;
+    if(cotizacionEditandoId){
+      const original = getCotizaciones().find(c => c.id === cotizacionEditandoId);
+      cotizacion.fechaCreacion = (original && original.fechaCreacion) || cotizacion.fechaCreacion;
+      cotizacion.estado = (original && original.estado) || cotizacion.estado;
+      btnGuardar.textContent = 'Guardando cambios...';
+      guardada = await actualizarCotizacion(cotizacionEditandoId, cotizacion);
+    } else {
+      btnGuardar.textContent = 'Guardando...';
+      guardada = await guardarCotizacion(cotizacion);
+    }
 
     btnGuardar.disabled = false;
-    btnGuardar.textContent = 'Guardar y ver resumen imprimible';
 
-    if(!guardada) return; // guardarCotizacion ya mostró el error
+    if(!guardada){
+      btnGuardar.textContent = cotizacionEditandoId ? 'Guardar cambios' : 'Guardar y ver resumen imprimible';
+      return; // guardarCotizacion/actualizarCotizacion ya mostró el error
+    }
 
+    salirModoEdicion();
     mostrarPreview(guardada);
 
     form.reset();
@@ -2872,7 +3169,7 @@
     let rows = all.map(c=>`
       <tr>
         <td>${String(c.folio).padStart(5,'0')}</td>
-        <td>${formatDate(c.fechaCreacion)}</td>
+        <td>${formatDate(c.fechaCreacion)}${c.editada ? `<div class="hint" title="Última modificación: ${escapeHtml(formatFechaHora(c.fechaActualizacion))}">Editada</div>` : ''}</td>
         <td>${escapeHtml(c.cliente.nombre)}</td>
         <td>${escapeHtml(c.categoriaServicio || "-")}</td>
         <td>${escapeHtml(nombresPlagasCot(c))}</td>
@@ -2883,6 +3180,7 @@
         <td>${estadoSelectHtml(c)}</td>
         <td>
           <button class="btn secondary small" data-action="ver" data-id="${c.id}">Ver / Imprimir</button>
+          <button class="btn secondary small" data-action="editar" data-id="${c.id}">Editar</button>
           <button class="btn secondary small" data-action="pdf" data-id="${c.id}" title="Abre el diálogo de impresión: elige 'Guardar como PDF' como destino">Exportar PDF</button>
           <button class="btn secondary small" data-action="email" data-id="${c.id}" title="Descarga el PDF y abre Gmail en una pestaña nueva para redactar el correo">Enviar por correo</button>
           <button class="btn danger small" data-action="eliminar" data-id="${c.id}">Eliminar</button>
@@ -2926,6 +3224,8 @@
 
     if(btn.dataset.action === 'ver'){
       mostrarPreview(cot);
+    } else if(btn.dataset.action === 'editar'){
+      entrarModoEdicion(cot);
     } else if(btn.dataset.action === 'pdf'){
       exportarPDF(cot);
     } else if(btn.dataset.action === 'email'){
