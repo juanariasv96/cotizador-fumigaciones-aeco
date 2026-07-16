@@ -1869,17 +1869,18 @@
     return categoriaServicio === 'Residencial' && p.familia === 'rastrero';
   }
 
-  // Precio real Empresarial (insecto rastrero) por m², calibrado con casos reales del negocio.
-  // No usa la fórmula de costo+margen: esa fórmula sugería precios muy por encima de lo que
-  // realmente se cobra a clientes empresariales (ej. 50 m² sugería ~$4,000 en vez de ~$800 real).
-  const TABLA_EMPRESARIAL_RASTRERO = [
+  // Precio real Empresarial/Industrial por m², calibrado con casos reales del negocio
+  // (sin distinguir familia de plaga). No usa la fórmula de costo+margen: esa fórmula
+  // sugería precios muy por encima de lo que realmente se cobra (ej. 50 m² sugería
+  // ~$4,000 en vez de ~$800 real).
+  const TABLA_EMPRESARIAL_M2 = [
     { m2: 50, precio: 800 },
     { m2: 100, precio: 900 },
     { m2: 200, precio: 1100 },
     { m2: 300, precio: 1300 }, // punto medio del rango real $1,200-$1,400 (varía según el caso)
   ];
   function buscarPrecioEmpresarial(m2){
-    const tabla = TABLA_EMPRESARIAL_RASTRERO;
+    const tabla = TABLA_EMPRESARIAL_M2;
     if(m2 <= 0) return { precio: null, motivo: 'sin-m2' };
     if(m2 <= tabla[0].m2) return { precio: tabla[0].precio, motivo: 'piso-minimo' };
     if(m2 > tabla[tabla.length - 1].m2) return { precio: null, motivo: 'fuera-de-tabla' };
@@ -1894,9 +1895,12 @@
     return { precio: null, motivo: 'fuera-de-tabla' };
   }
 
-  function esServicioRastreroEmpresarial(p){
+  // Empresarial e Industrial usan la tabla de precio real por m² (comparada
+  // contra la fórmula de tiempo) sin importar la familia de plaga; ya no cae
+  // en la fórmula vieja de costo+margen, que sabemos que sale muy alta.
+  function usaTablaM2Empresarial(){
     const categoriaServicio = document.getElementById('categoriaServicio').value;
-    return categoriaServicio === 'Empresarial' && p.familia === 'rastrero';
+    return categoriaServicio === 'Empresarial' || categoriaServicio === 'Industrial';
   }
 
   // Precio sugerido por tiempo real de trabajo, para Empresarial/Industrial.
@@ -2044,7 +2048,7 @@
       return;
     }
 
-    if(esServicioRastreroEmpresarial(p)){
+    if(usaTablaM2Empresarial()){
       const m2 = parseFloat(p.metrosCuadrados) || 0;
       let boxM2;
       if(!m2){
@@ -2054,7 +2058,7 @@
         if(resultado.precio == null){
           boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla Empresarial (máx. 300 m²). Cotiza manualmente.</div>`;
         } else {
-          const comboAplica = hayComboRastreroRoedor();
+          const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
           const bono = comboAplica ? 200 : 0;
           const precioSugerido = resultado.precio + bono;
           boxM2 = `
@@ -2075,36 +2079,25 @@
       return;
     }
 
-    const esEmpresarialOIndustrial = categoriaServicio === 'Empresarial' || categoriaServicio === 'Industrial';
-
+    // A partir de aquí solo llega Residencial (no-rastrero): Empresarial e
+    // Industrial siempre se resuelven arriba con tabla m² + tiempo.
     const calc = calcularCostoServicio(p);
-    let boxCosto;
     if(!calc){
-      boxCosto = `${esEmpresarialOIndustrial ? '<div class="sugerencia-col-titulo">Precio sugerido (costo + margen)</div>' : ''}<div class="hint">Captura los m² del área para calcular el costo real y el precio sugerido.</div>`;
-    } else {
-      const precioActual = parseFloat(p.precioServicio) || 0;
-      const oportunidad = precioActual > 0 && precioActual < calc.precioMeta;
-      boxCosto = `
-        ${esEmpresarialOIndustrial ? '<div class="sugerencia-col-titulo">Precio sugerido (costo + margen)</div>' : ''}
-        <div class="sugerencia-linea"><span>Costo real estimado:</span><strong>${formatMoney(calc.costoTotal)}</strong></div>
-        <div class="sugerencia-linea"><span>Factor de margen aplicado:</span><strong>${calc.factor.toFixed(1)}x</strong></div>
-        <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precioSugerido)}</strong></div>
-        ${calc.comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
-        <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precioSugerido.toFixed(2)}">Usar ${esEmpresarialOIndustrial ? 'este precio' : 'precio sugerido'}</button>
-        ${oportunidad ? `<div class="alerta-margen">⚠ Oportunidad de mejora de margen: el precio meta (factor ${calc.factorMeta.toFixed(1)}x) sería ${formatMoney(calc.precioMeta)}. Uso interno, no se imprime al cliente.</div>` : ''}
-      `;
+      caja.innerHTML = `<div class="hint">Captura los m² del área para calcular el costo real y el precio sugerido.</div>`;
+      return;
     }
 
-    if(esEmpresarialOIndustrial){
-      caja.innerHTML = `
-        <div class="sugerencia-columnas">
-          <div class="sugerencia-col">${boxCosto}</div>
-          <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
-        </div>
-      `;
-    } else {
-      caja.innerHTML = boxCosto;
-    }
+    const precioActual = parseFloat(p.precioServicio) || 0;
+    const oportunidad = precioActual > 0 && precioActual < calc.precioMeta;
+
+    caja.innerHTML = `
+      <div class="sugerencia-linea"><span>Costo real estimado:</span><strong>${formatMoney(calc.costoTotal)}</strong></div>
+      <div class="sugerencia-linea"><span>Factor de margen aplicado:</span><strong>${calc.factor.toFixed(1)}x</strong></div>
+      <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precioSugerido)}</strong></div>
+      ${calc.comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
+      <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precioSugerido.toFixed(2)}">Usar precio sugerido</button>
+      ${oportunidad ? `<div class="alerta-margen">⚠ Oportunidad de mejora de margen: el precio meta (factor ${calc.factorMeta.toFixed(1)}x) sería ${formatMoney(calc.precioMeta)}. Uso interno, no se imprime al cliente.</div>` : ''}
+    `;
   }
 
   function recalcularTodasLasSugerencias(){
