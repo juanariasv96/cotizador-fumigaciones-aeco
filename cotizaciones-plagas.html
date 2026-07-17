@@ -671,6 +671,45 @@
   }
   .qr-item .qr-meta{margin-top:8px;font-size:12px;line-height:1.4;color:#333;}
   .qr-item .qr-meta strong{display:block;font-size:14px;color:var(--verde-oscuro);}
+
+  /* ---------- Mapa del sitio (foto + pines) ---------- */
+  #mapaSitioContenedor{
+    position:relative;
+    display:inline-block;
+    max-width:100%;
+    margin-top:12px;
+  }
+  #mapaSitioImg{
+    max-width:100%;
+    max-height:520px;
+    display:block;
+    border-radius:6px;
+    border:1px solid var(--gris-borde);
+    cursor:crosshair;
+  }
+  .mapa-pin{
+    position:absolute;
+    transform:translate(-50%,-50%);
+    width:28px;height:28px;
+    border-radius:50%;
+    background:var(--verde-oscuro);
+    border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:12px;font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .mapa-pin.inactiva{background:#999;}
+  #mapaSitioInfoPanel{
+    margin-top:12px;
+    padding:12px 14px;
+    background:var(--verde-suave);
+    border:1px solid var(--verde-claro);
+    border-radius:8px;
+    font-size:13px;
+  }
+  #mapaSitioInfoPanel .field{margin-top:8px;max-width:280px;}
 </style>
 </head>
 <body>
@@ -1145,6 +1184,21 @@
       <div id="estacionesClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus estaciones.</div>
 
       <div id="estacionesContenido" class="hidden">
+        <div class="panel" id="mapaSitioPanel" style="margin:16px 0;">
+          <h3 style="margin-top:0;">Mapa del sitio</h3>
+          <p style="font-size:12px;color:#777;margin-top:0;">Sube una foto satelital (Google Maps/Earth) o un plano del lugar, y haz click sobre la imagen para clavar un pin y ubicar cada estación físicamente.</p>
+          <div class="actions-row">
+            <input type="file" id="fotoSitioInput" accept="image/*" class="hidden">
+            <button type="button" class="btn secondary" id="btnSubirFotoSitio">Subir foto del sitio</button>
+          </div>
+          <div id="mapaSitioVacio" class="empty-msg">Este cliente todavía no tiene foto de sitio.</div>
+          <div id="mapaSitioContenedor" class="hidden">
+            <img id="mapaSitioImg" src="" alt="Mapa del sitio">
+            <div id="mapaSitioPines"></div>
+          </div>
+          <div id="mapaSitioInfoPanel" class="hidden"></div>
+        </div>
+
         <div class="grid" id="estacionesFormAgregar" style="margin-top:16px;align-items:end;">
           <div class="field">
             <label for="estacionUbicacion">Ubicación</label>
@@ -1172,7 +1226,37 @@
         </div>
 
         <div class="actions-row" style="margin-top:14px;">
+          <button type="button" class="btn secondary" id="btnMostrarLote">+ Agregar varias estaciones</button>
           <button type="button" class="btn secondary" id="btnImprimirHojaQRs">Imprimir hoja de QRs</button>
+        </div>
+
+        <div id="estacionesLoteForm" class="hidden" style="margin-top:14px;padding:14px;border:1px solid var(--gris-borde);border-radius:8px;background:var(--gris-fondo);">
+          <div class="grid" style="align-items:end;">
+            <div class="field" style="max-width:140px;">
+              <label for="loteCantidad">Cantidad</label>
+              <input type="number" id="loteCantidad" min="1" max="200" step="1" placeholder="Ej. 20">
+            </div>
+            <div class="field">
+              <label for="loteUbicacion">Ubicación</label>
+              <select id="loteUbicacion">
+                <option value="Interior">Interior</option>
+                <option value="Exterior">Exterior</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="loteTipo">Tipo de estación</label>
+              <select id="loteTipo">
+                <option value="Cebadero">Cebadero</option>
+                <option value="Trampa de captura">Trampa de captura</option>
+                <option value="Lámpara UV">Lámpara UV</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="field" style="max-width:200px;">
+              <button type="button" class="btn" id="btnConfirmarLote" style="width:100%;">Crear estaciones</button>
+            </div>
+          </div>
+          <div class="hint">Se crearán numeradas en secuencia, continuando desde el número más alto ya existente para este cliente.</div>
         </div>
 
         <div id="estacionesLista" style="margin-top:18px;"></div>
@@ -1273,8 +1357,6 @@
     document.getElementById('tabBtnAccesos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
-    document.getElementById('estacionesFormAgregar').classList.toggle('hidden',
-      usuarioActual.rol === 'asistente');
 
     // Pre-llenar (sin forzar) quién genera la cotización con el usuario logueado
     const nombreInput = document.getElementById('generadoPorNombre');
@@ -3384,7 +3466,7 @@
   async function cargarClientesParaEstaciones(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono')
+      .select('id, nombre, telefono, foto_sitio_url')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
@@ -3417,9 +3499,10 @@
   function renderEstacionesLista(){
     if(estacionesCache.length === 0){
       estacionesListaEl.innerHTML = `<div class="empty-msg">Este cliente todavía no tiene estaciones registradas.</div>`;
+      renderPinesSitio();
       return;
     }
-    const puedeEditar = !usuarioActual || usuarioActual.rol !== 'asistente';
+    const puedeDesactivar = !usuarioActual || usuarioActual.rol !== 'asistente';
     estacionesListaEl.innerHTML = estacionesCache.map(e => `
       <div class="estacion-row ${e.activo ? '' : 'inactiva'}" data-id="${e.id}">
         <div class="estacion-qr" id="qr-${e.id}"></div>
@@ -3427,7 +3510,7 @@
           <div class="estacion-numero">Estación #${e.numero}${e.activo ? '' : ' (inactiva)'}</div>
           <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
         </div>
-        ${puedeEditar ? `
+        ${puedeDesactivar ? `
         <div class="estacion-acciones">
           <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
         </div>
@@ -3439,6 +3522,8 @@
       const cont = document.getElementById('qr-' + e.id);
       if(cont) new QRCode(cont, { text: URL_BASE_ESTACION + e.id, width: 72, height: 72 });
     });
+
+    renderPinesSitio();
   }
 
   estacionesClienteSelect.addEventListener('change', async ()=>{
@@ -3451,6 +3536,8 @@
     estacionesClienteVacio.classList.add('hidden');
     estacionesContenido.classList.remove('hidden');
     estacionesListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    ocultarMapaSitioInfoPanel();
+    renderMapaSitio();
     await cargarEstacionesDeCliente(estacionesClienteActualId);
     renderEstacionesLista();
   });
@@ -3486,6 +3573,54 @@
     renderEstacionesLista();
   });
 
+  // ---------- Agregar varias estaciones en lote ----------
+  const estacionesLoteForm = document.getElementById('estacionesLoteForm');
+
+  document.getElementById('btnMostrarLote').addEventListener('click', ()=>{
+    estacionesLoteForm.classList.toggle('hidden');
+  });
+
+  document.getElementById('btnConfirmarLote').addEventListener('click', async ()=>{
+    if(!estacionesClienteActualId){
+      alert('Selecciona un cliente primero.');
+      return;
+    }
+    const cantidadInput = document.getElementById('loteCantidad');
+    const cantidad = parseInt(cantidadInput.value, 10);
+    if(!cantidad || cantidad < 1 || cantidad > 200){
+      alert('Indica una cantidad válida (entre 1 y 200).');
+      return;
+    }
+    const ubicacion = document.getElementById('loteUbicacion').value;
+    const tipoEstacion = document.getElementById('loteTipo').value;
+    const base = estacionesCache.reduce((max, e) => Math.max(max, e.numero), 0);
+
+    const nuevas = [];
+    for(let i = 1; i <= cantidad; i++){
+      nuevas.push({
+        cliente_id: estacionesClienteActualId,
+        numero: base + i,
+        ubicacion,
+        tipo_estacion: tipoEstacion,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      });
+    }
+
+    const btn = document.getElementById('btnConfirmarLote');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('estaciones').insert(nuevas);
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudieron crear las estaciones: ' + error.message);
+      return;
+    }
+    cantidadInput.value = '';
+    estacionesLoteForm.classList.add('hidden');
+    await cargarEstacionesDeCliente(estacionesClienteActualId);
+    renderEstacionesLista();
+  });
+
   estacionesListaEl.addEventListener('click', async (e)=>{
     const btn = e.target.closest('[data-toggle-estacion]');
     if(!btn) return;
@@ -3504,6 +3639,166 @@
     await cargarEstacionesDeCliente(estacionesClienteActualId);
     renderEstacionesLista();
   });
+
+  // ---------- Mapa del sitio (foto + pines de estaciones) ----------
+  const fotoSitioInput = document.getElementById('fotoSitioInput');
+  const mapaSitioVacio = document.getElementById('mapaSitioVacio');
+  const mapaSitioContenedor = document.getElementById('mapaSitioContenedor');
+  const mapaSitioImg = document.getElementById('mapaSitioImg');
+  const mapaSitioPines = document.getElementById('mapaSitioPines');
+  const mapaSitioInfoPanel = document.getElementById('mapaSitioInfoPanel');
+
+  function clienteActualDeEstaciones(){
+    return clientesCache.find(c => c.id === estacionesClienteActualId);
+  }
+
+  function ocultarMapaSitioInfoPanel(){
+    mapaSitioInfoPanel.classList.add('hidden');
+    mapaSitioInfoPanel.innerHTML = '';
+  }
+
+  function renderMapaSitio(){
+    const cliente = clienteActualDeEstaciones();
+    if(!cliente || !cliente.foto_sitio_url){
+      mapaSitioVacio.classList.remove('hidden');
+      mapaSitioContenedor.classList.add('hidden');
+      return;
+    }
+    mapaSitioVacio.classList.add('hidden');
+    mapaSitioContenedor.classList.remove('hidden');
+    mapaSitioImg.src = cliente.foto_sitio_url;
+  }
+
+  function renderPinesSitio(){
+    mapaSitioPines.innerHTML = estacionesCache
+      .filter(e => e.pin_x != null && e.pin_y != null)
+      .map(e => `
+        <div class="mapa-pin ${e.activo ? '' : 'inactiva'}" data-pin-estacion="${e.id}"
+             style="left:${(e.pin_x * 100).toFixed(2)}%;top:${(e.pin_y * 100).toFixed(2)}%;"
+             title="Estación #${e.numero}">${e.numero}</div>
+      `).join('');
+  }
+
+  document.getElementById('btnSubirFotoSitio').addEventListener('click', ()=>{
+    if(!estacionesClienteActualId){
+      alert('Selecciona un cliente primero.');
+      return;
+    }
+    fotoSitioInput.click();
+  });
+
+  fotoSitioInput.addEventListener('change', async ()=>{
+    const file = fotoSitioInput.files[0];
+    if(!file) return;
+    const btn = document.getElementById('btnSubirFotoSitio');
+    btn.disabled = true;
+    btn.textContent = 'Subiendo...';
+
+    const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const ruta = `${estacionesClienteActualId}/${Date.now()}.${extension}`;
+
+    const { error: errorSubida } = await supabaseClient.storage
+      .from('sitios-clientes')
+      .upload(ruta, file, { upsert: true });
+
+    if(errorSubida){
+      btn.disabled = false;
+      btn.textContent = 'Subir foto del sitio';
+      alert('No se pudo subir la foto: ' + errorSubida.message);
+      return;
+    }
+
+    const { data: urlData } = supabaseClient.storage
+      .from('sitios-clientes')
+      .getPublicUrl(ruta);
+
+    const { error: errorUpdate } = await supabaseClient
+      .from('clientes')
+      .update({ foto_sitio_url: urlData.publicUrl })
+      .eq('id', estacionesClienteActualId);
+
+    btn.disabled = false;
+    btn.textContent = 'Subir foto del sitio';
+    fotoSitioInput.value = '';
+
+    if(errorUpdate){
+      alert('La foto se subió pero no se pudo guardar en el cliente: ' + errorUpdate.message);
+      return;
+    }
+
+    await cargarClientesParaEstaciones();
+    renderMapaSitio();
+    renderPinesSitio();
+  });
+
+  mapaSitioImg.addEventListener('click', (e)=>{
+    const rect = mapaSitioImg.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    mostrarSelectorNuevoPin(x, y);
+  });
+
+  mapaSitioPines.addEventListener('click', (e)=>{
+    const pin = e.target.closest('[data-pin-estacion]');
+    if(!pin) return;
+    e.stopPropagation();
+    mostrarInfoPin(pin.dataset.pinEstacion);
+  });
+
+  function mostrarSelectorNuevoPin(x, y){
+    const disponibles = estacionesCache.filter(est => est.pin_x == null || est.pin_y == null);
+    if(disponibles.length === 0){
+      mapaSitioInfoPanel.innerHTML = `<div class="hint">Todas las estaciones ya tienen un pin colocado. Agrega más estaciones si necesitas otro punto.</div>`;
+      mapaSitioInfoPanel.classList.remove('hidden');
+      return;
+    }
+    mapaSitioInfoPanel.innerHTML = `
+      <div><strong>Nuevo pin</strong> — elige a qué estación corresponde este punto:</div>
+      <div class="field">
+        <select id="selectorPinEstacion">
+          ${disponibles.map(est => `<option value="${est.id}">Estación #${est.numero} — ${escapeHtml(est.ubicacion)} · ${escapeHtml(est.tipo_estacion)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="actions-row" style="margin-top:10px;">
+        <button type="button" class="btn secondary small" id="btnCancelarPin">Cancelar</button>
+        <button type="button" class="btn small" id="btnConfirmarPin">Colocar pin</button>
+      </div>
+    `;
+    mapaSitioInfoPanel.classList.remove('hidden');
+
+    document.getElementById('btnCancelarPin').addEventListener('click', ocultarMapaSitioInfoPanel);
+    document.getElementById('btnConfirmarPin').addEventListener('click', async ()=>{
+      const estacionId = document.getElementById('selectorPinEstacion').value;
+      const btn = document.getElementById('btnConfirmarPin');
+      btn.disabled = true;
+      const { error } = await supabaseClient
+        .from('estaciones')
+        .update({ pin_x: x, pin_y: y })
+        .eq('id', estacionId);
+      if(error){
+        alert('No se pudo colocar el pin: ' + error.message);
+        btn.disabled = false;
+        return;
+      }
+      ocultarMapaSitioInfoPanel();
+      await cargarEstacionesDeCliente(estacionesClienteActualId);
+      renderEstacionesLista();
+    });
+  }
+
+  function mostrarInfoPin(estacionId){
+    const est = estacionesCache.find(e => e.id === estacionId);
+    if(!est) return;
+    mapaSitioInfoPanel.innerHTML = `
+      <div><strong>Estación #${est.numero}</strong>${est.activo ? '' : ' — Inactiva'}</div>
+      <div>${escapeHtml(est.ubicacion)} · ${escapeHtml(est.tipo_estacion)}${est.notas ? ' · ' + escapeHtml(est.notas) : ''}</div>
+      <div class="actions-row" style="margin-top:10px;">
+        <button type="button" class="btn secondary small" id="btnCerrarInfoPin">Cerrar</button>
+      </div>
+    `;
+    mapaSitioInfoPanel.classList.remove('hidden');
+    document.getElementById('btnCerrarInfoPin').addEventListener('click', ocultarMapaSitioInfoPanel);
+  }
 
   // ---------- Imprimir hoja de QRs ----------
   const qrPrintOverlay = document.getElementById('qrPrintOverlay');

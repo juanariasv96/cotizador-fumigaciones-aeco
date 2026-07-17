@@ -337,6 +337,44 @@ grant select, insert, update, delete on public.estaciones to authenticated;
 
 
 -- ---------------------------------------------------------------------
+-- 7. MAPA VISUAL DEL SITIO (foto por cliente + pines de estaciones)
+-- ---------------------------------------------------------------------
+
+-- Foto del sitio (satelital o plano) por cliente. Se guarda en Supabase
+-- Storage; aquí solo se guarda la URL pública del archivo.
+alter table public.clientes add column if not exists foto_sitio_url text;
+
+-- Posición del pin sobre la foto del sitio, como fracción 0-1 del ancho/alto
+-- de la imagen (no en píxeles), para que no dependa del tamaño en que se
+-- muestre la imagen. null mientras la estación no tenga pin colocado.
+alter table public.estaciones add column if not exists pin_x numeric;
+alter table public.estaciones add column if not exists pin_y numeric;
+
+-- Bucket público para las fotos de sitio. Público en LECTURA (son fotos
+-- satelitales/planos, no información sensible) para poder mostrarlas con
+-- una URL directa sin firmar; solo el equipo autenticado puede subir/borrar.
+insert into storage.buckets (id, name, public)
+values ('sitios-clientes', 'sitios-clientes', true)
+on conflict (id) do nothing;
+
+drop policy if exists "sitios_select_publico" on storage.objects;
+create policy "sitios_select_publico" on storage.objects
+  for select using (bucket_id = 'sitios-clientes');
+
+drop policy if exists "sitios_insert_equipo" on storage.objects;
+create policy "sitios_insert_equipo" on storage.objects
+  for insert to authenticated with check (bucket_id = 'sitios-clientes');
+
+drop policy if exists "sitios_update_equipo" on storage.objects;
+create policy "sitios_update_equipo" on storage.objects
+  for update to authenticated using (bucket_id = 'sitios-clientes') with check (bucket_id = 'sitios-clientes');
+
+drop policy if exists "sitios_delete_equipo" on storage.objects;
+create policy "sitios_delete_equipo" on storage.objects
+  for delete to authenticated using (bucket_id = 'sitios-clientes');
+
+
+-- ---------------------------------------------------------------------
 -- Listo. Después de correr esto:
 --   1. Ve a Authentication > Users > "Add user" y crea una cuenta para
 --      cada persona del equipo (email + password).
