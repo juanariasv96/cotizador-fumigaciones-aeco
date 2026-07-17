@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizaciones - Control de Plagas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --verde-oscuro:#016937;
@@ -506,6 +507,18 @@
     padding:0;
     box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
+  #qrPrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #qrPrintSheet{
+    background:var(--blanco);
+    width:100%;max-width:900px;
+    border-radius:6px;
+    padding:0;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
   .print-toolbar{
     display:flex;justify-content:flex-end;gap:10px;
     padding:14px;background:var(--gris-fondo);border-bottom:1px solid var(--gris-borde);
@@ -607,9 +620,11 @@
     @page{
       margin:10mm;
     }
-    body > *:not(#printOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
     #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+    #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
+    #qrPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     .print-toolbar{display:none;}
 
     .doc{padding:0;}
@@ -622,6 +637,40 @@
     .doc-seals .seal img{height:42px;}
     .doc-footer{margin-top:8px;padding-top:8px;}
   }
+
+  /* ---------- Estaciones / QRs ---------- */
+  .estacion-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:12px 14px;
+    border:1px solid var(--gris-borde);
+    border-radius:8px;
+    margin-bottom:10px;
+    background:var(--blanco);
+  }
+  .estacion-row.inactiva{opacity:.55;background:var(--gris-fondo);}
+  .estacion-row .estacion-qr{flex:0 0 auto;}
+  .estacion-row .estacion-info{flex:1 1 auto;}
+  .estacion-row .estacion-info .estacion-numero{font-size:15px;font-weight:700;color:var(--verde-oscuro);}
+  .estacion-row .estacion-info .estacion-meta{font-size:12px;color:#666;margin-top:2px;}
+  .estacion-row .estacion-acciones{flex:0 0 auto;}
+
+  .qr-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:14px;
+  }
+  .qr-item{
+    border:1px dashed #999;
+    border-radius:6px;
+    padding:12px;
+    text-align:center;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .qr-item .qr-meta{margin-top:8px;font-size:12px;line-height:1.4;color:#333;}
+  .qr-item .qr-meta strong{display:block;font-size:14px;color:var(--verde-oscuro);}
 </style>
 </head>
 <body>
@@ -667,6 +716,7 @@
   <button class="tab-btn active" data-tab="nueva">Nueva Cotización</button>
   <button class="tab-btn" data-tab="lista">Cotizaciones Guardadas</button>
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
+  <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
 </nav>
 
@@ -1080,6 +1130,56 @@
     </div>
   </section>
 
+  <!-- ================= TAB: ESTACIONES (dueño y técnico) ================= -->
+  <section id="tab-estaciones" class="hidden">
+    <div class="panel">
+      <h2>Estaciones / Cajas de cliente</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Cebaderos, trampas de captura y lámparas UV instaladas en las instalaciones de un cliente. Cada estación tiene su propio código QR para identificarla en campo.</p>
+      <div class="field" style="max-width:420px;">
+        <label for="estacionesClienteSelect">Selecciona un cliente</label>
+        <select id="estacionesClienteSelect">
+          <option value="">Selecciona...</option>
+        </select>
+      </div>
+
+      <div id="estacionesClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus estaciones.</div>
+
+      <div id="estacionesContenido" class="hidden">
+        <div class="grid" style="margin-top:16px;align-items:end;">
+          <div class="field">
+            <label for="estacionUbicacion">Ubicación</label>
+            <select id="estacionUbicacion">
+              <option value="Interior">Interior</option>
+              <option value="Exterior">Exterior</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="estacionTipo">Tipo de estación</label>
+            <select id="estacionTipo">
+              <option value="Cebadero">Cebadero</option>
+              <option value="Trampa de captura">Trampa de captura</option>
+              <option value="Lámpara UV">Lámpara UV</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="estacionNotas">Notas (opcional)</label>
+            <input type="text" id="estacionNotas" placeholder="Ej. Junto a la puerta trasera">
+          </div>
+          <div class="field" style="max-width:220px;">
+            <button type="button" class="btn" id="btnAgregarEstacion" style="width:100%;">+ Agregar estación</button>
+          </div>
+        </div>
+
+        <div class="actions-row" style="margin-top:14px;">
+          <button type="button" class="btn secondary" id="btnImprimirHojaQRs">Imprimir hoja de QRs</button>
+        </div>
+
+        <div id="estacionesLista" style="margin-top:18px;"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= TAB: ACCESOS (solo dueño) ================= -->
   <section id="tab-accesos" class="hidden">
     <div class="panel">
@@ -1092,6 +1192,17 @@
 </main>
 
 </div><!-- /#appRoot -->
+
+<!-- ================= OVERLAY DE IMPRESIÓN DE QRs ================= -->
+<div id="qrPrintOverlay" class="hidden">
+  <div id="qrPrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarQrPreview">Cerrar</button>
+      <button class="btn" id="btnImprimirQr">Imprimir</button>
+    </div>
+    <div class="doc" id="qrDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
 
 <!-- ================= OVERLAY DE IMPRESIÓN ================= -->
 <div id="printOverlay" class="hidden">
@@ -1160,6 +1271,8 @@
     document.getElementById('usuarioActualNombre').textContent =
       usuarioActual.nombre + (usuarioActual.rol ? ` (${usuarioActual.rol})` : '');
     document.getElementById('tabBtnAccesos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
+    document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
+      usuarioActual.rol !== 'dueño' && usuarioActual.rol !== 'tecnico');
 
     // Pre-llenar (sin forzar) quién genera la cotización con el usuario logueado
     const nombreInput = document.getElementById('generadoPorNombre');
@@ -1656,6 +1769,7 @@
     nueva: document.getElementById('tab-nueva'),
     lista: document.getElementById('tab-lista'),
     empresa: document.getElementById('tab-empresa'),
+    estaciones: document.getElementById('tab-estaciones'),
     accesos: document.getElementById('tab-accesos'),
   };
   function activarTab(nombre){
@@ -1664,6 +1778,7 @@
     tabs[nombre].classList.remove('hidden');
     if(nombre === 'lista') renderLista();
     if(nombre === 'accesos') cargarRegistroAccesos();
+    if(nombre === 'estaciones') cargarClientesParaEstaciones();
   }
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
@@ -3246,6 +3361,182 @@
     a.download = "respaldo_cotizaciones_" + new Date().toISOString().slice(0,10) + ".json";
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+
+  // ---------- Estaciones / Cajas de cliente (QR) ----------
+  // El QR codifica una URL con el id real de la estación; en la siguiente
+  // fase el técnico la escanea en campo y el sistema sabe exactamente
+  // qué caja es sin tener que teclear nada.
+  const URL_BASE_ESTACION = 'https://juanariasv96.github.io/cotizador-fumigaciones-aeco/?estacion=';
+
+  let clientesCache = [];
+  let estacionesClienteActualId = '';
+  let estacionesCache = [];
+
+  const estacionesClienteSelect = document.getElementById('estacionesClienteSelect');
+  const estacionesClienteVacio = document.getElementById('estacionesClienteVacio');
+  const estacionesContenido = document.getElementById('estacionesContenido');
+  const estacionesListaEl = document.getElementById('estacionesLista');
+
+  async function cargarClientesParaEstaciones(){
+    const { data, error } = await supabaseClient
+      .from('clientes')
+      .select('id, nombre, telefono')
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los clientes:', error);
+      return;
+    }
+    clientesCache = data || [];
+    const seleccionActual = estacionesClienteSelect.value;
+    estacionesClienteSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      clientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}${c.telefono ? ' — ' + escapeHtml(c.telefono) : ''}</option>`).join('');
+    if(seleccionActual && clientesCache.some(c => c.id === seleccionActual)){
+      estacionesClienteSelect.value = seleccionActual;
+    }
+  }
+
+  async function cargarEstacionesDeCliente(clienteId){
+    const { data, error } = await supabaseClient
+      .from('estaciones')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('numero');
+    if(error){
+      console.error('No se pudieron cargar las estaciones:', error);
+      alert('No se pudieron cargar las estaciones: ' + error.message);
+      estacionesCache = [];
+      return;
+    }
+    estacionesCache = data || [];
+  }
+
+  function renderEstacionesLista(){
+    if(estacionesCache.length === 0){
+      estacionesListaEl.innerHTML = `<div class="empty-msg">Este cliente todavía no tiene estaciones registradas.</div>`;
+      return;
+    }
+    estacionesListaEl.innerHTML = estacionesCache.map(e => `
+      <div class="estacion-row ${e.activo ? '' : 'inactiva'}" data-id="${e.id}">
+        <div class="estacion-qr" id="qr-${e.id}"></div>
+        <div class="estacion-info">
+          <div class="estacion-numero">Estación #${e.numero}${e.activo ? '' : ' (inactiva)'}</div>
+          <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
+        </div>
+        <div class="estacion-acciones">
+          <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
+        </div>
+      </div>
+    `).join('');
+
+    estacionesCache.forEach(e => {
+      const cont = document.getElementById('qr-' + e.id);
+      if(cont) new QRCode(cont, { text: URL_BASE_ESTACION + e.id, width: 72, height: 72 });
+    });
+  }
+
+  estacionesClienteSelect.addEventListener('change', async ()=>{
+    estacionesClienteActualId = estacionesClienteSelect.value;
+    if(!estacionesClienteActualId){
+      estacionesClienteVacio.classList.remove('hidden');
+      estacionesContenido.classList.add('hidden');
+      return;
+    }
+    estacionesClienteVacio.classList.add('hidden');
+    estacionesContenido.classList.remove('hidden');
+    estacionesListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    await cargarEstacionesDeCliente(estacionesClienteActualId);
+    renderEstacionesLista();
+  });
+
+  document.getElementById('btnAgregarEstacion').addEventListener('click', async ()=>{
+    if(!estacionesClienteActualId){
+      alert('Selecciona un cliente primero.');
+      return;
+    }
+    const ubicacion = document.getElementById('estacionUbicacion').value;
+    const tipoEstacion = document.getElementById('estacionTipo').value;
+    const notas = document.getElementById('estacionNotas').value.trim();
+    const siguienteNumero = estacionesCache.reduce((max, e) => Math.max(max, e.numero), 0) + 1;
+
+    const btn = document.getElementById('btnAgregarEstacion');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('estaciones').insert({
+      cliente_id: estacionesClienteActualId,
+      numero: siguienteNumero,
+      ubicacion,
+      tipo_estacion: tipoEstacion,
+      notas: notas || null,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudo agregar la estación: ' + error.message);
+      return;
+    }
+    document.getElementById('estacionNotas').value = '';
+    await cargarEstacionesDeCliente(estacionesClienteActualId);
+    renderEstacionesLista();
+  });
+
+  estacionesListaEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('[data-toggle-estacion]');
+    if(!btn) return;
+    const id = btn.dataset.toggleEstacion;
+    const activoActual = btn.dataset.activo === 'true';
+    btn.disabled = true;
+    const { error } = await supabaseClient
+      .from('estaciones')
+      .update({ activo: !activoActual })
+      .eq('id', id);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo actualizar la estación: ' + error.message);
+      return;
+    }
+    await cargarEstacionesDeCliente(estacionesClienteActualId);
+    renderEstacionesLista();
+  });
+
+  // ---------- Imprimir hoja de QRs ----------
+  const qrPrintOverlay = document.getElementById('qrPrintOverlay');
+  const qrDocContent = document.getElementById('qrDocContent');
+
+  document.getElementById('btnImprimirHojaQRs').addEventListener('click', ()=>{
+    const activas = estacionesCache.filter(e => e.activo);
+    if(activas.length === 0){
+      alert('Este cliente no tiene estaciones activas para imprimir.');
+      return;
+    }
+    const cliente = clientesCache.find(c => c.id === estacionesClienteActualId);
+    qrDocContent.innerHTML = `
+      <h2 style="margin-top:0;">Estaciones — ${escapeHtml(cliente ? cliente.nombre : '')}</h2>
+      <div class="qr-grid">
+        ${activas.map(e => `
+          <div class="qr-item">
+            <div id="qrprint-${e.id}"></div>
+            <div class="qr-meta">
+              <strong>Estación #${e.numero}</strong>
+              ${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    activas.forEach(e => {
+      const cont = document.getElementById('qrprint-' + e.id);
+      if(cont) new QRCode(cont, { text: URL_BASE_ESTACION + e.id, width: 110, height: 110 });
+    });
+    qrPrintOverlay.classList.remove('hidden');
+  });
+
+  document.getElementById('btnCerrarQrPreview').addEventListener('click', ()=>{
+    qrPrintOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnImprimirQr').addEventListener('click', ()=>{
+    window.print();
   });
 
 

@@ -296,6 +296,47 @@ grant select, insert, update          on public.configuracion_empresa to authent
 
 
 -- ---------------------------------------------------------------------
+-- 6. ESTACIONES (cajas/trampas de cliente — base del módulo de reportes
+--    de campo). Se agrega como bloque aparte para poder correr solo esto
+--    si el resto del script ya se corrió antes.
+-- ---------------------------------------------------------------------
+
+create table if not exists public.estaciones (
+  id             uuid primary key default gen_random_uuid(),
+  cliente_id     uuid not null references public.clientes(id),
+  numero         integer not null,        -- número de estación DENTRO de ese cliente (1, 2, 3...), no global
+  ubicacion      text not null check (ubicacion in ('Interior', 'Exterior')),
+  tipo_estacion  text not null check (tipo_estacion in ('Cebadero', 'Trampa de captura', 'Lámpara UV', 'Otro')),
+  activo         boolean not null default true,   -- para desactivar sin borrar si se quita una caja física
+  notas          text,
+  creado_por     uuid references auth.users(id),
+  fecha_creacion timestamptz not null default now(),
+  unique (cliente_id, numero)
+);
+
+alter table public.estaciones enable row level security;
+
+-- Mismo criterio de equipo compartido que clientes/cotizaciones.
+drop policy if exists "estaciones_select_equipo" on public.estaciones;
+create policy "estaciones_select_equipo" on public.estaciones
+  for select to authenticated using (true);
+
+drop policy if exists "estaciones_insert_equipo" on public.estaciones;
+create policy "estaciones_insert_equipo" on public.estaciones
+  for insert to authenticated with check (true);
+
+drop policy if exists "estaciones_update_equipo" on public.estaciones;
+create policy "estaciones_update_equipo" on public.estaciones
+  for update to authenticated using (true) with check (true);
+
+drop policy if exists "estaciones_delete_equipo" on public.estaciones;
+create policy "estaciones_delete_equipo" on public.estaciones
+  for delete to authenticated using (true);
+
+grant select, insert, update, delete on public.estaciones to authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- Listo. Después de correr esto:
 --   1. Ve a Authentication > Users > "Add user" y crea una cuenta para
 --      cada persona del equipo (email + password).
