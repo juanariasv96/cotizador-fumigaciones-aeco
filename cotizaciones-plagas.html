@@ -1145,7 +1145,7 @@
       <div id="estacionesClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus estaciones.</div>
 
       <div id="estacionesContenido" class="hidden">
-        <div class="grid" style="margin-top:16px;align-items:end;">
+        <div class="grid" id="estacionesFormAgregar" style="margin-top:16px;align-items:end;">
           <div class="field">
             <label for="estacionUbicacion">Ubicación</label>
             <select id="estacionUbicacion">
@@ -1272,7 +1272,9 @@
       usuarioActual.nombre + (usuarioActual.rol ? ` (${usuarioActual.rol})` : '');
     document.getElementById('tabBtnAccesos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
-      usuarioActual.rol !== 'dueño' && usuarioActual.rol !== 'tecnico');
+      !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('estacionesFormAgregar').classList.toggle('hidden',
+      usuarioActual.rol === 'asistente');
 
     // Pre-llenar (sin forzar) quién genera la cotización con el usuario logueado
     const nombreInput = document.getElementById('generadoPorNombre');
@@ -3417,6 +3419,7 @@
       estacionesListaEl.innerHTML = `<div class="empty-msg">Este cliente todavía no tiene estaciones registradas.</div>`;
       return;
     }
+    const puedeEditar = !usuarioActual || usuarioActual.rol !== 'asistente';
     estacionesListaEl.innerHTML = estacionesCache.map(e => `
       <div class="estacion-row ${e.activo ? '' : 'inactiva'}" data-id="${e.id}">
         <div class="estacion-qr" id="qr-${e.id}"></div>
@@ -3424,9 +3427,11 @@
           <div class="estacion-numero">Estación #${e.numero}${e.activo ? '' : ' (inactiva)'}</div>
           <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
         </div>
+        ${puedeEditar ? `
         <div class="estacion-acciones">
           <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
         </div>
+        ` : ''}
       </div>
     `).join('');
 
