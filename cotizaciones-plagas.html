@@ -1902,15 +1902,65 @@
 
   // ---------- Plantillas técnicas por tipo de plaga ----------
   const PLANTILLAS = {
+    // Plantilla general de insectos rastreros: se usa cuando ya hay OTRO insecto
+    // rastrero en la misma cotización (ver RASTRERO_PLANTILLA_INDIVIDUAL abajo).
     rastrero: {
       descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios de los insectos rastreros, incluyendo cucarachas, hormigas, arañas, pulgas, garrapatas, alacranes, tarántulas y ciempiés. Los productos se rotan constantemente para evitar la generación de resistencias, garantizando resultados óptimos y duraderos.",
-      productos: "Urbatrim Flow (Deltametrina, inodoro), Termidor (Fipronil, inodoro), Alstar Duo (Bifentrina + Imidacloprid, inodoro)",
+      productos: "Urbatrine Flow (Deltametrina, inodoro), Termidor (Fipronil, inodoro), Alstar Duo (Bifentrina + Imidacloprid, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    cucarachas: {
+      descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios de la cucaracha: grietas, tuberías, coladeras y rincones.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro), Alstar Duo (Bifentrina + Imidacloprid, gel)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    hormigas: {
+      descripcion: "Se identificará el rastro y posible nido, aplicando cebo en gel y aspersión perimetral en puntos de entrada.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro), Alstar Duo (Bifentrina + Imidacloprid, gel)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    aranas: {
+      descripcion: "Se realizará aspersión residual en rincones, techos, marcos de puertas/ventanas y áreas exteriores, con retiro físico de telarañas existentes.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    pulgas: {
+      descripcion: "Se realizará aspersión en pisos, alfombras y áreas de descanso de mascotas.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    garrapatas: {
+      descripcion: "Se realizará aspersión perimetral en jardín, pasto y muros exteriores con producto de acción residual.",
+      productos: "Termidor SC (Fipronil 9.1%)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    escorpiones_alacranes: {
+      descripcion: "Se realizará aspersión residual perimetral, sellado de grietas de acceso y tratamiento en jardín/áreas exteriores.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    tarantulas: {
+      descripcion: "Se realizará aspersión perimetral exterior y revisión de posibles madrigueras, con el mismo enfoque profesional usado para arácnidos.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    ciempies: {
+      descripcion: "Se realizará aspersión perimetral, control de humedad y sellado de grietas de acceso.",
+      productos: "Termidor SC (Fipronil 9.1%)",
       garantia: "30 días",
       advertencia: "",
     },
     termitas: {
-      descripcion: "El servicio se realiza mediante la inyección de producto termiticida a los pisos o muros, dependiendo el área y tipo de construcción, mediante equipo especializado de alta presión a través de perforaciones que son resanadas al finalizar. Producto: Termidor SC (fipronil) al 1%.",
-      productos: "Termidor SC (Fipronil al 1%)",
+      descripcion: "El servicio se realiza mediante la inyección de producto termiticida a los pisos o muros, dependiendo el área y tipo de construcción, mediante equipo especializado de alta presión a través de perforaciones que son resanadas al finalizar. Producto: Termidor SC (fipronil) al 9.1%.",
+      productos: "Termidor SC (Fipronil 9.1%)",
       garantia: "3 años",
       advertencia: "IMPORTANTE: Se requiere el plano arquitectónico del inmueble para identificar la trayectoria de instalaciones (ductos y tuberías). Cualquier daño en estas será cubierto por la compañía; en caso contrario, el costo de reparación será por cuenta del cliente.",
     },
@@ -1928,9 +1978,93 @@
     },
     cucaracha_alemana: {
       descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios de la cucaracha alemana en dos aplicaciones, con rotación de productos para evitar la generación de resistencias y romper el ciclo reproductivo de la plaga.",
-      productos: "Urbatrim Flow (Deltametrina, inodoro), Termidor (Fipronil, inodoro), Alstar Duo (Bifentrina + Imidacloprid, inodoro)",
+      productos: "Urbatrine Flow (Deltametrina, inodoro), Termidor (Fipronil, inodoro), Alstar Duo (Bifentrina + Imidacloprid, inodoro)",
       garantia: "30 días",
       advertencia: "Área cerrada al menos 4 horas tras la aplicación 1. Mantener áreas libres de alimentos 14 días (aplicación 1) y 7 días (aplicación 2).",
+    },
+    pez_plateado: {
+      descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios del pez plateado, enfocando libros, papel, closets y zonas de humedad.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    gorgojos: {
+      descripcion: "Se realizará aspersión minuciosa en todas las áreas de almacenamiento propias del gorgojo, con revisión de empaques y productos a granel.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    chinches: {
+      descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios de la chinche, incluyendo colchones, marcos de cama y muebles cercanos al área de descanso.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    cochinillas: {
+      descripcion: "Se realizará aspersión minuciosa en todos los escondrijos propios de la cochinilla, enfocando zonas húmedas, baños y sótanos.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    caracoles: {
+      descripcion: "Se realizará aplicación de cebo molusquicida en todas las áreas propias del caracol, principalmente jardín y zonas húmedas exteriores.",
+      productos: "Cebo granulado a base de Metaldehído",
+      garantia: "30 días",
+      advertencia: "Mantener fuera del alcance de mascotas y niños; el metaldehído es tóxico si se ingiere.",
+    },
+    pulgones: {
+      descripcion: "Se realizará aplicación foliar en todas las plantas y áreas de jardín afectadas por pulgón.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    gallina_ciega: {
+      descripcion: "Se realizará aplicación en suelo y jardín para control de larvas de gallina ciega.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    fumigacion_general: {
+      descripcion: "Se realizará aspersión residual perimetral e interior en todas las áreas indicadas, dirigida al control de insectos rastreros comunes.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "30 días",
+      advertencia: "",
+    },
+    abejas: {
+      descripcion: "Se realizará retiro y reubicación del panal por personal capacitado. No se recomienda exterminio directo por tratarse de un polinizador protegido.",
+      productos: "Equipo de protección apícola; sin aplicación de insecticida",
+      garantia: "",
+      advertencia: "Servicio sujeto a inspección previa; el costo puede variar según ubicación y tamaño del panal.",
+    },
+    avispas: {
+      descripcion: "Se realizará retiro del nido con equipo de protección adecuado, aplicando insecticida dirigido únicamente al nido.",
+      productos: "Urbatrine Flow (Deltametrina, inodoro)",
+      garantia: "",
+      advertencia: "Servicio sujeto a inspección previa; el costo puede variar según ubicación y tamaño del nido.",
+    },
+    murcielago: {
+      descripcion: "Se realizará exclusión no letal: verificación de salida del refugio y sellado posterior de puntos de acceso.",
+      productos: "Sin aplicación de plaguicida; material de sellado",
+      garantia: "",
+      advertencia: "Especie protegida; no se permite el uso de veneno. Servicio sujeto a inspección previa.",
+    },
+    tlacuache: {
+      descripcion: "Se realizará captura y reubicación del ejemplar, con sellado de puntos de acceso identificados.",
+      productos: "Trampa de captura viva; sin aplicación de veneno",
+      garantia: "",
+      advertencia: "Servicio sujeto a inspección previa.",
+    },
+    zorrillo: {
+      descripcion: "Se realizará ahuyentamiento/captura del ejemplar, sellado de refugios y recomendaciones de manejo de residuos como atrayente.",
+      productos: "Trampa de captura viva; sin aplicación de veneno",
+      garantia: "",
+      advertencia: "Servicio sujeto a inspección previa.",
+    },
+    palomas: {
+      descripcion: "Se realizará instalación de malla o púas anti-aves en los puntos de anidación identificados (control físico, no exterminio).",
+      productos: "Malla/púas anti-aves",
+      garantia: "1 año (material)",
+      advertencia: "",
     },
   };
   PLANTILLAS.combinada = {
@@ -1956,6 +2090,34 @@
     "Moscas": "volador",
     "Zancudos y mosquitos": "volador",
     "Póliza combinada": "combinada",
+    "Pez plateado": "pez_plateado",
+    "Gorgojos": "gorgojos",
+    "Chinches": "chinches",
+    "Cochinillas": "cochinillas",
+    "Caracoles": "caracoles",
+    "Pulgones": "pulgones",
+    "Gallina ciega": "gallina_ciega",
+    "Fumigación general": "fumigacion_general",
+    "Abejas": "abejas",
+    "Avispas": "avispas",
+    "Murciélago": "murcielago",
+    "Tlacuache": "tlacuache",
+    "Zorrillo": "zorrillo",
+    "Palomas": "palomas",
+  };
+
+  // Plantilla de TEXTO (no de precio) para cada insecto rastrero específico.
+  // p.familia sigue siendo 'rastrero' para todos (tabla de zona, combo, etc. sin cambios);
+  // esto solo decide qué descripción/productos se precargan al agregar la plaga.
+  const RASTRERO_PLANTILLA_INDIVIDUAL = {
+    "Cucarachas": "cucarachas",
+    "Hormigas": "hormigas",
+    "Arañas": "aranas",
+    "Pulgas": "pulgas",
+    "Garrapatas": "garrapatas",
+    "Escorpiones y alacranes": "escorpiones_alacranes",
+    "Tarántulas": "tarantulas",
+    "Ciempiés": "ciempies",
   };
 
   const TABLA_TERMITAS = [
@@ -2231,7 +2393,15 @@
       return null;
     }
     const key = PLAGA_A_PLANTILLA[tipoPlaga.value];
-    const plantilla = key ? PLANTILLAS[key] : null;
+    // Para insectos rastreros: si es el único de la familia en esta cotización, usa su
+    // plantilla individual; si ya hay otro rastrero agregado, usa la plantilla combinada
+    // (no reescribe la de las plagas ya agregadas, solo decide la de esta nueva).
+    let plantillaKey = key;
+    if(key === 'rastrero' && RASTRERO_PLANTILLA_INDIVIDUAL[tipoPlaga.value]){
+      const yaHayOtroRastrero = plagasSeleccionadas.some(p => p.familia === 'rastrero');
+      plantillaKey = yaHayOtroRastrero ? 'rastrero' : RASTRERO_PLANTILLA_INDIVIDUAL[tipoPlaga.value];
+    }
+    const plantilla = plantillaKey ? PLANTILLAS[plantillaKey] : null;
     return {
       id: 'plaga_' + (++plagaIdCounter),
       tipoPlaga: nombre,
