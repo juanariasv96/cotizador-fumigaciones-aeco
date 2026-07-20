@@ -1964,38 +1964,6 @@
     "Póliza combinada": "combinada",
   };
 
-  // ---------- Calculadora de "Precio sugerido" (costo real + factor de margen) ----------
-  const TABLA_INSUMOS = [
-    { max: 100, litros: 2, minPrep: 3, minServicio: 30 },
-    { max: 200, litros: 4, minPrep: 4, minServicio: 35 },
-    { max: 300, litros: 6, minPrep: 5, minServicio: 45 },
-    { max: 400, litros: 8, minPrep: 6, minServicio: 50 },
-    { max: 600, litros: 10, minPrep: 10, minServicio: 60 },
-    { max: 800, litros: 14, minPrep: 12, minServicio: 70 },
-    { max: 1000, litros: 16, minPrep: 15, minServicio: 80 },
-    { max: 1500, litros: 24, minPrep: 20, minServicio: 90 },
-    { max: 2000, litros: 32, minPrep: 25, minServicio: 100 },
-    { max: 4000, litros: 64, minPrep: 30, minServicio: 140 },
-    { max: 6000, litros: 96, minPrep: 45, minServicio: 180 },
-  ];
-  function buscarInsumos(m2){
-    for(const fila of TABLA_INSUMOS){ if(m2 <= fila.max) return fila; }
-    return TABLA_INSUMOS[TABLA_INSUMOS.length - 1];
-  }
-
-  const TABLA_FACTOR_MARGEN = [
-    { max: 200, factor: 2.5, factorMeta: 3.5 },
-    { max: 500, factor: 2.2, factorMeta: 3.2 },
-    { max: 1000, factor: 2.0, factorMeta: 3.0 },
-    { max: 2500, factor: 1.7, factorMeta: 2.9 },
-    { max: 5000, factor: 1.6, factorMeta: 2.8 },
-    { max: 20000, factor: 1.5, factorMeta: 2.7 },
-  ];
-  function buscarFactorMargen(costo){
-    for(const fila of TABLA_FACTOR_MARGEN){ if(costo <= fila.max) return fila; }
-    return TABLA_FACTOR_MARGEN[TABLA_FACTOR_MARGEN.length - 1];
-  }
-
   const TABLA_TERMITAS = [
     { max: 10, precio: 1500 },
     { max: 60, precio: 3500 },
@@ -2072,14 +2040,17 @@
   // (sin distinguir familia de plaga). No usa la fórmula de costo+margen: esa fórmula
   // sugería precios muy por encima de lo que realmente se cobra (ej. 50 m² sugería
   // ~$4,000 en vez de ~$800 real).
-  const TABLA_EMPRESARIAL_M2 = [
+  // Se reutiliza también como referencia inicial para Residencial (no-rastrero): no está
+  // calibrada exacta para Residencial todavía, pero evita caer en costo+margen mientras
+  // se ajusta con datos reales.
+  const TABLA_M2_REFERENCIA = [
     { m2: 50, precio: 800 },
     { m2: 100, precio: 900 },
     { m2: 200, precio: 1100 },
     { m2: 300, precio: 1300 }, // punto medio del rango real $1,200-$1,400 (varía según el caso)
   ];
-  function buscarPrecioEmpresarial(m2){
-    const tabla = TABLA_EMPRESARIAL_M2;
+  function buscarPrecioM2(m2){
+    const tabla = TABLA_M2_REFERENCIA;
     if(m2 <= 0) return { precio: null, motivo: 'sin-m2' };
     if(m2 <= tabla[0].m2) return { precio: tabla[0].precio, motivo: 'piso-minimo' };
     if(m2 > tabla[tabla.length - 1].m2) return { precio: null, motivo: 'fuera-de-tabla' };
@@ -2092,14 +2063,6 @@
       }
     }
     return { precio: null, motivo: 'fuera-de-tabla' };
-  }
-
-  // Empresarial e Industrial usan la tabla de precio real por m² (comparada
-  // contra la fórmula de tiempo) sin importar la familia de plaga; ya no cae
-  // en la fórmula vieja de costo+margen, que sabemos que sale muy alta.
-  function usaTablaM2Empresarial(){
-    const categoriaServicio = document.getElementById('categoriaServicio').value;
-    return categoriaServicio === 'Empresarial' || categoriaServicio === 'Industrial';
   }
 
   // Precio sugerido por tiempo real de trabajo, para Empresarial/Industrial.
@@ -2127,42 +2090,9 @@
     `;
   }
 
-  function costoBasePorLitro(quimico, emp){
-    const mapa = {
-      'Biothrine': emp.costoBiothrine != null ? emp.costoBiothrine : 900,
-      'Termidol': emp.costoTermidol != null ? emp.costoTermidol : 650,
-      'Cirano': emp.costoCirano != null ? emp.costoCirano : 700,
-      'Combinación': emp.costoCombinacion != null ? emp.costoCombinacion : 750,
-    };
-    return mapa[quimico] != null ? mapa[quimico] : (emp.costoCombinacion != null ? emp.costoCombinacion : 750);
-  }
-
   function hayComboRastreroRoedor(){
     const familias = plagasSeleccionadas.map(p => p.familia);
     return familias.includes('rastrero') && familias.includes('roedores');
-  }
-
-  function calcularCostoServicio(p){
-    const m2 = parseFloat(p.metrosCuadrados) || 0;
-    if(!m2) return null;
-    const emp = getEmpresa();
-    const kmRecorrido = parseFloat(document.getElementById('kmRecorrido').value) || 0;
-
-    const insumos = buscarInsumos(m2);
-    const costoQuimico = insumos.litros * costoBasePorLitro(p.quimico, emp);
-    const minutosTotales = insumos.minPrep + insumos.minServicio;
-    const costoManoObra = minutosTotales * (emp.costoManoObraMin != null ? emp.costoManoObraMin : 1.20);
-    const costoAdmin = emp.costoAdministrativo != null ? emp.costoAdministrativo : 64;
-    const costoTraslado = kmRecorrido * (emp.costoPorKm != null ? emp.costoPorKm : 1.50);
-    const costoTotal = costoQuimico + costoManoObra + costoAdmin + costoTraslado;
-
-    const { factor, factorMeta } = buscarFactorMargen(costoTotal);
-    const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
-    const bonoCombo = comboAplica ? 200 : 0;
-    const precioSugerido = costoTotal * factor + bonoCombo;
-    const precioMeta = costoTotal * factorMeta + bonoCombo;
-
-    return { m2, insumos, costoQuimico, costoManoObra, costoAdmin, costoTraslado, costoTotal, factor, factorMeta, precioSugerido, precioMeta, comboAplica };
   }
 
   function actualizarSugerenciaCard(p){
@@ -2247,55 +2177,35 @@
       return;
     }
 
-    if(usaTablaM2Empresarial()){
-      const m2 = parseFloat(p.metrosCuadrados) || 0;
-      let boxM2;
-      if(!m2){
-        boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Captura los m² del área para ver este precio.</div>`;
+    // A partir de aquí: Empresarial/Industrial (cualquier familia) y Residencial
+    // no cubierto arriba (fumigación general, combinada, etc.) usan la tabla m²
+    // de referencia + tiempo. Ya no cae en costo+margen, que inflaba precios.
+    const m2 = parseFloat(p.metrosCuadrados) || 0;
+    let boxM2;
+    if(!m2){
+      boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Captura los m² del área para ver este precio.</div>`;
+    } else {
+      const resultado = buscarPrecioM2(m2);
+      if(resultado.precio == null){
+        boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla de referencia (máx. 300 m²). Cotiza manualmente.</div>`;
       } else {
-        const resultado = buscarPrecioEmpresarial(m2);
-        if(resultado.precio == null){
-          boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla Empresarial (máx. 300 m²). Cotiza manualmente.</div>`;
-        } else {
-          const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
-          const bono = comboAplica ? 200 : 0;
-          const precioSugerido = resultado.precio + bono;
-          boxM2 = `
-            <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
-            <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
-            ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
-            ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
-            <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
-          `;
-        }
+        const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
+        const bono = comboAplica ? 200 : 0;
+        const precioSugerido = resultado.precio + bono;
+        boxM2 = `
+          <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
+          <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
+          ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
+          ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
+          <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
+        `;
       }
-      caja.innerHTML = `
-        <div class="sugerencia-columnas">
-          <div class="sugerencia-col">${boxM2}</div>
-          <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
-        </div>
-      `;
-      return;
     }
-
-    // A partir de aquí solo llega Residencial (no-rastrero): Empresarial e
-    // Industrial siempre se resuelven arriba con tabla m² + tiempo.
-    const calc = calcularCostoServicio(p);
-    if(!calc){
-      caja.innerHTML = `<div class="hint">Captura los m² del área para calcular el costo real y el precio sugerido.</div>`;
-      return;
-    }
-
-    const precioActual = parseFloat(p.precioServicio) || 0;
-    const oportunidad = precioActual > 0 && precioActual < calc.precioMeta;
-
     caja.innerHTML = `
-      <div class="sugerencia-linea"><span>Costo real estimado:</span><strong>${formatMoney(calc.costoTotal)}</strong></div>
-      <div class="sugerencia-linea"><span>Factor de margen aplicado:</span><strong>${calc.factor.toFixed(1)}x</strong></div>
-      <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(calc.precioSugerido)}</strong></div>
-      ${calc.comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
-      <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${calc.precioSugerido.toFixed(2)}">Usar precio sugerido</button>
-      ${oportunidad ? `<div class="alerta-margen">⚠ Oportunidad de mejora de margen: el precio meta (factor ${calc.factorMeta.toFixed(1)}x) sería ${formatMoney(calc.precioMeta)}. Uso interno, no se imprime al cliente.</div>` : ''}
+      <div class="sugerencia-columnas">
+        <div class="sugerencia-col">${boxM2}</div>
+        <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
+      </div>
     `;
   }
 
