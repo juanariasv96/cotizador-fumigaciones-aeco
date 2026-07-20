@@ -2105,38 +2105,46 @@
     return familias.includes('rastrero') && familias.includes('roedores');
   }
 
+  // Caja "Precio sugerido (tabla m²)", compartida por Empresarial/Industrial,
+  // Residencial no cubierto por zona/termitas, y Cucaracha Alemana.
+  function boxTablaM2Html(p){
+    const m2 = parseFloat(p.metrosCuadrados) || 0;
+    if(!m2){
+      return `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Captura los m² del área para ver este precio.</div>`;
+    }
+    const resultado = buscarPrecioM2(m2);
+    if(resultado.precio == null){
+      return `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla de referencia (máx. 300 m²). Cotiza manualmente.</div>`;
+    }
+    const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
+    const bono = comboAplica ? 200 : 0;
+    const precioSugerido = resultado.precio + bono;
+    return `
+      <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
+      <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
+      ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
+      ${resultado.motivo === 'extrapolado' ? `<div class="hint">Área mayor a 300 m²; tarifa extrapolada con 10% de descuento por economía de escala.</div>` : ''}
+      ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
+      <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
+    `;
+  }
+
   function actualizarSugerenciaCard(p){
     const caja = document.getElementById('sugerencia-' + p.id);
     if(!caja) return;
 
     const categoriaServicio = document.getElementById('categoriaServicio').value;
 
-    // Cucaracha Alemana: mismo servicio base de insecto rastrero. En Residencial mostramos
-    // el precio de referencia de la tabla de zona (el vendedor lo reparte entre las 2 aplicaciones).
-    // No aplica la fórmula de costo aquí (ambigüedad de a cuál aplicación asignarlo).
+    // Cucaracha Alemana: se cobra en 2 aplicaciones separadas (cada una con su propio
+    // precio). Las cajas de abajo sugieren el precio de UNA sola aplicación/visita,
+    // igual que las demás plagas (tabla m² + tiempo); no del total de las 2.
     if(p.esCucarachaAlemana){
-      if(categoriaServicio !== 'Residencial'){
-        caja.innerHTML = '';
-        return;
-      }
-      const zona = document.getElementById('clienteZona').value;
-      const m2 = parseFloat(p.metrosCuadrados) || 0;
-      if(!zona){
-        caja.innerHTML = `<div class="hint">Selecciona la zona del cliente (Datos del cliente) para ver el precio de referencia.</div>`;
-        return;
-      }
-      if(!m2){
-        caja.innerHTML = `<div class="hint">Captura los m² del área para ver el precio de referencia según zona.</div>`;
-        return;
-      }
-      const resultado = buscarPrecioZonaRastrero(zona, m2);
-      if(resultado.precio == null){
-        caja.innerHTML = `<div class="hint">Área fuera del rango de la tabla de zona (${escapeHtml(zona)}). Cotiza manualmente.</div>`;
-        return;
-      }
       caja.innerHTML = `
-        <div class="sugerencia-linea"><span>Precio mínimo de referencia (tabla ${escapeHtml(zona)}):</span><strong>${formatMoney(resultado.precio)}</strong></div>
-        <div class="hint">Es el mismo servicio de insecto rastrero; repártelo entre las 2 aplicaciones según tu criterio.</div>
+        <div class="hint" style="margin-bottom:8px;"><strong>Precio sugerido por aplicación:</strong> Cucaracha Alemana se cobra en 2 aplicaciones separadas; el precio de estas cajas es de UNA sola visita y se cobra 2 veces (Aplicación 1 + Aplicación 2).</div>
+        <div class="sugerencia-columnas">
+          <div class="sugerencia-col">${boxTablaM2Html(p)}</div>
+          <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
+        </div>
       `;
       return;
     }
@@ -2190,31 +2198,9 @@
     // A partir de aquí: Empresarial/Industrial (cualquier familia) y Residencial
     // no cubierto arriba (fumigación general, combinada, etc.) usan la tabla m²
     // de referencia + tiempo. Ya no cae en costo+margen, que inflaba precios.
-    const m2 = parseFloat(p.metrosCuadrados) || 0;
-    let boxM2;
-    if(!m2){
-      boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Captura los m² del área para ver este precio.</div>`;
-    } else {
-      const resultado = buscarPrecioM2(m2);
-      if(resultado.precio == null){
-        boxM2 = `<div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div><div class="hint">Área fuera de la tabla de referencia (máx. 300 m²). Cotiza manualmente.</div>`;
-      } else {
-        const comboAplica = p.familia === 'rastrero' && hayComboRastreroRoedor();
-        const bono = comboAplica ? 200 : 0;
-        const precioSugerido = resultado.precio + bono;
-        boxM2 = `
-          <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
-          <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
-          ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
-          ${resultado.motivo === 'extrapolado' ? `<div class="hint">Área mayor a 300 m²; tarifa extrapolada con 10% de descuento por economía de escala.</div>` : ''}
-          ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
-          <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
-        `;
-      }
-    }
     caja.innerHTML = `
       <div class="sugerencia-columnas">
-        <div class="sugerencia-col">${boxM2}</div>
+        <div class="sugerencia-col">${boxTablaM2Html(p)}</div>
         <div class="sugerencia-col">${boxTiempoHtml(p)}</div>
       </div>
     `;
@@ -2315,7 +2301,29 @@
             <input type="number" min="0" step="0.01" data-field="metrosCuadrados" value="${escapeHtml(p.metrosCuadrados)}" placeholder="Ej. 150">
           </div>
         </div>
+        <div class="grid" style="margin-top:10px;">
+          <div class="field">
+            <label>Tiempo de servicio (min) *</label>
+            <input type="number" min="0" step="1" data-field="tiempoServicio" value="${escapeHtml(p.tiempoServicio)}" placeholder="Ej. 100">
+          </div>
+          <div class="field">
+            <label>Tiempo de traslado (min) *</label>
+            <input type="number" min="0" step="1" data-field="tiempoTraslado" value="${escapeHtml(p.tiempoTraslado)}" placeholder="Ej. 20">
+          </div>
+        </div>
+        <div class="grid" style="margin-top:10px;">
+          <div class="field">
+            <label>Distancia de traslado (km) *</label>
+            <input type="number" min="0" step="0.1" data-field="distanciaTraslado" value="${escapeHtml(p.distanciaTraslado)}" placeholder="Ej. 15">
+            <div class="hint">Solo de referencia; no afecta el cálculo del precio sugerido.</div>
+          </div>
+          <div class="field">
+            <label>Casetas ($)</label>
+            <input type="number" min="0" step="0.01" data-field="casetas" value="${escapeHtml(p.casetas)}" placeholder="0.00 (opcional)">
+          </div>
+        </div>
         <div class="sugerencia-box" id="sugerencia-${p.id}"></div>
+        <div class="hint">El precio sugerido de arriba es por 1 aplicación; captura el precio real de cada una abajo (pueden diferir).</div>
         <div class="grid" style="margin-top:10px;">
           <div class="field">
             <label>Precio Aplicación 1 *</label>
@@ -2344,7 +2352,7 @@
           </div>
           ` : ''}
         </div>
-        ${esEmpresarialOIndustrial ? `
+        ${esEmpresarialOIndustrial || (!p.esTermitas && !esServicioRastreroResidencial(p)) ? `
         <div class="grid" style="margin-top:10px;">
           <div class="field">
             <label>Tiempo de servicio (min) *</label>
@@ -2408,9 +2416,18 @@
       const p = plagasSeleccionadas.find(pl => pl.id === card.dataset.id);
       if(!p) return;
       const valor = parseFloat(btnUsar.dataset.valor) || 0;
-      p.precioServicio = valor;
-      const input = card.querySelector('[data-field="precioServicio"]');
-      if(input) input.value = valor.toFixed(2);
+      if(p.esCucarachaAlemana){
+        p.precioAplicacion1 = valor;
+        p.precioAplicacion2 = valor;
+        const input1 = card.querySelector('[data-field="precioAplicacion1"]');
+        const input2 = card.querySelector('[data-field="precioAplicacion2"]');
+        if(input1) input1.value = valor.toFixed(2);
+        if(input2) input2.value = valor.toFixed(2);
+      } else {
+        p.precioServicio = valor;
+        const input = card.querySelector('[data-field="precioServicio"]');
+        if(input) input.value = valor.toFixed(2);
+      }
       actualizarSugerenciaCard(p);
       calcularTotales();
     }
