@@ -2049,11 +2049,21 @@
     { m2: 200, precio: 1100 },
     { m2: 300, precio: 1300 }, // punto medio del rango real $1,200-$1,400 (varía según el caso)
   ];
+  // Descuento aplicado a la tarifa del último tramo (200->300 m²) al extrapolar
+  // más allá de la tabla, para reflejar economía de escala en áreas grandes.
+  const DESCUENTO_EXTRAPOLACION_M2 = 0.10;
   function buscarPrecioM2(m2){
     const tabla = TABLA_M2_REFERENCIA;
     if(m2 <= 0) return { precio: null, motivo: 'sin-m2' };
     if(m2 <= tabla[0].m2) return { precio: tabla[0].precio, motivo: 'piso-minimo' };
-    if(m2 > tabla[tabla.length - 1].m2) return { precio: null, motivo: 'fuera-de-tabla' };
+    const ultimo = tabla[tabla.length - 1];
+    if(m2 > ultimo.m2){
+      const penultimo = tabla[tabla.length - 2];
+      const tarifaUltimoTramo = (ultimo.precio - penultimo.precio) / (ultimo.m2 - penultimo.m2);
+      const tarifaExtrapolada = tarifaUltimoTramo * (1 - DESCUENTO_EXTRAPOLACION_M2);
+      const precio = ultimo.precio + (m2 - ultimo.m2) * tarifaExtrapolada;
+      return { precio, motivo: 'extrapolado' };
+    }
     for(let i = 0; i < tabla.length - 1; i++){
       const a = tabla[i], b = tabla[i + 1];
       if(m2 >= a.m2 && m2 <= b.m2){
@@ -2196,6 +2206,7 @@
           <div class="sugerencia-col-titulo">Precio sugerido (tabla m²)</div>
           <div class="sugerencia-linea"><span>Precio sugerido:</span><strong>${formatMoney(precioSugerido)}</strong></div>
           ${resultado.motivo === 'piso-minimo' ? `<div class="hint">Área menor al rango de la tabla; se usa el precio mínimo.</div>` : ''}
+          ${resultado.motivo === 'extrapolado' ? `<div class="hint">Área mayor a 300 m²; tarifa extrapolada con 10% de descuento por economía de escala.</div>` : ''}
           ${comboAplica ? `<div class="hint">Incluye +$200 por combo insecto rastrero + roedor.</div>` : ''}
           <button type="button" class="btn secondary small" data-usar-sugerido="${p.id}" data-valor="${precioSugerido.toFixed(2)}">Usar este precio</button>
         `;
