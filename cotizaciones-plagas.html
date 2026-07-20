@@ -932,11 +932,6 @@
           <div class="areas-list" id="areasList"></div>
         </div>
 
-        <div class="field" style="margin-top:14px;max-width:320px;">
-          <label for="kmRecorrido">Distancia estimada de traslado (km, ida y vuelta)</label>
-          <input type="number" min="0" step="0.1" id="kmRecorrido" placeholder="0" value="0">
-          <div class="hint">Se usa solo para calcular el precio sugerido (uso interno, no se imprime).</div>
-        </div>
       </div>
 
       <div class="panel">
@@ -1902,7 +1897,6 @@
     if(e.key === 'Enter'){ e.preventDefault(); addAreaFromInput(); }
   });
 
-  document.getElementById('kmRecorrido').addEventListener('input', ()=> recalcularTodasLasSugerencias());
   document.getElementById('categoriaServicio').addEventListener('change', ()=> recalcularTodasLasSugerencias());
   document.getElementById('clienteZona').addEventListener('change', ()=> recalcularTodasLasSugerencias());
 
