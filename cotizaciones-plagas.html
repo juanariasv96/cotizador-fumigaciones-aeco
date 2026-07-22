@@ -655,6 +655,7 @@
   .estacion-row .estacion-info .estacion-numero{font-size:15px;font-weight:700;color:var(--verde-oscuro);}
   .estacion-row .estacion-info .estacion-meta{font-size:12px;color:#666;margin-top:2px;}
   .estacion-row .estacion-acciones{flex:0 0 auto;}
+  #serviciosLista tr.inactiva{opacity:.55;}
 
   .qr-grid{
     display:grid;
@@ -756,6 +757,7 @@
   <button class="tab-btn" data-tab="lista">Cotizaciones Guardadas</button>
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
+  <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
 </nav>
 
@@ -1255,6 +1257,68 @@
         </div>
 
         <div id="estacionesLista" style="margin-top:18px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: SERVICIOS CONTRATADOS ================= -->
+  <section id="tab-servicios" class="hidden">
+    <div class="panel">
+      <h2>Servicios contratados</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Pólizas y servicios de fumigación contratados por cada cliente: tipo, frecuencia, vigencia y costos.</p>
+      <div class="field" style="max-width:420px;">
+        <label for="serviciosClienteSelect">Selecciona un cliente</label>
+        <select id="serviciosClienteSelect">
+          <option value="">Selecciona...</option>
+        </select>
+      </div>
+
+      <div id="serviciosClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus servicios contratados.</div>
+
+      <div id="serviciosContenido" class="hidden">
+        <div class="grid" id="servicioForm" style="margin-top:16px;align-items:end;">
+          <div class="field">
+            <label for="servicioTipo">Tipo de servicio</label>
+            <input type="text" id="servicioTipo" placeholder="Ej. Rastrero y Roedor">
+          </div>
+          <div class="field">
+            <label for="servicioFrecuencia">Frecuencia</label>
+            <input type="text" id="servicioFrecuencia" placeholder="Ej. Mensual">
+          </div>
+          <div class="field">
+            <label for="servicioVigencia">Vigencia de póliza</label>
+            <input type="text" id="servicioVigencia" placeholder="Ej. Ene2026-Dic2026">
+          </div>
+          <div class="field" style="max-width:160px;">
+            <label for="servicioCostoSinIva">Costo s/IVA</label>
+            <input type="number" id="servicioCostoSinIva" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="field" style="max-width:160px;">
+            <label for="servicioCostoConIva">Costo c/IVA</label>
+            <input type="number" id="servicioCostoConIva" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="field">
+            <label for="servicioEstatus">Estatus (opcional)</label>
+            <input type="text" id="servicioEstatus" placeholder="Ej. Confirmado">
+          </div>
+          <div class="field">
+            <label for="servicioNotas">Notas (opcional)</label>
+            <input type="text" id="servicioNotas" placeholder="Notas libres">
+          </div>
+          <div class="field" style="max-width:120px;">
+            <label for="servicioActivo">Activo</label>
+            <select id="servicioActivo">
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:200px;">
+            <button type="button" class="btn" id="btnGuardarServicio" style="width:100%;">+ Agregar servicio</button>
+            <button type="button" class="btn secondary small hidden" id="btnCancelarEdicionServicio" style="width:100%;margin-top:6px;">Cancelar edición</button>
+          </div>
+        </div>
+
+        <div id="serviciosLista" style="margin-top:18px;"></div>
       </div>
     </div>
   </section>
@@ -1849,6 +1913,7 @@
     lista: document.getElementById('tab-lista'),
     empresa: document.getElementById('tab-empresa'),
     estaciones: document.getElementById('tab-estaciones'),
+    servicios: document.getElementById('tab-servicios'),
     accesos: document.getElementById('tab-accesos'),
   };
   function activarTab(nombre){
@@ -1858,6 +1923,7 @@
     if(nombre === 'lista') renderLista();
     if(nombre === 'accesos') cargarRegistroAccesos();
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
+    if(nombre === 'servicios') cargarClientesParaServicios();
   }
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
@@ -3958,6 +4024,197 @@
   });
   document.getElementById('btnImprimirQr').addEventListener('click', ()=>{
     window.print();
+  });
+
+
+  // ---------- Servicios contratados por cliente ----------
+  let serviciosClientesCache = [];
+  let serviciosClienteActualId = '';
+  let serviciosCache = [];
+  let servicioEditandoId = null;
+
+  const serviciosClienteSelect = document.getElementById('serviciosClienteSelect');
+  const serviciosClienteVacio = document.getElementById('serviciosClienteVacio');
+  const serviciosContenido = document.getElementById('serviciosContenido');
+  const serviciosListaEl = document.getElementById('serviciosLista');
+
+  async function cargarClientesParaServicios(){
+    const { data, error } = await supabaseClient
+      .from('clientes')
+      .select('id, nombre, telefono')
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los clientes:', error);
+      alert('No se pudieron cargar los clientes: ' + error.message);
+      return;
+    }
+    serviciosClientesCache = data || [];
+    const seleccionActual = serviciosClienteSelect.value;
+    serviciosClienteSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      serviciosClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}${c.telefono ? ' — ' + escapeHtml(c.telefono) : ''}</option>`).join('');
+    if(seleccionActual && serviciosClientesCache.some(c => c.id === seleccionActual)){
+      serviciosClienteSelect.value = seleccionActual;
+    }
+  }
+
+  async function cargarServiciosDeCliente(clienteId){
+    const { data, error } = await supabaseClient
+      .from('servicios_cliente')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('fecha_creacion');
+    if(error){
+      console.error('No se pudieron cargar los servicios:', error);
+      alert('No se pudieron cargar los servicios: ' + error.message);
+      serviciosCache = [];
+      return;
+    }
+    serviciosCache = data || [];
+  }
+
+  function formatMoneyOrDash(n){
+    if(n === null || n === undefined || n === '') return '—';
+    return formatMoney(n);
+  }
+
+  function limpiarFormularioServicio(){
+    servicioEditandoId = null;
+    document.getElementById('servicioTipo').value = '';
+    document.getElementById('servicioFrecuencia').value = '';
+    document.getElementById('servicioVigencia').value = '';
+    document.getElementById('servicioCostoSinIva').value = '';
+    document.getElementById('servicioCostoConIva').value = '';
+    document.getElementById('servicioEstatus').value = '';
+    document.getElementById('servicioNotas').value = '';
+    document.getElementById('servicioActivo').value = 'true';
+    document.getElementById('btnGuardarServicio').textContent = '+ Agregar servicio';
+    document.getElementById('btnCancelarEdicionServicio').classList.add('hidden');
+  }
+
+  function renderServiciosLista(){
+    if(serviciosCache.length === 0){
+      serviciosListaEl.innerHTML = `<div class="empty-msg">Este cliente todavía no tiene servicios contratados registrados.</div>`;
+      return;
+    }
+    const filas = serviciosCache.map(s => `
+      <tr class="${s.activo ? '' : 'inactiva'}">
+        <td>${escapeHtml(s.tipo_servicio || '-')}</td>
+        <td>${escapeHtml(s.frecuencia || '-')}</td>
+        <td>${escapeHtml(s.vigencia_poliza || '-')}</td>
+        <td>${formatMoneyOrDash(s.costo_sin_iva)}</td>
+        <td>${formatMoneyOrDash(s.costo_con_iva)}</td>
+        <td>${escapeHtml(s.estatus || '-')}</td>
+        <td>${escapeHtml(s.notas || '-')}</td>
+        <td>${s.activo ? 'Sí' : 'No'}</td>
+        <td>
+          <button class="btn secondary small" data-action="editar" data-id="${s.id}">Editar</button>
+          <button class="btn danger small" data-action="eliminar" data-id="${s.id}">Eliminar</button>
+        </td>
+      </tr>
+    `).join('');
+    serviciosListaEl.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo de servicio</th><th>Frecuencia</th><th>Vigencia</th>
+            <th>Costo s/IVA</th><th>Costo c/IVA</th><th>Estatus</th><th>Notas</th><th>Activo</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    `;
+  }
+
+  serviciosClienteSelect.addEventListener('change', async ()=>{
+    serviciosClienteActualId = serviciosClienteSelect.value;
+    limpiarFormularioServicio();
+    if(!serviciosClienteActualId){
+      serviciosClienteVacio.classList.remove('hidden');
+      serviciosContenido.classList.add('hidden');
+      return;
+    }
+    serviciosClienteVacio.classList.add('hidden');
+    serviciosContenido.classList.remove('hidden');
+    serviciosListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    await cargarServiciosDeCliente(serviciosClienteActualId);
+    renderServiciosLista();
+  });
+
+  document.getElementById('btnGuardarServicio').addEventListener('click', async ()=>{
+    if(!serviciosClienteActualId){
+      alert('Selecciona un cliente primero.');
+      return;
+    }
+    const costoSinIvaVal = document.getElementById('servicioCostoSinIva').value;
+    const costoConIvaVal = document.getElementById('servicioCostoConIva').value;
+    const payload = {
+      cliente_id: serviciosClienteActualId,
+      tipo_servicio: document.getElementById('servicioTipo').value.trim() || null,
+      frecuencia: document.getElementById('servicioFrecuencia').value.trim() || null,
+      vigencia_poliza: document.getElementById('servicioVigencia').value.trim() || null,
+      costo_sin_iva: costoSinIvaVal === '' ? null : Number(costoSinIvaVal),
+      costo_con_iva: costoConIvaVal === '' ? null : Number(costoConIvaVal),
+      estatus: document.getElementById('servicioEstatus').value.trim() || null,
+      notas: document.getElementById('servicioNotas').value.trim() || null,
+      activo: document.getElementById('servicioActivo').value === 'true',
+    };
+
+    const btn = document.getElementById('btnGuardarServicio');
+    btn.disabled = true;
+    let error;
+    if(servicioEditandoId){
+      ({ error } = await supabaseClient.from('servicios_cliente').update(payload).eq('id', servicioEditandoId));
+    } else {
+      ({ error } = await supabaseClient.from('servicios_cliente').insert(payload));
+    }
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudo guardar el servicio: ' + error.message);
+      return;
+    }
+    limpiarFormularioServicio();
+    await cargarServiciosDeCliente(serviciosClienteActualId);
+    renderServiciosLista();
+  });
+
+  document.getElementById('btnCancelarEdicionServicio').addEventListener('click', ()=>{
+    limpiarFormularioServicio();
+  });
+
+  serviciosListaEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const servicio = serviciosCache.find(s => s.id === id);
+    if(!servicio) return;
+
+    if(btn.dataset.action === 'editar'){
+      servicioEditandoId = servicio.id;
+      document.getElementById('servicioTipo').value = servicio.tipo_servicio || '';
+      document.getElementById('servicioFrecuencia').value = servicio.frecuencia || '';
+      document.getElementById('servicioVigencia').value = servicio.vigencia_poliza || '';
+      document.getElementById('servicioCostoSinIva').value = servicio.costo_sin_iva ?? '';
+      document.getElementById('servicioCostoConIva').value = servicio.costo_con_iva ?? '';
+      document.getElementById('servicioEstatus').value = servicio.estatus || '';
+      document.getElementById('servicioNotas').value = servicio.notas || '';
+      document.getElementById('servicioActivo').value = servicio.activo ? 'true' : 'false';
+      document.getElementById('btnGuardarServicio').textContent = 'Guardar cambios';
+      document.getElementById('btnCancelarEdicionServicio').classList.remove('hidden');
+      document.getElementById('servicioTipo').scrollIntoView({behavior:'smooth', block:'center'});
+    } else if(btn.dataset.action === 'eliminar'){
+      if(!confirm(`¿Seguro que quieres eliminar este servicio (${servicio.tipo_servicio || 'sin tipo'})? Esta acción no se puede deshacer.`)) return;
+      btn.disabled = true;
+      const { error } = await supabaseClient.from('servicios_cliente').delete().eq('id', id);
+      btn.disabled = false;
+      if(error){
+        alert('No se pudo eliminar el servicio: ' + error.message);
+        return;
+      }
+      if(servicioEditandoId === id) limpiarFormularioServicio();
+      await cargarServiciosDeCliente(serviciosClienteActualId);
+      renderServiciosLista();
+    }
   });
 
 
