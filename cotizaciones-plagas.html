@@ -3612,11 +3612,10 @@
           <div class="estacion-numero">Estación #${e.numero}${e.activo ? '' : ' (inactiva)'}</div>
           <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
         </div>
-        ${puedeDesactivar ? `
         <div class="estacion-acciones">
-          <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
+          ${puedeDesactivar ? `<button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>` : ''}
+          <button type="button" class="btn danger small" data-delete-estacion="${e.id}" data-numero="${e.numero}" style="margin-left:8px;">Eliminar</button>
         </div>
-        ` : ''}
       </div>
     `).join('');
 
@@ -3736,6 +3735,26 @@
     btn.disabled = false;
     if(error){
       alert('No se pudo actualizar la estación: ' + error.message);
+      return;
+    }
+    await cargarEstacionesDeCliente(estacionesClienteActualId);
+    renderEstacionesLista();
+  });
+
+  estacionesListaEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('[data-delete-estacion]');
+    if(!btn) return;
+    const id = btn.dataset.deleteEstacion;
+    const numero = btn.dataset.numero;
+    if(!confirm(`¿Seguro que quieres eliminar la estación #${numero}? Esta acción no se puede deshacer.`)) return;
+    btn.disabled = true;
+    const { error } = await supabaseClient
+      .from('estaciones')
+      .delete()
+      .eq('id', id);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo eliminar la estación: ' + error.message);
       return;
     }
     await cargarEstacionesDeCliente(estacionesClienteActualId);
