@@ -3670,7 +3670,6 @@
       renderPinesSitio();
       return;
     }
-    const puedeDesactivar = !usuarioActual || usuarioActual.rol !== 'asistente';
     estacionesListaEl.innerHTML = estacionesCache.map(e => `
       <div class="estacion-row ${e.activo ? '' : 'inactiva'}" data-id="${e.id}">
         <div class="estacion-qr" id="qr-${e.id}"></div>
@@ -3679,7 +3678,7 @@
           <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
         </div>
         <div class="estacion-acciones">
-          ${puedeDesactivar ? `<button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>` : ''}
+          <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
           <button type="button" class="btn danger small" data-delete-estacion="${e.id}" data-numero="${e.numero}" style="margin-left:8px;">Eliminar</button>
         </div>
       </div>
