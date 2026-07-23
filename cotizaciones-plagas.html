@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizaciones - Control de Plagas</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#016937">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AECO">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -620,13 +628,15 @@
     @page{
       margin:10mm;
     }
-    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
     #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
     #qrPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #planPrintOverlay{position:static;display:block;padding:0;background:none;}
     #planPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+    #reportePrintOverlay{position:static;display:block;padding:0;background:none;}
+    #reportePrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     .print-toolbar{display:none;}
 
     .doc{padding:0;}
@@ -658,6 +668,7 @@
   .estacion-row .estacion-info .estacion-meta{font-size:12px;color:#666;margin-top:2px;}
   .estacion-row .estacion-acciones{flex:0 0 auto;}
   #serviciosLista tr.inactiva{opacity:.55;}
+  #avisosLista tr.inactiva{opacity:.55;}
 
   /* ---------- Calendario de visitas ---------- */
   .badge.programada{background:#e7f0fd;color:#1d4ed8;}
@@ -684,12 +695,22 @@
   .cal-chip.realizada{background:#d8f3dc;color:#1b4332;}
   .cal-chip.reprogramada{background:#fff3cd;color:#8a6d00;}
   .cal-chip.cancelada{background:#fde8e8;color:#b3261e;text-decoration:line-through;}
+  .cal-chip.refuerzo{border-left:3px solid #b3261e;font-weight:700;}
   #visitaOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
     padding:30px 15px;overflow:auto;z-index:999;
   }
   #visitaPanel{
+    background:var(--blanco);width:100%;max-width:480px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #refuerzoOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #refuerzoPanel{
     background:var(--blanco);width:100%;max-width:480px;border-radius:6px;
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
@@ -712,6 +733,35 @@
     background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
+
+  /* ---------- Reporte de visita (tecnico) ---------- */
+  #reporteOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #reportePanel{
+    background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #reporteEstacionesLista table select, #reporteEstacionesLista table input{width:100%;}
+  .firma-bloque{border:1px solid var(--gris-borde);border-radius:8px;padding:12px;}
+  .firma-canvas{
+    display:block;width:100%;max-width:320px;height:120px;
+    border:1px dashed var(--gris-borde);border-radius:6px;background:var(--blanco);
+    touch-action:none;cursor:crosshair;
+  }
+  #reportePrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #reportePrintSheet{
+    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+  .firma-doc-img{max-width:220px;max-height:90px;display:block;}
+  .firma-doc-linea{border-top:1px solid #333;margin-top:40px;padding-top:4px;font-size:12px;}
 
   .qr-grid{
     display:grid;
@@ -779,8 +829,8 @@
     <p class="login-sub">Inicia sesión con tu cuenta del equipo para continuar.</p>
     <form id="formLogin">
       <div class="field">
-        <label for="loginEmail">Correo electrónico</label>
-        <input type="email" id="loginEmail" required autocomplete="username" placeholder="tu@correo.com">
+        <label for="loginEmail">Usuario</label>
+        <input type="text" id="loginEmail" required autocomplete="username" placeholder="tu usuario o correo">
       </div>
       <div class="field" style="margin-top:10px;">
         <label for="loginPassword">Contraseña</label>
@@ -1440,6 +1490,21 @@
         </div>
 
         <div id="serviciosLista" style="margin-top:18px;"></div>
+
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin-top:0;">Avisos del cliente</h3>
+          <p style="font-size:12px;color:#777;margin-top:0;">Reportes o quejas del cliente, para que el técnico los vea al hacer su reporte de la próxima visita.</p>
+          <div class="grid" style="align-items:end;">
+            <div class="field" style="flex:1 1 320px;">
+              <label for="avisoDescripcion">Nuevo aviso</label>
+              <input type="text" id="avisoDescripcion" placeholder="Ej. Cliente reporta actividad de rata cerca de la cocina">
+            </div>
+            <div class="field" style="max-width:160px;">
+              <button type="button" class="btn secondary" id="btnAgregarAviso" style="width:100%;">+ Agregar aviso</button>
+            </div>
+          </div>
+          <div id="avisosLista" style="margin-top:14px;"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -1470,6 +1535,7 @@
         <h3 id="calMesLabel">Enero 2026</h3>
         <button type="button" class="btn secondary small" id="btnCalMesSiguiente">Mes siguiente →</button>
         <button type="button" class="btn secondary small" id="btnCalHoy">Hoy</button>
+        <button type="button" class="btn secondary small" id="btnAgendarRefuerzo">+ Agendar refuerzo</button>
       </div>
 
       <div class="cal-daynames">
@@ -1584,6 +1650,121 @@
   </div>
 </div>
 
+<!-- ================= OVERLAY DE REPORTE DE VISITA (tecnico) ================= -->
+<div id="reporteOverlay" class="hidden">
+  <div id="reportePanel">
+    <h3 style="margin-top:0;" id="reportePanelTitulo">Reporte de visita</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;" id="reportePanelSubtitulo"></p>
+
+    <div class="panel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Mantenimiento según plan</h4>
+      <div id="reportePlanInfo" class="hint"></div>
+    </div>
+
+    <div class="panel" id="reporteAvisosPanel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Reportado por el cliente / visita anterior</h4>
+      <div id="reporteAvisosLista"></div>
+      <div class="grid" style="align-items:end;margin-top:10px;">
+        <div class="field" style="flex:1 1 300px;">
+          <label for="reporteNuevoAviso">Dejar aviso para la próxima visita (opcional)</label>
+          <input type="text" id="reporteNuevoAviso" placeholder="Ej. Falta revisar caja del patio trasero">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Estaciones</h4>
+      <div id="reporteEstacionesLista"></div>
+    </div>
+
+    <div class="field">
+      <label for="reporteObservaciones">Observaciones generales</label>
+      <textarea id="reporteObservaciones" rows="3"></textarea>
+    </div>
+
+    <div class="grid" style="margin-top:14px;">
+      <div class="field firma-bloque">
+        <label>Firma del cliente</label>
+        <canvas id="firmaClienteCanvas" width="320" height="120" class="firma-canvas"></canvas>
+        <button type="button" class="btn secondary small" id="btnLimpiarFirmaCliente" style="margin-top:6px;">Limpiar firma</button>
+        <div class="field" style="margin-top:8px;">
+          <label for="firmaClienteNombre">O escribe el nombre (si no puede firmar)</label>
+          <input type="text" id="firmaClienteNombre" placeholder="Nombre completo">
+        </div>
+      </div>
+      <div class="field firma-bloque">
+        <label>Firma del técnico</label>
+        <canvas id="firmaTecnicoCanvas" width="320" height="120" class="firma-canvas"></canvas>
+        <button type="button" class="btn secondary small" id="btnLimpiarFirmaTecnico" style="margin-top:6px;">Limpiar firma</button>
+        <div class="field" style="margin-top:8px;">
+          <label for="firmaTecnicoNombre">O escribe el nombre (si no puede firmar)</label>
+          <input type="text" id="firmaTecnicoNombre" placeholder="Nombre completo">
+        </div>
+      </div>
+    </div>
+
+    <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarReporteVisita">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarReporteVisita">Guardar reporte</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE IMPRESION DEL COMPROBANTE DE REPORTE ================= -->
+<div id="reportePrintOverlay" class="hidden">
+  <div id="reportePrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarReportePreview">Cerrar</button>
+      <button class="btn" id="btnImprimirReporteDoc">Imprimir</button>
+    </div>
+    <div class="doc" id="reporteDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE AGENDAR REFUERZO/GARANTIA (oficina) ================= -->
+<div id="refuerzoOverlay" class="hidden">
+  <div id="refuerzoPanel">
+    <h3 style="margin-top:0;">Agendar refuerzo / garantía</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;">Visita extra fuera del plan normal, para atender un refuerzo de garantía durante la vigencia de la póliza.</p>
+    <div class="field">
+      <label for="refuerzoCliente">Cliente</label>
+      <select id="refuerzoCliente">
+        <option value="">Selecciona...</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="refuerzoServicio">Servicio</label>
+      <select id="refuerzoServicio">
+        <option value="">Selecciona un cliente primero...</option>
+      </select>
+    </div>
+    <div class="grid" style="align-items:end;">
+      <div class="field">
+        <label for="refuerzoFecha">Fecha</label>
+        <input type="date" id="refuerzoFecha">
+      </div>
+      <div class="field">
+        <label for="refuerzoHora">Hora (opcional)</label>
+        <input type="time" id="refuerzoHora">
+      </div>
+    </div>
+    <div class="field">
+      <label for="refuerzoTecnico">Técnico asignado (opcional)</label>
+      <select id="refuerzoTecnico">
+        <option value="">Sin asignar</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="refuerzoNotas">Motivo / notas</label>
+      <textarea id="refuerzoNotas" rows="2" placeholder="Ej. Cliente reporta actividad de cucarachas en cocina, refuerzo de garantía"></textarea>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarRefuerzo">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarRefuerzo">Agendar refuerzo</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= OVERLAY DE IMPRESIÓN ================= -->
 <div id="printOverlay" class="hidden">
   <div id="printSheet">
@@ -1653,6 +1834,17 @@
     document.getElementById('tabBtnAccesos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
+
+    // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
+    // sus reportes de visita). El resto de pestanas quedan ocultas.
+    if(usuarioActual.rol === 'tecnico'){
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if(btn.dataset.tab !== 'calendario') btn.classList.add('hidden');
+      });
+      activarTab('calendario');
+    }
+    // Agendar un refuerzo/garantia es funcion de oficina, no del tecnico.
+    document.getElementById('btnAgendarRefuerzo').classList.toggle('hidden', usuarioActual.rol === 'tecnico');
 
     // Pre-llenar (sin forzar) quién genera la cotización con el usuario logueado
     const nombreInput = document.getElementById('generadoPorNombre');
@@ -1729,7 +1921,8 @@
     btnLogin.disabled = true;
     btnLogin.textContent = 'Ingresando...';
 
-    const email = document.getElementById('loginEmail').value.trim();
+    const usuarioIngresado = document.getElementById('loginEmail').value.trim();
+    const email = usuarioIngresado.includes('@') ? usuarioIngresado : usuarioIngresado + '@aeco.interno';
     const password = document.getElementById('loginPassword').value;
 
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -3860,7 +4053,7 @@
   // El QR codifica una URL con el id real de la estación; en la siguiente
   // fase el técnico la escanea en campo y el sistema sabe exactamente
   // qué caja es sin tener que teclear nada.
-  const URL_BASE_ESTACION = 'https://juanariasv96.github.io/cotizador-fumigaciones-aeco/?estacion=';
+  const URL_BASE_ESTACION = 'https://reportes.fumigacionesaeco.com/?estacion=';
 
   let clientesCache = [];
   let estacionesClienteActualId = '';
@@ -4380,6 +4573,8 @@
     serviciosListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
     await cargarServiciosDeCliente(serviciosClienteActualId);
     renderServiciosLista();
+    await cargarAvisosDeCliente(serviciosClienteActualId);
+    renderAvisosLista();
   });
 
   document.getElementById('btnGuardarServicio').addEventListener('click', async ()=>{
@@ -4474,6 +4669,94 @@
       await cargarServiciosDeCliente(serviciosClienteActualId);
       renderServiciosLista();
     }
+  });
+
+
+  // ---------- Avisos del cliente (oficina captura, tecnico tambien deja avisos al reportar) ----------
+  let avisosCache = [];
+  const avisosListaEl = document.getElementById('avisosLista');
+
+  async function cargarAvisosDeCliente(clienteId){
+    const { data, error } = await supabaseClient
+      .from('avisos_cliente')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('fecha_creacion', { ascending: false });
+    if(error){
+      console.error('No se pudieron cargar los avisos:', error);
+      alert('No se pudieron cargar los avisos: ' + error.message);
+      avisosCache = [];
+      return;
+    }
+    avisosCache = data || [];
+  }
+
+  function renderAvisosLista(){
+    if(avisosCache.length === 0){
+      avisosListaEl.innerHTML = `<div class="empty-msg">Sin avisos registrados para este cliente.</div>`;
+      return;
+    }
+    const filas = avisosCache.map(a => `
+      <tr class="${a.resuelto ? 'inactiva' : ''}">
+        <td>${escapeHtml(a.descripcion)}</td>
+        <td>${a.origen === 'tecnico' ? 'Técnico' : 'Oficina'}</td>
+        <td>${formatDate((a.fecha_creacion || '').slice(0, 10))}</td>
+        <td>${a.resuelto ? 'Resuelto' : 'Abierto'}</td>
+        <td>
+          <button type="button" class="btn secondary small" data-action="toggle-aviso" data-id="${a.id}" data-resuelto="${a.resuelto}">${a.resuelto ? 'Reabrir' : 'Marcar resuelto'}</button>
+        </td>
+      </tr>
+    `).join('');
+    avisosListaEl.innerHTML = `
+      <table>
+        <thead><tr><th>Descripción</th><th>Origen</th><th>Fecha</th><th>Estatus</th><th>Acciones</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    `;
+  }
+
+  document.getElementById('btnAgregarAviso').addEventListener('click', async ()=>{
+    if(!serviciosClienteActualId){
+      alert('Selecciona un cliente primero.');
+      return;
+    }
+    const descripcionInput = document.getElementById('avisoDescripcion');
+    const descripcion = descripcionInput.value.trim();
+    if(!descripcion){
+      alert('Escribe una descripción para el aviso.');
+      return;
+    }
+    const btn = document.getElementById('btnAgregarAviso');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('avisos_cliente').insert({
+      cliente_id: serviciosClienteActualId,
+      origen: 'oficina',
+      descripcion: descripcion,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo guardar el aviso: ' + error.message);
+      return;
+    }
+    descripcionInput.value = '';
+    await cargarAvisosDeCliente(serviciosClienteActualId);
+    renderAvisosLista();
+  });
+
+  avisosListaEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action="toggle-aviso"]');
+    if(!btn) return;
+    const nuevoResuelto = btn.dataset.resuelto !== 'true';
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('avisos_cliente').update({ resuelto: nuevoResuelto }).eq('id', btn.dataset.id);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo actualizar el aviso: ' + error.message);
+      return;
+    }
+    await cargarAvisosDeCliente(serviciosClienteActualId);
+    renderAvisosLista();
   });
 
 
@@ -4784,6 +5067,11 @@
       calMesActual = hoyReal.getMonth();
       calInicializado = true;
     }
+    if(usuarioActual.rol === 'tecnico'){
+      calFiltroTecnico.value = usuarioActual.id;
+      calFiltroTecnico.disabled = true;
+      calFiltroTecnico.closest('.field').classList.add('hidden');
+    }
     await cargarVisitasDelAnio();
     renderCalendarioMes();
   }
@@ -4880,7 +5168,9 @@
         const clienteNombre = (v.clientes && v.clientes.nombre) || '';
         const tipoServicio = (v.servicios_cliente && v.servicios_cliente.tipo_servicio) || '';
         const estatusClase = (v.estatus || 'Programada').toLowerCase();
-        return `<button type="button" class="cal-chip ${estatusClase}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.estatus || 'Programada')})">${escapeHtml(clienteNombre)}</button>`;
+        const esRefuerzo = v.tipo === 'Refuerzo';
+        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre;
+        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')})">${escapeHtml(etiqueta)}</button>`;
       }).join('');
 
       celdas += `
@@ -4940,7 +5230,13 @@
   calGrid.addEventListener('click', (e)=>{
     const chip = e.target.closest('.cal-chip');
     if(!chip) return;
-    abrirPanelVisita(chip.dataset.id);
+    // El tecnico no gestiona la visita (reasignar/mover/cancelar es solo
+    // de oficina): su clic va directo al Reporte de esa visita.
+    if(usuarioActual.rol === 'tecnico'){
+      abrirReporteVisita(chip.dataset.id);
+    } else {
+      abrirPanelVisita(chip.dataset.id);
+    }
   });
 
   document.getElementById('btnCerrarVisitaPanel').addEventListener('click', ()=>{
@@ -5004,6 +5300,461 @@
   });
 
 
+  // ---------- Agendar refuerzo/garantia (oficina, fuera del plan normal) ----------
+  const refuerzoOverlay = document.getElementById('refuerzoOverlay');
+
+  document.getElementById('btnAgendarRefuerzo').addEventListener('click', ()=>{
+    document.getElementById('refuerzoCliente').innerHTML = '<option value="">Selecciona...</option>' +
+      calClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    document.getElementById('refuerzoServicio').innerHTML = '<option value="">Selecciona un cliente primero...</option>';
+    document.getElementById('refuerzoTecnico').innerHTML = '<option value="">Sin asignar</option>' +
+      calTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+    document.getElementById('refuerzoFecha').value = '';
+    document.getElementById('refuerzoHora').value = '';
+    document.getElementById('refuerzoNotas').value = '';
+    refuerzoOverlay.classList.remove('hidden');
+  });
+
+  document.getElementById('refuerzoCliente').addEventListener('change', async ()=>{
+    const clienteId = document.getElementById('refuerzoCliente').value;
+    const select = document.getElementById('refuerzoServicio');
+    if(!clienteId){
+      select.innerHTML = '<option value="">Selecciona un cliente primero...</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Cargando...</option>';
+    const { data, error } = await supabaseClient
+      .from('servicios_cliente')
+      .select('id, tipo_servicio')
+      .eq('cliente_id', clienteId)
+      .order('fecha_creacion');
+    if(error){
+      select.innerHTML = '<option value="">No se pudieron cargar los servicios</option>';
+      return;
+    }
+    const servicios = data || [];
+    if(servicios.length === 0){
+      select.innerHTML = '<option value="">Este cliente no tiene servicios registrados</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Selecciona...</option>' +
+      servicios.map(s => `<option value="${s.id}">${escapeHtml(s.tipo_servicio || 'Sin tipo')}</option>`).join('');
+  });
+
+  document.getElementById('btnCerrarRefuerzo').addEventListener('click', ()=>{
+    refuerzoOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnGuardarRefuerzo').addEventListener('click', async ()=>{
+    const clienteId = document.getElementById('refuerzoCliente').value;
+    const servicioId = document.getElementById('refuerzoServicio').value;
+    const fecha = document.getElementById('refuerzoFecha').value;
+    if(!clienteId || !servicioId || !fecha){
+      alert('Selecciona cliente, servicio y fecha.');
+      return;
+    }
+    const btn = document.getElementById('btnGuardarRefuerzo');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('visitas_programadas').insert({
+      servicio_id: servicioId,
+      cliente_id: clienteId,
+      fecha_programada: fecha,
+      hora: document.getElementById('refuerzoHora').value || null,
+      tecnico_asignado: document.getElementById('refuerzoTecnico').value || null,
+      notas: document.getElementById('refuerzoNotas').value.trim() || null,
+      tipo: 'Refuerzo',
+    });
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo agendar el refuerzo: ' + error.message);
+      return;
+    }
+    mostrarToast('Refuerzo agendado.');
+    refuerzoOverlay.classList.add('hidden');
+    await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
+
+
+  // ---------- Firma dibujada (canvas) para el Reporte de visita ----------
+  function inicializarFirmaCanvas(canvas){
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1b4332';
+    let dibujando = false;
+    let tieneTrazo = false;
+
+    function posicion(e){
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height),
+      };
+    }
+    function iniciar(e){
+      e.preventDefault();
+      dibujando = true;
+      const p = posicion(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }
+    function mover(e){
+      if(!dibujando) return;
+      e.preventDefault();
+      const p = posicion(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      tieneTrazo = true;
+    }
+    function soltar(){ dibujando = false; }
+
+    canvas.addEventListener('mousedown', iniciar);
+    canvas.addEventListener('mousemove', mover);
+    window.addEventListener('mouseup', soltar);
+    canvas.addEventListener('touchstart', iniciar, { passive: false });
+    canvas.addEventListener('touchmove', mover, { passive: false });
+    canvas.addEventListener('touchend', soltar);
+
+    canvas._limpiar = function(){
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      tieneTrazo = false;
+    };
+    canvas._tieneTrazo = function(){ return tieneTrazo; };
+  }
+
+  const firmaClienteCanvas = document.getElementById('firmaClienteCanvas');
+  const firmaTecnicoCanvas = document.getElementById('firmaTecnicoCanvas');
+  inicializarFirmaCanvas(firmaClienteCanvas);
+  inicializarFirmaCanvas(firmaTecnicoCanvas);
+
+  function obtenerFirmaFinal(canvas, existente){
+    if(canvas._tieneTrazo && canvas._tieneTrazo()) return canvas.toDataURL('image/png');
+    return existente || null;
+  }
+
+  document.getElementById('btnLimpiarFirmaCliente').addEventListener('click', ()=>{
+    firmaClienteCanvas._limpiar();
+    reporteFirmaClienteExistente = null;
+  });
+  document.getElementById('btnLimpiarFirmaTecnico').addEventListener('click', ()=>{
+    firmaTecnicoCanvas._limpiar();
+    reporteFirmaTecnicoExistente = null;
+  });
+
+
+  // ---------- Reporte de visita (Mantenimiento y Refuerzo) ----------
+  const CATALOGO_CONDICION = [['Bn','Bien'],['Da','Dañada'],['Fa','Faltante'],['Su','Sucia'],['Ob','Obstruida']];
+  const CATALOGO_ACTIVIDAD = [['Nh','No hay'],['Cr','Consumo roedor'],['Ci','Consumo insecto'],['Hu','Huellas'],['Ex','Excremento']];
+  const CATALOGO_ACCION = [['Ss','Sin servicio'],['Cc','Cambio cebo'],['Cg','Cambio goma'],['Ld','Limpieza'],['Re','Reparación'],['Rp','Reposición']];
+
+  let reporteVisitaActualId = null;
+  let reporteClienteActualId = null;
+  let reporteEstacionesCache = [];
+  let reporteAvisosCache = [];
+  let reporteFirmaClienteExistente = null;
+  let reporteFirmaTecnicoExistente = null;
+
+  const reporteOverlay = document.getElementById('reporteOverlay');
+  const reportePrintOverlay = document.getElementById('reportePrintOverlay');
+  const reporteDocContent = document.getElementById('reporteDocContent');
+
+  function renderReporteAvisos(){
+    const cont = document.getElementById('reporteAvisosLista');
+    if(reporteAvisosCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">Sin avisos abiertos para este cliente.</div>`;
+      return;
+    }
+    cont.innerHTML = reporteAvisosCache.map(a => `
+      <div class="hint" style="margin-bottom:6px;">
+        <label style="display:flex;gap:6px;align-items:flex-start;">
+          <input type="checkbox" class="reporte-aviso-resolver" data-aviso-id="${a.id}" style="margin-top:3px;">
+          <span>${escapeHtml(a.descripcion)} <em>(${a.origen === 'tecnico' ? 'técnico' : 'oficina'}, ${formatDate((a.fecha_creacion || '').slice(0, 10))})</em></span>
+        </label>
+      </div>
+    `).join('');
+  }
+
+  function renderReporteEstaciones(detalleMap){
+    const cont = document.getElementById('reporteEstacionesLista');
+    if(reporteEstacionesCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">Este cliente no tiene estaciones activas registradas.</div>`;
+      return;
+    }
+    const opciones = (valorActual, catalogo) => catalogo.map(([cod, label]) =>
+      `<option value="${cod}" ${valorActual === cod ? 'selected' : ''}>${cod} (${label})</option>`
+    ).join('');
+
+    const filas = reporteEstacionesCache.map(e => {
+      const d = detalleMap[e.id] || {};
+      return `
+        <tr data-estacion-id="${e.id}">
+          <td>${e.numero}</td>
+          <td>${escapeHtml(e.ubicacion)}</td>
+          <td>${escapeHtml(e.tipo_estacion)}</td>
+          <td><select class="reporte-condicion"><option value="">-</option>${opciones(d.condicion, CATALOGO_CONDICION)}</select></td>
+          <td><select class="reporte-actividad"><option value="">-</option>${opciones(d.actividad, CATALOGO_ACTIVIDAD)}</select></td>
+          <td><select class="reporte-accion"><option value="">-</option>${opciones(d.accion, CATALOGO_ACCION)}</select></td>
+          <td><input type="text" class="reporte-notas" value="${escapeHtml(d.notas || '')}"></td>
+        </tr>
+      `;
+    }).join('');
+
+    cont.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    `;
+  }
+
+  async function abrirReporteVisita(visitaId){
+    const visita = calVisitasCache.find(v => v.id === visitaId);
+    if(!visita) return;
+
+    reporteVisitaActualId = visitaId;
+    reporteClienteActualId = visita.cliente_id;
+    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
+    const tipoServicio = (visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
+    const tipoVisita = visita.tipo || 'Mantenimiento';
+
+    document.getElementById('reportePanelTitulo').textContent = `Reporte de visita — ${clienteNombre}`;
+    document.getElementById('reportePanelSubtitulo').textContent =
+      `${tipoServicio ? tipoServicio + ' · ' : ''}${tipoVisita} · ${formatDate(visita.fecha_programada)}${visita.hora ? ' ' + visita.hora.slice(0, 5) : ''}`;
+
+    document.getElementById('reportePlanInfo').textContent =
+      (visita.ingrediente_insecticida || visita.ingrediente_rodenticida)
+        ? `Insecticida sugerido: ${visita.ingrediente_insecticida || '—'} · Rodenticida sugerido: ${visita.ingrediente_rodenticida || '—'}`
+        : 'Sin ingredientes sugeridos para esta visita.';
+
+    const { data: estaciones, error: errEst } = await supabaseClient
+      .from('estaciones')
+      .select('*')
+      .eq('cliente_id', reporteClienteActualId)
+      .eq('activo', true)
+      .order('numero');
+    if(errEst){
+      alert('No se pudieron cargar las estaciones: ' + errEst.message);
+      return;
+    }
+    reporteEstacionesCache = estaciones || [];
+
+    const { data: avisos, error: errAvisos } = await supabaseClient
+      .from('avisos_cliente')
+      .select('*')
+      .eq('cliente_id', reporteClienteActualId)
+      .eq('resuelto', false)
+      .order('fecha_creacion', { ascending: false });
+    if(errAvisos) console.error('No se pudieron cargar los avisos:', errAvisos);
+    reporteAvisosCache = avisos || [];
+
+    const { data: reporteExistente, error: errReporte } = await supabaseClient
+      .from('reportes_visita')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(errReporte) console.error('No se pudo cargar el reporte existente:', errReporte);
+
+    let detalleExistente = [];
+    if(reporteExistente){
+      const { data: detalle, error: errDetalle } = await supabaseClient
+        .from('reportes_visita_estaciones')
+        .select('*')
+        .eq('reporte_id', reporteExistente.id);
+      if(errDetalle) console.error('No se pudo cargar el detalle del reporte:', errDetalle);
+      detalleExistente = detalle || [];
+    }
+    const detalleMap = {};
+    detalleExistente.forEach(d => { detalleMap[d.estacion_id] = d; });
+
+    renderReporteAvisos();
+    renderReporteEstaciones(detalleMap);
+
+    document.getElementById('reporteObservaciones').value = (reporteExistente && reporteExistente.observaciones) || '';
+    document.getElementById('firmaClienteNombre').value = (reporteExistente && reporteExistente.firma_cliente_nombre) || '';
+    document.getElementById('firmaTecnicoNombre').value = (reporteExistente && reporteExistente.firma_tecnico_nombre) || '';
+    document.getElementById('reporteNuevoAviso').value = '';
+    reporteFirmaClienteExistente = (reporteExistente && reporteExistente.firma_cliente_imagen) || null;
+    reporteFirmaTecnicoExistente = (reporteExistente && reporteExistente.firma_tecnico_imagen) || null;
+    firmaClienteCanvas._limpiar();
+    firmaTecnicoCanvas._limpiar();
+
+    reporteOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarReporteVisita').addEventListener('click', ()=>{
+    reporteOverlay.classList.add('hidden');
+  });
+
+  function firmaHtml(imagen, nombre, etiqueta){
+    if(imagen){
+      return `<div>${escapeHtml(etiqueta)}<br><img class="firma-doc-img" src="${imagen}" alt="${escapeHtml(etiqueta)}"></div>`;
+    }
+    return `<div class="firma-doc-linea" style="margin-top:70px;">${escapeHtml(nombre || '(sin firma)')} — ${escapeHtml(etiqueta)}</div>`;
+  }
+
+  function abrirImpresionReporte(payloadReporte, filasEstaciones, avisosResueltosDescripciones){
+    const emp = getEmpresa();
+    const visita = calVisitasCache.find(v => v.id === reporteVisitaActualId);
+    const clienteNombre = (visita && visita.clientes && visita.clientes.nombre) || '';
+    const clienteDireccion = (visita && visita.clientes && visita.clientes.direccion) || '';
+    const tipoServicio = (visita && visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
+    const tipoVisita = (visita && visita.tipo) || 'Mantenimiento';
+    const fechaVisita = visita ? formatDate(visita.fecha_programada) : '';
+
+    const estacionPorId = {};
+    reporteEstacionesCache.forEach(e => { estacionPorId[e.id] = e; });
+
+    const filasHtml = filasEstaciones.map(f => {
+      const e = estacionPorId[f.estacion_id] || {};
+      return `
+        <tr>
+          <td>${e.numero || '-'}</td>
+          <td>${escapeHtml(e.ubicacion || '-')}</td>
+          <td>${escapeHtml(e.tipo_estacion || '-')}</td>
+          <td>${f.condicion || '-'}</td>
+          <td>${f.actividad || '-'}</td>
+          <td>${f.accion || '-'}</td>
+          <td>${escapeHtml(f.notas || '')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    reporteDocContent.innerHTML = `
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(emp.nombre || "Nombre de tu empresa")}</h2>
+          <p>${escapeHtml(emp.direccion || "Dirección de la empresa")}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || "-")} ${emp.email ? " | " + escapeHtml(emp.email) : ""}</p>
+        </div>
+        <div class="doc-logo">
+          ${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}
+        </div>
+      </div>
+      <div class="doc-title">
+        <h1>Comprobante de servicio — ${escapeHtml(tipoVisita)}</h1>
+        <div class="folio">Cliente: ${escapeHtml(clienteNombre)}${tipoServicio ? ' — ' + escapeHtml(tipoServicio) : ''}</div>
+        <div class="folio">Dirección: ${escapeHtml(clienteDireccion || '-')} &nbsp;|&nbsp; Fecha de visita: ${fechaVisita}</div>
+      </div>
+
+      <h3>Estaciones revisadas</h3>
+      <table>
+        <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
+        <tbody>${filasHtml || '<tr><td colspan="7">Sin estaciones registradas.</td></tr>'}</tbody>
+      </table>
+
+      ${payloadReporte.observaciones ? `<h3>Observaciones</h3><p style="white-space:pre-wrap;">${escapeHtml(payloadReporte.observaciones)}</p>` : ''}
+
+      ${avisosResueltosDescripciones.length ? `<h3>Avisos atendidos en esta visita</h3><ul>${avisosResueltosDescripciones.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
+
+      <h3>Firmas</h3>
+      <div class="grid">
+        <div>${firmaHtml(payloadReporte.firma_cliente_imagen, payloadReporte.firma_cliente_nombre, 'Firma del cliente')}</div>
+        <div>${firmaHtml(payloadReporte.firma_tecnico_imagen, payloadReporte.firma_tecnico_nombre, 'Firma del técnico')}</div>
+      </div>
+    `;
+    reportePrintOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarReportePreview').addEventListener('click', ()=>{
+    reportePrintOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnImprimirReporteDoc').addEventListener('click', ()=>{
+    window.print();
+  });
+
+  document.getElementById('btnGuardarReporteVisita').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnGuardarReporteVisita');
+    btn.disabled = true;
+
+    const filasEstaciones = Array.from(document.querySelectorAll('#reporteEstacionesLista tr[data-estacion-id]')).map(tr => ({
+      estacion_id: tr.dataset.estacionId,
+      condicion: tr.querySelector('.reporte-condicion').value || null,
+      actividad: tr.querySelector('.reporte-actividad').value || null,
+      accion: tr.querySelector('.reporte-accion').value || null,
+      notas: tr.querySelector('.reporte-notas').value.trim() || null,
+    }));
+
+    const payloadReporte = {
+      visita_id: reporteVisitaActualId,
+      tecnico_id: (usuarioActual && usuarioActual.id) || null,
+      observaciones: document.getElementById('reporteObservaciones').value.trim() || null,
+      firma_cliente_imagen: obtenerFirmaFinal(firmaClienteCanvas, reporteFirmaClienteExistente),
+      firma_cliente_nombre: document.getElementById('firmaClienteNombre').value.trim() || null,
+      firma_tecnico_imagen: obtenerFirmaFinal(firmaTecnicoCanvas, reporteFirmaTecnicoExistente),
+      firma_tecnico_nombre: document.getElementById('firmaTecnicoNombre').value.trim() || null,
+    };
+
+    const { data: reporteGuardado, error: errReporte } = await supabaseClient
+      .from('reportes_visita')
+      .upsert(payloadReporte, { onConflict: 'visita_id' })
+      .select('id')
+      .single();
+    if(errReporte){
+      btn.disabled = false;
+      alert('No se pudo guardar el reporte: ' + errReporte.message);
+      return;
+    }
+
+    if(filasEstaciones.length > 0){
+      const detalleParaGuardar = filasEstaciones.map(f => ({
+        reporte_id: reporteGuardado.id,
+        estacion_id: f.estacion_id,
+        condicion: f.condicion,
+        actividad: f.actividad,
+        accion: f.accion,
+        notas: f.notas,
+      }));
+      const { error: errDetalle } = await supabaseClient
+        .from('reportes_visita_estaciones')
+        .upsert(detalleParaGuardar, { onConflict: 'reporte_id,estacion_id' });
+      if(errDetalle){
+        btn.disabled = false;
+        alert('El reporte se guardó, pero no se pudo guardar el detalle de estaciones: ' + errDetalle.message);
+        return;
+      }
+    }
+
+    const idsAvisosResueltos = Array.from(document.querySelectorAll('.reporte-aviso-resolver:checked')).map(cb => cb.dataset.avisoId);
+    const avisosResueltosDescripciones = reporteAvisosCache
+      .filter(a => idsAvisosResueltos.includes(a.id))
+      .map(a => a.descripcion);
+    if(idsAvisosResueltos.length > 0){
+      await supabaseClient.from('avisos_cliente')
+        .update({ resuelto: true, resuelto_en_visita_id: reporteVisitaActualId })
+        .in('id', idsAvisosResueltos);
+    }
+
+    const nuevoAvisoTexto = document.getElementById('reporteNuevoAviso').value.trim();
+    if(nuevoAvisoTexto){
+      await supabaseClient.from('avisos_cliente').insert({
+        cliente_id: reporteClienteActualId,
+        origen: 'tecnico',
+        descripcion: nuevoAvisoTexto,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      });
+    }
+
+    await supabaseClient.from('visitas_programadas').update({
+      estatus: 'Realizada',
+      fecha_realizada: fechaALocalISO(new Date()),
+    }).eq('id', reporteVisitaActualId);
+
+    btn.disabled = false;
+    mostrarToast('Reporte guardado.');
+    reporteOverlay.classList.add('hidden');
+
+    if(calInicializado){
+      await cargarVisitasDelAnio();
+      renderCalendarioMes();
+    }
+
+    abrirImpresionReporte(payloadReporte, filasEstaciones, avisosResueltosDescripciones);
+  });
+
+
   // ---------- Inicialización ----------
   const hoy = new Date();
   const vigenciaDefault = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 15);
@@ -5023,6 +5774,16 @@
   verificarSesionExistente();
 
 })();
+</script>
+<script>
+  // Registro del service worker (PWA). Ruta relativa a proposito: este sitio
+  // vive en una subruta de GitHub Pages, no en la raiz del dominio.
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js', { scope: './' })
+        .catch(err => console.warn('No se pudo registrar el service worker:', err));
+    });
+  }
 </script>
 </body>
 </html>
