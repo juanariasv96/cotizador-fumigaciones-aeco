@@ -620,11 +620,13 @@
     @page{
       margin:10mm;
     }
-    body > *:not(#printOverlay):not(#qrPrintOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
     #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
     #qrPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+    #planPrintOverlay{position:static;display:block;padding:0;background:none;}
+    #planPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     .print-toolbar{display:none;}
 
     .doc{padding:0;}
@@ -656,6 +658,60 @@
   .estacion-row .estacion-info .estacion-meta{font-size:12px;color:#666;margin-top:2px;}
   .estacion-row .estacion-acciones{flex:0 0 auto;}
   #serviciosLista tr.inactiva{opacity:.55;}
+
+  /* ---------- Calendario de visitas ---------- */
+  .badge.programada{background:#e7f0fd;color:#1d4ed8;}
+  .badge.realizada{background:#d8f3dc;color:#1b4332;}
+  .badge.reprogramada{background:#fff3cd;color:#8a6d00;}
+  .badge.cancelada{background:#fde8e8;color:#b3261e;}
+  .cal-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .cal-toolbar h3{margin:0 10px 0 0;min-width:170px;text-align:center;}
+  .cal-daynames{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;}
+  .cal-daynames div{font-size:12px;font-weight:700;color:#777;text-align:center;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-day{
+    min-height:90px;border:1px solid var(--gris-borde);border-radius:6px;
+    padding:4px;background:var(--blanco);display:flex;flex-direction:column;gap:3px;
+  }
+  .cal-day.fuera-mes{background:var(--gris-fondo);opacity:.5;}
+  .cal-day.hoy{border-color:var(--verde);border-width:2px;}
+  .cal-day-num{font-size:11px;font-weight:700;color:#777;}
+  .cal-chip{
+    display:block;width:100%;text-align:left;border:none;border-radius:4px;
+    padding:2px 5px;font-size:10.5px;line-height:1.3;cursor:pointer;
+  }
+  .cal-chip.programada{background:#e7f0fd;color:#1d4ed8;}
+  .cal-chip.realizada{background:#d8f3dc;color:#1b4332;}
+  .cal-chip.reprogramada{background:#fff3cd;color:#8a6d00;}
+  .cal-chip.cancelada{background:#fde8e8;color:#b3261e;text-decoration:line-through;}
+  #visitaOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #visitaPanel{
+    background:var(--blanco);width:100%;max-width:480px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #planOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #planPanel{
+    background:var(--blanco);width:100%;max-width:760px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #planTablaBody input{width:100%;}
+  #planPrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #planPrintSheet{
+    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
 
   .qr-grid{
     display:grid;
@@ -758,6 +814,7 @@
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
+  <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
 </nav>
 
@@ -1318,8 +1375,64 @@
           </div>
         </div>
 
+        <div class="grid" style="margin-top:10px;align-items:end;">
+          <div class="field" style="max-width:200px;">
+            <label for="servicioFechaInicio">Fecha de inicio (opcional)</label>
+            <input type="date" id="servicioFechaInicio">
+          </div>
+          <div class="field" style="max-width:200px;">
+            <label for="servicioFrecuenciaCat">Frecuencia (catálogo)</label>
+            <select id="servicioFrecuenciaCat">
+              <option value="">Sin generar calendario</option>
+              <option value="Mensual">Mensual</option>
+              <option value="Bimestral">Bimestral</option>
+              <option value="Trimestral">Trimestral</option>
+              <option value="Semestral">Semestral</option>
+              <option value="Anual">Anual</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1 1 260px;">
+            <div class="hint">Si llenas estos dos campos, al guardar se abrirá el Plan de trabajo con las fechas sugeridas de 2026 (mismo día de la semana que la fecha de inicio) para revisar, ajustar y confirmar antes de generar el calendario.</div>
+          </div>
+        </div>
+
         <div id="serviciosLista" style="margin-top:18px;"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: CALENDARIO DE VISITAS ================= -->
+  <section id="tab-calendario" class="hidden">
+    <div class="panel">
+      <h2>Calendario de visitas</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Visitas programadas por servicio, generadas automáticamente o agregadas a mano. Haz clic en una visita para asignar técnico, cambiar estatus o mover la fecha.</p>
+
+      <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:220px;">
+          <label for="calFiltroTecnico">Filtrar por técnico</label>
+          <select id="calFiltroTecnico">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:260px;">
+          <label for="calFiltroCliente">Filtrar por cliente</label>
+          <select id="calFiltroCliente">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cal-toolbar" style="margin-top:16px;">
+        <button type="button" class="btn secondary small" id="btnCalMesAnterior">← Mes anterior</button>
+        <h3 id="calMesLabel">Enero 2026</h3>
+        <button type="button" class="btn secondary small" id="btnCalMesSiguiente">Mes siguiente →</button>
+        <button type="button" class="btn secondary small" id="btnCalHoy">Hoy</button>
+      </div>
+
+      <div class="cal-daynames">
+        <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
     </div>
   </section>
 
@@ -1344,6 +1457,87 @@
       <button class="btn" id="btnImprimirQr">Imprimir</button>
     </div>
     <div class="doc" id="qrDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE DETALLE DE VISITA (Calendario) ================= -->
+<div id="visitaOverlay" class="hidden">
+  <div id="visitaPanel">
+    <h3 style="margin-top:0;" id="visitaPanelTitulo">Visita</h3>
+    <div class="field">
+      <label for="visitaTecnico">Técnico asignado</label>
+      <select id="visitaTecnico">
+        <option value="">Sin asignar</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="visitaEstatus">Estatus</label>
+      <select id="visitaEstatus">
+        <option value="Programada">Programada</option>
+        <option value="Realizada">Realizada</option>
+        <option value="Reprogramada">Reprogramada</option>
+        <option value="Cancelada">Cancelada</option>
+      </select>
+    </div>
+    <div class="grid" style="align-items:end;">
+      <div class="field">
+        <label for="visitaFecha">Fecha programada</label>
+        <input type="date" id="visitaFecha">
+      </div>
+      <div class="field">
+        <label for="visitaHora">Hora (opcional)</label>
+        <input type="time" id="visitaHora">
+      </div>
+    </div>
+    <div class="field">
+      <label for="visitaFechaRealizada">Fecha realizada (opcional)</label>
+      <input type="date" id="visitaFechaRealizada">
+    </div>
+    <div class="field">
+      <label for="visitaNotas">Notas</label>
+      <textarea id="visitaNotas" rows="2"></textarea>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:space-between;">
+      <button type="button" class="btn danger small" id="btnEliminarVisita">Eliminar</button>
+      <div>
+        <button type="button" class="btn secondary small" id="btnVerPlanCompleto">Ver plan completo</button>
+        <button type="button" class="btn secondary small" id="btnCerrarVisitaPanel">Cancelar</button>
+        <button type="button" class="btn" id="btnGuardarVisita">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE PLAN DE TRABAJO ================= -->
+<div id="planOverlay" class="hidden">
+  <div id="planPanel">
+    <h3 style="margin-top:0;" id="planPanelTitulo">Plan de trabajo</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;">Fechas sugeridas para las visitas del año. Puedes ajustar cada fecha, cambiar los ingredientes activos, y agregar o quitar filas antes de confirmar. Aquí no se asigna técnico — eso se hace después, desde cada visita en el Calendario.</p>
+    <table>
+      <thead>
+        <tr><th>Servicio</th><th>Fecha</th><th>Ingrediente Activo Insecticida</th><th>Ingrediente Activo Rodenticida</th><th></th></tr>
+      </thead>
+      <tbody id="planTablaBody"></tbody>
+    </table>
+    <div class="actions-row" style="margin-top:10px;">
+      <button type="button" class="btn secondary small" id="btnAgregarFilaPlan">+ Agregar visita</button>
+      <button type="button" class="btn secondary small" id="btnImprimirPlan">Imprimir plan de trabajo</button>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarPlanPanel">Cancelar</button>
+      <button type="button" class="btn" id="btnConfirmarPlan">Confirmar plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE IMPRESIÓN DEL PLAN DE TRABAJO ================= -->
+<div id="planPrintOverlay" class="hidden">
+  <div id="planPrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarPlanPreview">Cerrar</button>
+      <button class="btn" id="btnImprimirPlanDoc">Imprimir</button>
+    </div>
+    <div class="doc" id="planDocContent"><!-- contenido generado por JS --></div>
   </div>
 </div>
 
@@ -1914,6 +2108,7 @@
     empresa: document.getElementById('tab-empresa'),
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
+    calendario: document.getElementById('tab-calendario'),
     accesos: document.getElementById('tab-accesos'),
   };
   function activarTab(nombre){
@@ -1924,6 +2119,7 @@
     if(nombre === 'accesos') cargarRegistroAccesos();
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
+    if(nombre === 'calendario') inicializarCalendario();
   }
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
@@ -4086,6 +4282,8 @@
     document.getElementById('servicioEstatus').value = '';
     document.getElementById('servicioNotas').value = '';
     document.getElementById('servicioActivo').value = 'true';
+    document.getElementById('servicioFechaInicio').value = '';
+    document.getElementById('servicioFrecuenciaCat').value = '';
     document.getElementById('btnGuardarServicio').textContent = '+ Agregar servicio';
     document.getElementById('btnCancelarEdicionServicio').classList.add('hidden');
   }
@@ -4107,6 +4305,7 @@
         <td>${s.activo ? 'Sí' : 'No'}</td>
         <td>
           <button class="btn secondary small" data-action="editar" data-id="${s.id}">Editar</button>
+          <button class="btn secondary small" data-action="plan" data-id="${s.id}">Plan de trabajo</button>
           <button class="btn danger small" data-action="eliminar" data-id="${s.id}">Eliminar</button>
         </td>
       </tr>
@@ -4146,6 +4345,9 @@
     }
     const costoSinIvaVal = document.getElementById('servicioCostoSinIva').value;
     const costoConIvaVal = document.getElementById('servicioCostoConIva').value;
+    const fechaInicio = document.getElementById('servicioFechaInicio').value || null;
+    const frecuenciaCat = document.getElementById('servicioFrecuenciaCat').value || null;
+    const activo = document.getElementById('servicioActivo').value === 'true';
     const payload = {
       cliente_id: serviciosClienteActualId,
       tipo_servicio: document.getElementById('servicioTipo').value.trim() || null,
@@ -4155,16 +4357,20 @@
       costo_con_iva: costoConIvaVal === '' ? null : Number(costoConIvaVal),
       estatus: document.getElementById('servicioEstatus').value.trim() || null,
       notas: document.getElementById('servicioNotas').value.trim() || null,
-      activo: document.getElementById('servicioActivo').value === 'true',
+      activo: activo,
+      fecha_inicio: fechaInicio,
+      frecuencia_cat: frecuenciaCat,
     };
 
     const btn = document.getElementById('btnGuardarServicio');
     btn.disabled = true;
-    let error;
+    let error, servicioGuardadoId = servicioEditandoId;
     if(servicioEditandoId){
       ({ error } = await supabaseClient.from('servicios_cliente').update(payload).eq('id', servicioEditandoId));
     } else {
-      ({ error } = await supabaseClient.from('servicios_cliente').insert(payload));
+      const resultado = await supabaseClient.from('servicios_cliente').insert(payload).select('id').single();
+      error = resultado.error;
+      servicioGuardadoId = resultado.data && resultado.data.id;
     }
     btn.disabled = false;
 
@@ -4175,6 +4381,11 @@
     limpiarFormularioServicio();
     await cargarServiciosDeCliente(serviciosClienteActualId);
     renderServiciosLista();
+
+    if(activo && fechaInicio && frecuenciaCat && servicioGuardadoId){
+      const clienteObj = serviciosClientesCache.find(c => c.id === serviciosClienteActualId);
+      await abrirPlanDeTrabajo(servicioGuardadoId, serviciosClienteActualId, (clienteObj && clienteObj.nombre) || '', payload.tipo_servicio || '', fechaInicio, frecuenciaCat);
+    }
   });
 
   document.getElementById('btnCancelarEdicionServicio').addEventListener('click', ()=>{
@@ -4198,9 +4409,14 @@
       document.getElementById('servicioEstatus').value = servicio.estatus || '';
       document.getElementById('servicioNotas').value = servicio.notas || '';
       document.getElementById('servicioActivo').value = servicio.activo ? 'true' : 'false';
+      document.getElementById('servicioFechaInicio').value = servicio.fecha_inicio || '';
+      document.getElementById('servicioFrecuenciaCat').value = servicio.frecuencia_cat || '';
       document.getElementById('btnGuardarServicio').textContent = 'Guardar cambios';
       document.getElementById('btnCancelarEdicionServicio').classList.remove('hidden');
       document.getElementById('servicioTipo').scrollIntoView({behavior:'smooth', block:'center'});
+    } else if(btn.dataset.action === 'plan'){
+      const clienteObj = serviciosClientesCache.find(c => c.id === serviciosClienteActualId);
+      await abrirPlanDeTrabajo(servicio.id, serviciosClienteActualId, (clienteObj && clienteObj.nombre) || '', servicio.tipo_servicio || '', servicio.fecha_inicio, servicio.frecuencia_cat);
     } else if(btn.dataset.action === 'eliminar'){
       if(!confirm(`¿Seguro que quieres eliminar este servicio (${servicio.tipo_servicio || 'sin tipo'})? Esta acción no se puede deshacer.`)) return;
       btn.disabled = true;
@@ -4214,6 +4430,518 @@
       await cargarServiciosDeCliente(serviciosClienteActualId);
       renderServiciosLista();
     }
+  });
+
+
+  // ---------- Generación automática de visitas (fecha_inicio + frecuencia_cat) ----------
+  const INTERVALO_MESES = { Mensual: 1, Bimestral: 2, Trimestral: 3, Semestral: 6, Anual: 12 };
+  const ANIO_CALENDARIO = 2026;
+
+  function sumarMeses(fecha, meses){
+    return new Date(fecha.getFullYear(), fecha.getMonth() + meses, fecha.getDate());
+  }
+
+  function ajustarADiaSemana(fechaObjetivo, diaSemanaDeseado){
+    const diff = ((diaSemanaDeseado - fechaObjetivo.getDay()) + 7) % 7;
+    const ajuste = diff > 3 ? diff - 7 : diff;
+    const d = new Date(fechaObjetivo);
+    d.setDate(d.getDate() + ajuste);
+    return d;
+  }
+
+  function fechaALocalISO(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // Genera las fechas objetivo (fecha_inicio + N intervalos) y las ajusta
+  // al día de la semana de fecha_inicio más cercano; solo conserva las
+  // que caen dentro de ANIO_CALENDARIO.
+  function calcularFechasVisita(fechaInicioStr, frecuenciaCat){
+    const intervaloMeses = INTERVALO_MESES[frecuenciaCat];
+    if(!intervaloMeses) return [];
+    const [y, m, d] = fechaInicioStr.split('-').map(Number);
+    const fechaInicio = new Date(y, m - 1, d);
+    const diaSemana = fechaInicio.getDay();
+    const fechas = [];
+    for(let k = 0; k < 60; k++){
+      const objetivo = sumarMeses(fechaInicio, k * intervaloMeses);
+      if(objetivo.getFullYear() > ANIO_CALENDARIO) break;
+      const ajustada = ajustarADiaSemana(objetivo, diaSemana);
+      if(ajustada.getFullYear() === ANIO_CALENDARIO){
+        fechas.push(ajustada);
+      }
+    }
+    return fechas;
+  }
+
+  // ---------- Plan de trabajo (revisar/editar antes de generar el calendario) ----------
+  const INSECTICIDAS_ROTACION = ['Fipronil', 'Cipermetrina', 'Bifentrina + Imidacloprid'];
+  const RODENTICIDAS_ROTACION = ['Bromadiolona', 'Difacinona'];
+
+  let planServicioActualId = null;
+  let planClienteActualId = null;
+  let planClienteNombreActual = '';
+  let planTipoServicioActual = '';
+  let planFilasActuales = [];
+  let planIdsOriginales = [];
+
+  const planOverlay = document.getElementById('planOverlay');
+  const planTablaBody = document.getElementById('planTablaBody');
+  const planPrintOverlay = document.getElementById('planPrintOverlay');
+  const planDocContent = document.getElementById('planDocContent');
+
+  function renderFilasPlan(){
+    if(planFilasActuales.length === 0){
+      planTablaBody.innerHTML = `<tr><td colspan="5"><div class="empty-msg">Sin visitas todavía. Usa "+ Agregar visita".</div></td></tr>`;
+      return;
+    }
+    planTablaBody.innerHTML = planFilasActuales.map((f, i) => `
+      <tr data-id="${f.id || ''}">
+        <td>${i + 1}</td>
+        <td><input type="date" class="plan-fecha" value="${f.fecha || ''}"></td>
+        <td><input type="text" class="plan-insecticida" value="${escapeHtml(f.insecticida || '')}"></td>
+        <td><input type="text" class="plan-rodenticida" value="${escapeHtml(f.rodenticida || '')}"></td>
+        <td><button type="button" class="btn danger small" data-action="quitar-fila">Quitar</button></td>
+      </tr>
+    `).join('');
+  }
+
+  // Vuelca lo que el usuario tiene escrito en la tabla (que puede diferir
+  // de planFilasActuales) antes de agregar/quitar filas o de confirmar,
+  // para no perder ediciones en curso al volver a pintar la tabla.
+  function sincronizarFilasPlanDesdeDom(){
+    const filas = [];
+    planTablaBody.querySelectorAll('tr[data-id]').forEach(tr => {
+      filas.push({
+        id: tr.dataset.id || null,
+        fecha: tr.querySelector('.plan-fecha').value,
+        insecticida: tr.querySelector('.plan-insecticida').value.trim(),
+        rodenticida: tr.querySelector('.plan-rodenticida').value.trim(),
+      });
+    });
+    planFilasActuales = filas;
+  }
+
+  async function abrirPlanDeTrabajo(servicioId, clienteId, clienteNombre, tipoServicio, fechaInicio, frecuenciaCat){
+    planServicioActualId = servicioId;
+    planClienteActualId = clienteId;
+    planClienteNombreActual = clienteNombre;
+    planTipoServicioActual = tipoServicio;
+
+    const { data, error } = await supabaseClient
+      .from('visitas_programadas')
+      .select('id, fecha_programada, ingrediente_insecticida, ingrediente_rodenticida')
+      .eq('servicio_id', servicioId)
+      .order('fecha_programada');
+    if(error){
+      alert('No se pudo cargar el plan de trabajo: ' + error.message);
+      return;
+    }
+
+    if(data && data.length > 0){
+      planFilasActuales = data.map(v => ({
+        id: v.id,
+        fecha: v.fecha_programada,
+        insecticida: v.ingrediente_insecticida || '',
+        rodenticida: v.ingrediente_rodenticida || '',
+      }));
+    } else if(fechaInicio && frecuenciaCat){
+      const fechas = calcularFechasVisita(fechaInicio, frecuenciaCat);
+      planFilasActuales = fechas.map((f, i) => ({
+        id: null,
+        fecha: fechaALocalISO(f),
+        insecticida: INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length],
+        rodenticida: RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length],
+      }));
+    } else {
+      planFilasActuales = [];
+    }
+
+    planIdsOriginales = planFilasActuales.filter(f => f.id).map(f => f.id);
+    document.getElementById('planPanelTitulo').textContent = `Plan de trabajo — ${clienteNombre}${tipoServicio ? ' — ' + tipoServicio : ''}`;
+    renderFilasPlan();
+    planOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnAgregarFilaPlan').addEventListener('click', ()=>{
+    sincronizarFilasPlanDesdeDom();
+    const i = planFilasActuales.length;
+    planFilasActuales.push({
+      id: null,
+      fecha: '',
+      insecticida: INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length],
+      rodenticida: RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length],
+    });
+    renderFilasPlan();
+  });
+
+  planTablaBody.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-action="quitar-fila"]');
+    if(!btn) return;
+    const tr = btn.closest('tr');
+    const idx = Array.from(tr.parentElement.children).indexOf(tr);
+    sincronizarFilasPlanDesdeDom();
+    planFilasActuales.splice(idx, 1);
+    renderFilasPlan();
+  });
+
+  document.getElementById('btnCerrarPlanPanel').addEventListener('click', ()=>{
+    planOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnConfirmarPlan').addEventListener('click', async ()=>{
+    sincronizarFilasPlanDesdeDom();
+
+    if(planFilasActuales.some(f => !f.fecha)){
+      alert('Todas las visitas necesitan una fecha.');
+      return;
+    }
+
+    const idsActuales = planFilasActuales.filter(f => f.id).map(f => f.id);
+    const idsAEliminar = planIdsOriginales.filter(id => !idsActuales.includes(id));
+
+    const btn = document.getElementById('btnConfirmarPlan');
+    btn.disabled = true;
+
+    if(idsAEliminar.length > 0){
+      const { error } = await supabaseClient.from('visitas_programadas').delete().in('id', idsAEliminar);
+      if(error){
+        btn.disabled = false;
+        alert('No se pudo actualizar el plan (al quitar visitas): ' + error.message);
+        return;
+      }
+    }
+
+    for(const f of planFilasActuales.filter(f => f.id)){
+      const { error } = await supabaseClient.from('visitas_programadas').update({
+        fecha_programada: f.fecha,
+        ingrediente_insecticida: f.insecticida || null,
+        ingrediente_rodenticida: f.rodenticida || null,
+      }).eq('id', f.id);
+      if(error){
+        btn.disabled = false;
+        alert('No se pudo actualizar una de las visitas: ' + error.message);
+        return;
+      }
+    }
+
+    const nuevas = planFilasActuales.filter(f => !f.id).map(f => ({
+      servicio_id: planServicioActualId,
+      cliente_id: planClienteActualId,
+      fecha_programada: f.fecha,
+      ingrediente_insecticida: f.insecticida || null,
+      ingrediente_rodenticida: f.rodenticida || null,
+    }));
+    if(nuevas.length > 0){
+      const { error } = await supabaseClient.from('visitas_programadas').insert(nuevas);
+      if(error){
+        btn.disabled = false;
+        alert('No se pudieron agregar las visitas nuevas del plan: ' + error.message);
+        return;
+      }
+    }
+
+    btn.disabled = false;
+    mostrarToast(`Plan de trabajo confirmado: ${planFilasActuales.length} visitas.`);
+    planOverlay.classList.add('hidden');
+    if(calInicializado){
+      await cargarVisitasDelAnio();
+      renderCalendarioMes();
+    }
+  });
+
+  document.getElementById('btnImprimirPlan').addEventListener('click', ()=>{
+    sincronizarFilasPlanDesdeDom();
+    const emp = getEmpresa();
+    const filasHtml = planFilasActuales.map((f, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${formatDate(f.fecha)}</td>
+        <td>${escapeHtml(f.insecticida || '-')}</td>
+        <td>${escapeHtml(f.rodenticida || '-')}</td>
+      </tr>
+    `).join('');
+    planDocContent.innerHTML = `
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(emp.nombre || "Nombre de tu empresa")}</h2>
+          <p>${escapeHtml(emp.direccion || "Dirección de la empresa")}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || "-")} ${emp.email ? " | " + escapeHtml(emp.email) : ""}</p>
+        </div>
+        <div class="doc-logo">
+          ${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}
+        </div>
+      </div>
+      <div class="doc-title">
+        <h1>Calendario de trabajo</h1>
+        <div class="folio">Cliente: ${escapeHtml(planClienteNombreActual)}${planTipoServicioActual ? ' — ' + escapeHtml(planTipoServicioActual) : ''}</div>
+      </div>
+      <table style="margin-top:16px;">
+        <thead>
+          <tr><th>Servicio</th><th>Fecha</th><th>Ingrediente Activo Insecticida</th><th>Ingrediente Activo Rodenticida</th></tr>
+        </thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+      <p style="font-size:11px;color:#777;margin-top:16px;">Las fechas programadas para la realización de los servicios de fumigación están sujetas a cambios sin previo aviso, debido a factores operativos o climáticos. Se recomienda a los responsables mantenerse atentos a posibles actualizaciones.</p>
+    `;
+    planPrintOverlay.classList.remove('hidden');
+  });
+
+  document.getElementById('btnCerrarPlanPreview').addEventListener('click', ()=>{
+    planPrintOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnImprimirPlanDoc').addEventListener('click', ()=>{
+    window.print();
+  });
+
+
+  // ---------- Calendario de visitas ----------
+  const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  let calAnioActual = ANIO_CALENDARIO;
+  let calMesActual = 0;
+  let calVisitasCache = [];
+  let calTecnicosCache = [];
+  let calClientesCache = [];
+  let calVisitaActualId = null;
+  let calInicializado = false;
+
+  const calGrid = document.getElementById('calGrid');
+  const calMesLabel = document.getElementById('calMesLabel');
+  const calFiltroTecnico = document.getElementById('calFiltroTecnico');
+  const calFiltroCliente = document.getElementById('calFiltroCliente');
+  const visitaOverlay = document.getElementById('visitaOverlay');
+  const visitaTecnicoSelect = document.getElementById('visitaTecnico');
+
+  async function inicializarCalendario(){
+    if(!calInicializado){
+      await cargarTecnicosParaCalendario();
+      await cargarClientesParaCalendarioFiltro();
+      const hoyReal = new Date();
+      calAnioActual = hoyReal.getFullYear();
+      calMesActual = hoyReal.getMonth();
+      calInicializado = true;
+    }
+    await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  }
+
+  async function cargarTecnicosParaCalendario(){
+    const { data, error } = await supabaseClient
+      .from('perfiles_usuario')
+      .select('id, nombre')
+      .eq('rol', 'tecnico')
+      .eq('activo', true)
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los técnicos:', error);
+      alert('No se pudieron cargar los técnicos: ' + error.message);
+      return;
+    }
+    calTecnicosCache = data || [];
+    const opcionesTecnicos = calTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+    calFiltroTecnico.innerHTML = '<option value="">Todos</option>' + opcionesTecnicos;
+    visitaTecnicoSelect.innerHTML = '<option value="">Sin asignar</option>' + opcionesTecnicos;
+  }
+
+  async function cargarClientesParaCalendarioFiltro(){
+    const { data, error } = await supabaseClient
+      .from('clientes')
+      .select('id, nombre')
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los clientes:', error);
+      alert('No se pudieron cargar los clientes: ' + error.message);
+      return;
+    }
+    calClientesCache = data || [];
+    calFiltroCliente.innerHTML = '<option value="">Todos</option>' +
+      calClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  }
+
+  async function cargarVisitasDelAnio(){
+    const inicio = `${calAnioActual}-01-01`;
+    const fin = `${calAnioActual}-12-31`;
+    const { data, error } = await supabaseClient
+      .from('visitas_programadas')
+      .select('*, clientes(nombre), servicios_cliente(tipo_servicio)')
+      .gte('fecha_programada', inicio)
+      .lte('fecha_programada', fin)
+      .order('fecha_programada');
+    if(error){
+      console.error('No se pudieron cargar las visitas:', error);
+      alert('No se pudieron cargar las visitas del calendario: ' + error.message);
+      calVisitasCache = [];
+      return;
+    }
+    calVisitasCache = data || [];
+  }
+
+  function visitasFiltradas(){
+    const tecnicoFiltro = calFiltroTecnico.value;
+    const clienteFiltro = calFiltroCliente.value;
+    return calVisitasCache.filter(v => {
+      if(tecnicoFiltro && v.tecnico_asignado !== tecnicoFiltro) return false;
+      if(clienteFiltro && v.cliente_id !== clienteFiltro) return false;
+      return true;
+    });
+  }
+
+  function renderCalendarioMes(){
+    calMesLabel.textContent = `${MESES_NOMBRE[calMesActual]} ${calAnioActual}`;
+
+    const primerDiaMes = new Date(calAnioActual, calMesActual, 1);
+    const offsetInicio = (primerDiaMes.getDay() + 6) % 7; // semana empieza en lunes
+    const inicioGrid = new Date(calAnioActual, calMesActual, 1 - offsetInicio);
+    const hoyISO = fechaALocalISO(new Date());
+
+    const visitasPorFecha = {};
+    visitasFiltradas().forEach(v => {
+      (visitasPorFecha[v.fecha_programada] = visitasPorFecha[v.fecha_programada] || []).push(v);
+    });
+
+    let celdas = '';
+    for(let i = 0; i < 42; i++){
+      const dia = new Date(inicioGrid.getFullYear(), inicioGrid.getMonth(), inicioGrid.getDate() + i);
+      const diaISO = fechaALocalISO(dia);
+      const fueraDeMes = dia.getMonth() !== calMesActual;
+      const esHoy = diaISO === hoyISO;
+      const visitasDelDia = visitasPorFecha[diaISO] || [];
+
+      const conteoTecnicoDia = {};
+      visitasDelDia.forEach(v => {
+        if(v.tecnico_asignado) conteoTecnicoDia[v.tecnico_asignado] = (conteoTecnicoDia[v.tecnico_asignado] || 0) + 1;
+      });
+      const hayExceso = Object.values(conteoTecnicoDia).some(n => n > 10);
+
+      const chips = visitasDelDia.map(v => {
+        const clienteNombre = (v.clientes && v.clientes.nombre) || '';
+        const tipoServicio = (v.servicios_cliente && v.servicios_cliente.tipo_servicio) || '';
+        const estatusClase = (v.estatus || 'Programada').toLowerCase();
+        return `<button type="button" class="cal-chip ${estatusClase}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.estatus || 'Programada')})">${escapeHtml(clienteNombre)}</button>`;
+      }).join('');
+
+      celdas += `
+        <div class="cal-day ${fueraDeMes ? 'fuera-mes' : ''} ${esHoy ? 'hoy' : ''}">
+          <div class="cal-day-num">${dia.getDate()}${hayExceso ? ' <span title="Un técnico tiene más de 10 visitas este día" style="color:#b3261e;">⚠</span>' : ''}</div>
+          ${chips}
+        </div>
+      `;
+    }
+    calGrid.innerHTML = celdas;
+  }
+
+  document.getElementById('btnCalMesAnterior').addEventListener('click', async ()=>{
+    const anioPrevio = calAnioActual;
+    calMesActual--;
+    if(calMesActual < 0){ calMesActual = 11; calAnioActual--; }
+    if(calAnioActual !== anioPrevio) await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
+
+  document.getElementById('btnCalMesSiguiente').addEventListener('click', async ()=>{
+    const anioPrevio = calAnioActual;
+    calMesActual++;
+    if(calMesActual > 11){ calMesActual = 0; calAnioActual++; }
+    if(calAnioActual !== anioPrevio) await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
+
+  document.getElementById('btnCalHoy').addEventListener('click', async ()=>{
+    const hoyReal = new Date();
+    const cambioAnio = hoyReal.getFullYear() !== calAnioActual;
+    calAnioActual = hoyReal.getFullYear();
+    calMesActual = hoyReal.getMonth();
+    if(cambioAnio) await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
+
+  calFiltroTecnico.addEventListener('change', renderCalendarioMes);
+  calFiltroCliente.addEventListener('change', renderCalendarioMes);
+
+  function abrirPanelVisita(id){
+    const visita = calVisitasCache.find(v => v.id === id);
+    if(!visita) return;
+    calVisitaActualId = id;
+    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
+    const tipoServicio = (visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
+    document.getElementById('visitaPanelTitulo').textContent = `${clienteNombre}${tipoServicio ? ' — ' + tipoServicio : ''}`;
+    visitaTecnicoSelect.value = visita.tecnico_asignado || '';
+    document.getElementById('visitaEstatus').value = visita.estatus || 'Programada';
+    document.getElementById('visitaFecha').value = visita.fecha_programada || '';
+    document.getElementById('visitaHora').value = visita.hora || '';
+    document.getElementById('visitaFechaRealizada').value = visita.fecha_realizada || '';
+    document.getElementById('visitaNotas').value = visita.notas || '';
+    visitaOverlay.classList.remove('hidden');
+  }
+
+  calGrid.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.cal-chip');
+    if(!chip) return;
+    abrirPanelVisita(chip.dataset.id);
+  });
+
+  document.getElementById('btnCerrarVisitaPanel').addEventListener('click', ()=>{
+    visitaOverlay.classList.add('hidden');
+    calVisitaActualId = null;
+  });
+
+  document.getElementById('btnVerPlanCompleto').addEventListener('click', async ()=>{
+    if(!calVisitaActualId) return;
+    const visita = calVisitasCache.find(v => v.id === calVisitaActualId);
+    if(!visita) return;
+    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
+    const tipoServicio = (visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
+    visitaOverlay.classList.add('hidden');
+    await abrirPlanDeTrabajo(visita.servicio_id, visita.cliente_id, clienteNombre, tipoServicio, null, null);
+  });
+
+  document.getElementById('btnGuardarVisita').addEventListener('click', async ()=>{
+    if(!calVisitaActualId) return;
+    const fechaProgramada = document.getElementById('visitaFecha').value;
+    if(!fechaProgramada){
+      alert('La fecha programada es obligatoria.');
+      return;
+    }
+    const payload = {
+      tecnico_asignado: visitaTecnicoSelect.value || null,
+      estatus: document.getElementById('visitaEstatus').value,
+      fecha_programada: fechaProgramada,
+      hora: document.getElementById('visitaHora').value || null,
+      fecha_realizada: document.getElementById('visitaFechaRealizada').value || null,
+      notas: document.getElementById('visitaNotas').value.trim() || null,
+    };
+
+    const btn = document.getElementById('btnGuardarVisita');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('visitas_programadas').update(payload).eq('id', calVisitaActualId);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo guardar la visita: ' + error.message);
+      return;
+    }
+    visitaOverlay.classList.add('hidden');
+    await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
+
+  document.getElementById('btnEliminarVisita').addEventListener('click', async ()=>{
+    if(!calVisitaActualId) return;
+    if(!confirm('¿Seguro que quieres eliminar esta visita del calendario? Esta acción no se puede deshacer.')) return;
+    const btn = document.getElementById('btnEliminarVisita');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('visitas_programadas').delete().eq('id', calVisitaActualId);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo eliminar la visita: ' + error.message);
+      return;
+    }
+    visitaOverlay.classList.add('hidden');
+    await cargarVisitasDelAnio();
+    renderCalendarioMes();
   });
 
 
