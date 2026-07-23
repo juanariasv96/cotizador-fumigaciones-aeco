@@ -1884,6 +1884,7 @@
       id: fila.id,
       folio: fila.folio,
       estado: fila.estado,
+      cliente_id: fila.cliente_id,
       fechaCreacion: fechaCreacionCompleta.slice(0,10),
       fechaActualizacion: fechaActualizacion,
       editada: editada,
@@ -4568,7 +4569,22 @@
     planFilasActuales = filas;
   }
 
+  // Un cliente puede tener plan de trabajo si: no tiene ninguna cotizacion
+  // registrada (clientes ya cargados directo, sin pasar por el flujo de
+  // cotizaciones), o si tiene al menos una cotizacion en estado 'Cerrada'.
+  // Queda bloqueado solo si tiene cotizaciones y ninguna esta 'Cerrada'
+  // (todas 'Pendiente' y/o 'Perdida').
+  function clienteEsGanado(clienteId){
+    const cotizacionesDelCliente = getCotizaciones().filter(c => c.cliente_id === clienteId);
+    if(cotizacionesDelCliente.length === 0) return true;
+    return cotizacionesDelCliente.some(c => c.estado === 'Cerrada');
+  }
+
   async function abrirPlanDeTrabajo(servicioId, clienteId, clienteNombre, tipoServicio, fechaInicio, frecuenciaCat){
+    if(!clienteEsGanado(clienteId)){
+      alert('Este cliente está Pendiente/Rechazado — solo clientes Ganados pueden tener plan de trabajo.');
+      return;
+    }
     planServicioActualId = servicioId;
     planClienteActualId = clienteId;
     planClienteNombreActual = clienteNombre;
