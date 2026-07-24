@@ -1028,6 +1028,7 @@
               <option value="Ciempiés">Ciempiés</option>
               <option value="Palomas">Palomas</option>
               <option value="Póliza combinada">Póliza combinada (Rastrero + Roedor + Volador)</option>
+              <option value="Póliza combinada (Rastrero + Roedor)">Póliza combinada (Rastrero + Roedor)</option>
               <option value="Fumigación general">Fumigación general</option>
               <option value="Otro">Otro</option>
             </select>
@@ -2572,6 +2573,12 @@
     garantia: "30 días",
     advertencia: "",
   };
+  PLANTILLAS.combinada_rr = {
+    descripcion: PLANTILLAS.rastrero.descripcion + "\n\n" + PLANTILLAS.roedores.descripcion + "\n\nIncluye certificados y reportes de servicio.",
+    productos: PLANTILLAS.rastrero.productos + " | " + PLANTILLAS.roedores.productos,
+    garantia: "30 días",
+    advertencia: "",
+  };
 
   const PLAGA_A_PLANTILLA = {
     "Cucarachas": "rastrero",
@@ -2589,6 +2596,7 @@
     "Moscas": "volador",
     "Zancudos y mosquitos": "volador",
     "Póliza combinada": "combinada",
+    "Póliza combinada (Rastrero + Roedor)": "combinada_rr",
     "Pez plateado": "pez_plateado",
     "Gorgojos": "gorgojos",
     "Chinches": "chinches",
