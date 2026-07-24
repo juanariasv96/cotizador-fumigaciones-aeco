@@ -842,6 +842,18 @@
   </div>
 </div>
 
+<div id="dispositivoScreen" class="hidden">
+  <div class="login-card">
+    <img src="" alt="Fumigaciones AECO" class="login-logo" id="dispositivoLogo">
+    <h1 id="dispositivoTitulo">Dispositivo pendiente de aprobación</h1>
+    <p class="login-sub" id="dispositivoMensaje">Tu acceso desde este dispositivo debe ser aprobado por el dueño antes de continuar.</p>
+    <div class="actions-row" style="justify-content:center;margin-top:16px;">
+      <button type="button" class="btn secondary" id="btnCerrarSesionDispositivo">Cerrar sesión</button>
+      <button type="button" class="btn" id="btnReintentarDispositivo">Ya me aprobaron / Reintentar</button>
+    </div>
+  </div>
+</div>
+
 <div id="appRoot" class="hidden">
 
 <header class="app-header">
@@ -866,6 +878,7 @@
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
+  <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
 </nav>
 
 <main>
@@ -1555,6 +1568,18 @@
     </div>
   </section>
 
+  <!-- ================= TAB: DISPOSITIVOS (solo dueño) ================= -->
+  <section id="tab-dispositivos" class="hidden">
+    <div class="panel">
+      <h2>Dispositivos autorizados</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Aprueba qué celulares/computadoras pueden entrar al sistema. Un usuario que no sea dueño queda bloqueado en un dispositivo nuevo hasta que lo apruebes aquí. Visible solo para el rol "dueño".</p>
+      <h3 style="margin-top:18px;">Pendientes por aprobar</h3>
+      <div id="dispositivosPendientesLista"></div>
+      <h3 style="margin-top:24px;">Aprobados</h3>
+      <div id="dispositivosAprobadosLista"></div>
+    </div>
+  </section>
+
 </main>
 
 </div><!-- /#appRoot -->
@@ -1833,6 +1858,7 @@
     document.getElementById('usuarioActualNombre').textContent =
       usuarioActual.nombre + (usuarioActual.rol ? ` (${usuarioActual.rol})` : '');
     document.getElementById('tabBtnAccesos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
+    document.getElementById('tabBtnDispositivos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
 
@@ -1899,8 +1925,143 @@
     return d.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
   }
 
+  // ---------- Dispositivos autorizados (control de acceso por dispositivo) ----------
+  const dispositivoScreen = document.getElementById('dispositivoScreen');
+  let usuarioActualParaReintento = null;
+
+  function obtenerDeviceId(){
+    let id = localStorage.getItem('aeco_device_id');
+    if(!id){
+      id = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : ('dev_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+      localStorage.setItem('aeco_device_id', id);
+    }
+    return id;
+  }
+
+  function etiquetaDispositivo(){
+    const ua = navigator.userAgent || '';
+    let navegador = 'Navegador';
+    if(/Edg\//.test(ua)) navegador = 'Edge';
+    else if(/Chrome\//.test(ua) && !/Chromium/.test(ua)) navegador = 'Chrome';
+    else if(/Firefox\//.test(ua)) navegador = 'Firefox';
+    else if(/Safari\//.test(ua) && !/Chrome/.test(ua)) navegador = 'Safari';
+    const plataforma = navigator.platform || 'Desconocida';
+    return `${navegador} · ${plataforma}`;
+  }
+
+  function mostrarPantallaDispositivo(tipo, detalle){
+    loginScreen.classList.add('hidden');
+    appRoot.classList.add('hidden');
+    const titulo = document.getElementById('dispositivoTitulo');
+    const mensaje = document.getElementById('dispositivoMensaje');
+    if(tipo === 'pendiente'){
+      titulo.textContent = 'Dispositivo pendiente de aprobación';
+      mensaje.textContent = 'Tu acceso desde este dispositivo debe ser aprobado por el dueño antes de continuar. Avísale para que lo revise en la pestaña "Dispositivos".';
+    } else if(tipo === 'rechazado'){
+      titulo.textContent = 'Acceso no autorizado';
+      mensaje.textContent = 'El dueño no autorizó el acceso desde este dispositivo.';
+    } else {
+      titulo.textContent = 'No se pudo verificar el dispositivo';
+      mensaje.textContent = 'Ocurrió un error al verificar tu dispositivo' + (detalle ? (': ' + detalle) : '') + '. Intenta de nuevo.';
+    }
+    dispositivoScreen.classList.remove('hidden');
+  }
+
+  // Devuelve true si puede continuar entrando a la app; false si quedó
+  // bloqueado (ya mostró la pantalla correspondiente).
+  async function verificarDispositivo(user){
+    const deviceId = obtenerDeviceId();
+
+    if(usuarioActual.rol === 'dueño'){
+      // Autoregistro opcional como aprobado, solo para que aparezca en su
+      // propia lista de "Aprobados". Nunca bloquea al dueño pase lo que pase.
+      try{
+        await supabaseClient.from('dispositivos').upsert({
+          user_id: user.id,
+          device_id: deviceId,
+          etiqueta: etiquetaDispositivo(),
+          estado: 'aprobado',
+          aprobado_en: new Date().toISOString(),
+          aprobado_por: user.id,
+          ultimo_acceso: new Date().toISOString(),
+        }, { onConflict: 'user_id,device_id' });
+      }catch(e){
+        console.warn('No se pudo autoregistrar el dispositivo del dueño (no afecta su acceso):', e);
+      }
+      return true;
+    }
+
+    const { data: fila, error } = await supabaseClient
+      .from('dispositivos')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('device_id', deviceId)
+      .maybeSingle();
+
+    if(error){
+      console.error('No se pudo verificar el dispositivo:', error);
+      mostrarPantallaDispositivo('error', error.message);
+      return false;
+    }
+
+    if(!fila){
+      const { error: errInsert } = await supabaseClient.from('dispositivos').insert({
+        user_id: user.id,
+        device_id: deviceId,
+        etiqueta: etiquetaDispositivo(),
+      });
+      if(errInsert){
+        console.error('No se pudo registrar el dispositivo:', errInsert);
+        mostrarPantallaDispositivo('error', errInsert.message);
+        return false;
+      }
+      mostrarPantallaDispositivo('pendiente');
+      return false;
+    }
+
+    if(fila.estado === 'pendiente'){
+      mostrarPantallaDispositivo('pendiente');
+      return false;
+    }
+    if(fila.estado === 'rechazado'){
+      mostrarPantallaDispositivo('rechazado');
+      return false;
+    }
+
+    // aprobado: solo actualiza ultimo_acceso. El trigger en Supabase revierte
+    // cualquier intento de tocar estado/aprobado_en/aprobado_por si quien
+    // escribe no es el dueño, asi que esto es seguro aunque alguien
+    // manipule el codigo del navegador.
+    await supabaseClient.from('dispositivos').update({ ultimo_acceso: new Date().toISOString() }).eq('id', fila.id);
+    return true;
+  }
+
+  document.getElementById('btnReintentarDispositivo').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnReintentarDispositivo');
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+    if(usuarioActualParaReintento){
+      await iniciarApp(usuarioActualParaReintento);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Ya me aprobaron / Reintentar';
+  });
+
+  document.getElementById('btnCerrarSesionDispositivo').addEventListener('click', async ()=>{
+    await supabaseClient.auth.signOut();
+    window.location.reload();
+  });
+
   async function iniciarApp(user){
+    usuarioActualParaReintento = user;
     await cargarPerfilUsuario(user);
+
+    const dispositivoOk = await verificarDispositivo(user);
+    if(!dispositivoOk) return;
+
+    dispositivoScreen.classList.add('hidden');
     loginScreen.classList.add('hidden');
     appRoot.classList.remove('hidden');
     await cargarEmpresa();
@@ -2348,6 +2509,7 @@
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     accesos: document.getElementById('tab-accesos'),
+    dispositivos: document.getElementById('tab-dispositivos'),
   };
   function activarTab(nombre){
     tabButtons.forEach(b=>b.classList.toggle('active', b.dataset.tab === nombre));
@@ -2358,6 +2520,7 @@
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
+    if(nombre === 'dispositivos') cargarYRenderDispositivos();
   }
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
@@ -5763,6 +5926,114 @@
   });
 
 
+  // ---------- Panel de Dispositivos autorizados (solo dueño) ----------
+  let dispositivosCache = [];
+
+  async function cargarYRenderDispositivos(){
+    const { data: dispositivosData, error: errDisp } = await supabaseClient
+      .from('dispositivos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if(errDisp){
+      console.error('No se pudieron cargar los dispositivos:', errDisp);
+      alert('No se pudieron cargar los dispositivos: ' + errDisp.message);
+      return;
+    }
+
+    const { data: perfilesData, error: errPerf } = await supabaseClient
+      .from('perfiles_usuario')
+      .select('id, nombre, rol');
+    if(errPerf) console.error('No se pudieron cargar los perfiles de usuario:', errPerf);
+    const perfilesPorId = {};
+    (perfilesData || []).forEach(p => { perfilesPorId[p.id] = p; });
+
+    dispositivosCache = (dispositivosData || []).map(d => ({
+      ...d,
+      perfil: perfilesPorId[d.user_id] || null,
+    }));
+
+    renderDispositivos();
+  }
+
+  function renderDispositivos(){
+    const pendientes = dispositivosCache.filter(d => d.estado === 'pendiente');
+    const aprobados = dispositivosCache.filter(d => d.estado === 'aprobado');
+
+    const nombreDe = (d) => d.perfil ? `${escapeHtml(d.perfil.nombre || 'Sin nombre')} (${escapeHtml(d.perfil.rol || '-')})` : 'Usuario desconocido';
+
+    const pendientesEl = document.getElementById('dispositivosPendientesLista');
+    if(pendientes.length === 0){
+      pendientesEl.innerHTML = `<div class="empty-msg">Sin dispositivos pendientes.</div>`;
+    } else {
+      pendientesEl.innerHTML = `
+        <table>
+          <thead><tr><th>Usuario</th><th>Dispositivo</th><th>Solicitado</th><th>Acciones</th></tr></thead>
+          <tbody>
+            ${pendientes.map(d => `
+              <tr>
+                <td>${nombreDe(d)}</td>
+                <td>${escapeHtml(d.etiqueta || '-')}</td>
+                <td>${formatFechaHora(d.created_at)}</td>
+                <td>
+                  <button type="button" class="btn small" data-action="aprobar" data-id="${d.id}">Aprobar</button>
+                  <button type="button" class="btn danger small" data-action="rechazar" data-id="${d.id}">Rechazar</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    const aprobadosEl = document.getElementById('dispositivosAprobadosLista');
+    if(aprobados.length === 0){
+      aprobadosEl.innerHTML = `<div class="empty-msg">Sin dispositivos aprobados.</div>`;
+    } else {
+      aprobadosEl.innerHTML = `
+        <table>
+          <thead><tr><th>Usuario</th><th>Dispositivo</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+          <tbody>
+            ${aprobados.map(d => `
+              <tr>
+                <td>${nombreDe(d)}</td>
+                <td>${escapeHtml(d.etiqueta || '-')}</td>
+                <td>${d.ultimo_acceso ? formatFechaHora(d.ultimo_acceso) : '-'}</td>
+                <td>
+                  <button type="button" class="btn danger small" data-action="revocar" data-id="${d.id}">Revocar</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+
+  document.getElementById('tab-dispositivos').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const accion = btn.dataset.action;
+
+    let payload = null;
+    if(accion === 'aprobar'){
+      payload = { estado: 'aprobado', aprobado_en: new Date().toISOString(), aprobado_por: usuarioActual.id };
+    } else if(accion === 'rechazar' || accion === 'revocar'){
+      payload = { estado: 'rechazado', aprobado_en: new Date().toISOString(), aprobado_por: usuarioActual.id };
+    }
+    if(!payload) return;
+
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('dispositivos').update(payload).eq('id', id);
+    if(error){
+      alert('No se pudo actualizar el dispositivo: ' + error.message);
+      btn.disabled = false;
+      return;
+    }
+    await cargarYRenderDispositivos();
+  });
+
+
   // ---------- Inicialización ----------
   const hoy = new Date();
   const vigenciaDefault = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 15);
@@ -5779,6 +6050,7 @@
   renderFolioPreview();
 
   document.getElementById('loginLogo').src = document.getElementById('headerLogo').src;
+  document.getElementById('dispositivoLogo').src = document.getElementById('headerLogo').src;
   verificarSesionExistente();
 
 })();
