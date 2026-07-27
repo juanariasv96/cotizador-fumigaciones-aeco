@@ -772,7 +772,23 @@
     background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
-  #reporteEstacionesLista table select, #reporteEstacionesLista table input{width:100%;}
+  .estacion-reporte-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--blanco);
+  }
+  .estacion-reporte-header{font-size:14px;margin-bottom:10px;}
+  .estacion-reporte-header strong{color:var(--verde-oscuro);}
+  .estacion-reporte-grupo{margin-bottom:10px;}
+  .estacion-reporte-grupo:last-of-type{margin-bottom:8px;}
+  .estacion-reporte-grupo-label{font-size:12px;font-weight:600;color:var(--verde-oscuro);margin-bottom:5px;}
+  .chips-grupo{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip-opcion{
+    padding:7px 12px;border:1.5px solid var(--gris-borde);border-radius:16px;
+    background:var(--blanco);color:var(--texto);font-size:13px;font-family:inherit;
+    cursor:pointer;user-select:none;line-height:1.2;-webkit-tap-highlight-color:transparent;
+  }
+  .chip-opcion.activo{background:var(--verde);border-color:var(--verde-oscuro);color:#fff;font-weight:600;}
+  .chip-opcion:active{transform:scale(0.97);}
+  .estacion-reporte-card textarea{margin-top:2px;}
   .firma-bloque{border:1px solid var(--gris-borde);border-radius:8px;padding:12px;}
   .firma-canvas{
     display:block;width:100%;max-width:320px;height:120px;
@@ -5986,38 +6002,67 @@
     `).join('');
   }
 
+  // Los codigos se guardan como texto separado por comas (ej. "Bn,Da") para
+  // permitir varias opciones marcadas a la vez. Un reporte viejo con un solo
+  // codigo (ej. "Bn") tambien funciona igual: split(',') sobre un valor sin
+  // comas simplemente devuelve un arreglo de un solo elemento.
+  function codigosSeleccionados(valorGuardado){
+    return (valorGuardado || '').split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  // Para el comprobante impreso: "Bn,Da" -> "Bn, Da"; vacío -> "-".
+  function formatCodigosMultiples(valorGuardado){
+    const codigos = codigosSeleccionados(valorGuardado);
+    return codigos.length ? escapeHtml(codigos.join(', ')) : '-';
+  }
+
+  function chipsHtml(valorGuardado, catalogo){
+    const seleccionados = codigosSeleccionados(valorGuardado);
+    return catalogo.map(([cod, label]) =>
+      `<button type="button" class="chip-opcion ${seleccionados.includes(cod) ? 'activo' : ''}" data-codigo="${cod}">${cod} (${label})</button>`
+    ).join('');
+  }
+
   function renderReporteEstaciones(detalleMap){
     const cont = document.getElementById('reporteEstacionesLista');
     if(reporteEstacionesCache.length === 0){
       cont.innerHTML = `<div class="empty-msg">Este cliente no tiene estaciones activas registradas.</div>`;
       return;
     }
-    const opciones = (valorActual, catalogo) => catalogo.map(([cod, label]) =>
-      `<option value="${cod}" ${valorActual === cod ? 'selected' : ''}>${cod} (${label})</option>`
-    ).join('');
 
-    const filas = reporteEstacionesCache.map(e => {
+    cont.innerHTML = reporteEstacionesCache.map(e => {
       const d = detalleMap[e.id] || {};
       return `
-        <tr data-estacion-id="${e.id}">
-          <td>${e.numero}</td>
-          <td>${escapeHtml(e.ubicacion)}</td>
-          <td>${escapeHtml(e.tipo_estacion)}</td>
-          <td><select class="reporte-condicion"><option value="">-</option>${opciones(d.condicion, CATALOGO_CONDICION)}</select></td>
-          <td><select class="reporte-actividad"><option value="">-</option>${opciones(d.actividad, CATALOGO_ACTIVIDAD)}</select></td>
-          <td><select class="reporte-accion"><option value="">-</option>${opciones(d.accion, CATALOGO_ACCION)}</select></td>
-          <td><input type="text" class="reporte-notas" value="${escapeHtml(d.notas || '')}"></td>
-        </tr>
+        <div class="estacion-reporte-card" data-estacion-id="${e.id}">
+          <div class="estacion-reporte-header">
+            <strong>#${e.numero}</strong> ${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}
+          </div>
+          <div class="estacion-reporte-grupo">
+            <div class="estacion-reporte-grupo-label">Condición (toca para marcar varias)</div>
+            <div class="chips-grupo" data-campo="condicion">${chipsHtml(d.condicion, CATALOGO_CONDICION)}</div>
+          </div>
+          <div class="estacion-reporte-grupo">
+            <div class="estacion-reporte-grupo-label">Actividad (toca para marcar varias)</div>
+            <div class="chips-grupo" data-campo="actividad">${chipsHtml(d.actividad, CATALOGO_ACTIVIDAD)}</div>
+          </div>
+          <div class="estacion-reporte-grupo">
+            <div class="estacion-reporte-grupo-label">Acción (toca para marcar varias)</div>
+            <div class="chips-grupo" data-campo="accion">${chipsHtml(d.accion, CATALOGO_ACCION)}</div>
+          </div>
+          <textarea class="reporte-notas" rows="2" placeholder="Notas de esta estación (opcional)">${escapeHtml(d.notas || '')}</textarea>
+        </div>
       `;
     }).join('');
-
-    cont.innerHTML = `
-      <table>
-        <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-    `;
   }
+
+  // Delegado una sola vez sobre el contenedor fijo (aunque su contenido se
+  // reconstruya en cada render): tocar un chip solo alterna su estado
+  // visual, sin recargar nada ni disparar el guardado.
+  document.getElementById('reporteEstacionesLista').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip-opcion');
+    if(!chip) return;
+    chip.classList.toggle('activo');
+  });
 
   async function abrirReporteVisita(visitaId){
     const visita = calVisitasCache.find(v => v.id === visitaId);
@@ -6123,10 +6168,10 @@
           <td>${e.numero || '-'}</td>
           <td>${escapeHtml(e.ubicacion || '-')}</td>
           <td>${escapeHtml(e.tipo_estacion || '-')}</td>
-          <td>${f.condicion || '-'}</td>
-          <td>${f.actividad || '-'}</td>
-          <td>${f.accion || '-'}</td>
-          <td>${escapeHtml(f.notas || '')}</td>
+          <td>${formatCodigosMultiples(f.condicion)}</td>
+          <td>${formatCodigosMultiples(f.actividad)}</td>
+          <td>${formatCodigosMultiples(f.accion)}</td>
+          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '')}</td>
         </tr>
       `;
     }).join('');
@@ -6178,12 +6223,15 @@
   // datos guardados (para imprimir el comprobante o para alimentar el
   // Certificado con las mismas firmas) o null si algo falló.
   async function guardarReporteVisitaActual(){
-    const filasEstaciones = Array.from(document.querySelectorAll('#reporteEstacionesLista tr[data-estacion-id]')).map(tr => ({
-      estacion_id: tr.dataset.estacionId,
-      condicion: tr.querySelector('.reporte-condicion').value || null,
-      actividad: tr.querySelector('.reporte-actividad').value || null,
-      accion: tr.querySelector('.reporte-accion').value || null,
-      notas: tr.querySelector('.reporte-notas').value.trim() || null,
+    const leerChipsActivos = (card, campo) =>
+      Array.from(card.querySelectorAll(`.chips-grupo[data-campo="${campo}"] .chip-opcion.activo`)).map(b => b.dataset.codigo);
+
+    const filasEstaciones = Array.from(document.querySelectorAll('#reporteEstacionesLista [data-estacion-id]')).map(card => ({
+      estacion_id: card.dataset.estacionId,
+      condicion: leerChipsActivos(card, 'condicion').join(',') || null,
+      actividad: leerChipsActivos(card, 'actividad').join(',') || null,
+      accion: leerChipsActivos(card, 'accion').join(',') || null,
+      notas: card.querySelector('.reporte-notas').value.trim() || null,
     }));
 
     const payloadReporte = {
