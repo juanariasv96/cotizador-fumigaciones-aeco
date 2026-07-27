@@ -1430,6 +1430,7 @@
       <p style="font-size:12px;color:#777;margin-top:0;">Cebaderos, trampas de captura y lámparas UV instaladas en las instalaciones de un cliente. Cada estación tiene su propio código QR para identificarla en campo.</p>
       <div class="field" style="max-width:420px;">
         <label for="estacionesClienteSelect">Selecciona un cliente</label>
+        <input type="text" id="estacionesClienteBuscar" placeholder="Buscar cliente por nombre, teléfono o dirección..." style="margin-bottom:6px;">
         <select id="estacionesClienteSelect">
           <option value="">Selecciona...</option>
         </select>
@@ -1525,6 +1526,7 @@
       <p style="font-size:12px;color:#777;margin-top:0;">Pólizas y servicios de fumigación contratados por cada cliente: tipo, frecuencia, vigencia y costos.</p>
       <div class="field" style="max-width:420px;">
         <label for="serviciosClienteSelect">Selecciona un cliente</label>
+        <input type="text" id="serviciosClienteBuscar" placeholder="Buscar cliente por nombre, teléfono o dirección..." style="margin-bottom:6px;">
         <select id="serviciosClienteSelect">
           <option value="">Selecciona...</option>
         </select>
@@ -1631,6 +1633,7 @@
         </div>
         <div class="field" style="max-width:260px;">
           <label for="calFiltroCliente">Filtrar por cliente</label>
+          <input type="text" id="calFiltroClienteBuscar" placeholder="Buscar cliente..." style="margin-bottom:6px;">
           <select id="calFiltroCliente">
             <option value="">Todos</option>
           </select>
@@ -1914,6 +1917,7 @@
     <p style="font-size:12px;color:#777;margin-top:0;">Visita extra fuera del plan normal, para atender un refuerzo de garantía durante la vigencia de la póliza.</p>
     <div class="field">
       <label for="refuerzoCliente">Cliente</label>
+      <input type="text" id="refuerzoClienteBuscar" placeholder="Buscar cliente por nombre, teléfono o dirección..." style="margin-bottom:6px;">
       <select id="refuerzoCliente">
         <option value="">Selecciona...</option>
       </select>
@@ -4530,11 +4534,39 @@
   // qué caja es sin tener que teclear nada.
   const URL_BASE_ESTACION = 'https://reportes.fumigacionesaeco.com/?estacion=';
 
+  // Buscador de cliente reutilizado en todos los selectores de cliente del
+  // sistema (Estaciones, Servicios, Calendario, Agendar refuerzo): filtra
+  // por nombre/teléfono/dirección sobre una cache ya cargada (sin volver a
+  // pedir datos a Supabase en cada tecla). El cliente ya seleccionado se
+  // mantiene en la lista aunque deje de coincidir con el filtro, para que
+  // la selección no se pierda mientras el usuario sigue escribiendo.
+  function filtrarSelectClientes(selectEl, cache, filtroTexto, etiquetaVacia){
+    const filtro = (filtroTexto || '').trim().toLowerCase();
+    const coincide = c => !filtro
+      || (c.nombre || '').toLowerCase().includes(filtro)
+      || (c.telefono || '').toLowerCase().includes(filtro)
+      || (c.direccion || '').toLowerCase().includes(filtro);
+
+    const seleccionActual = selectEl.value;
+    let visibles = cache.filter(coincide);
+    if(seleccionActual && !visibles.some(c => c.id === seleccionActual)){
+      const actual = cache.find(c => c.id === seleccionActual);
+      if(actual) visibles = [actual, ...visibles];
+    }
+    selectEl.innerHTML = `<option value="">${etiquetaVacia}</option>` +
+      visibles.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}${c.telefono ? ' — ' + escapeHtml(c.telefono) : ''}</option>`).join('');
+    if(seleccionActual) selectEl.value = seleccionActual;
+  }
+
   let clientesCache = [];
   let estacionesClienteActualId = '';
   let estacionesCache = [];
 
   const estacionesClienteSelect = document.getElementById('estacionesClienteSelect');
+  const estacionesClienteBuscar = document.getElementById('estacionesClienteBuscar');
+  estacionesClienteBuscar.addEventListener('input', ()=>{
+    filtrarSelectClientes(estacionesClienteSelect, clientesCache, estacionesClienteBuscar.value, 'Selecciona...');
+  });
   const estacionesClienteVacio = document.getElementById('estacionesClienteVacio');
   const estacionesContenido = document.getElementById('estacionesContenido');
   const estacionesListaEl = document.getElementById('estacionesLista');
@@ -4542,19 +4574,14 @@
   async function cargarClientesParaEstaciones(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono, foto_sitio_url')
+      .select('id, nombre, telefono, direccion, foto_sitio_url')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
       return;
     }
     clientesCache = data || [];
-    const seleccionActual = estacionesClienteSelect.value;
-    estacionesClienteSelect.innerHTML = '<option value="">Selecciona...</option>' +
-      clientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}${c.telefono ? ' — ' + escapeHtml(c.telefono) : ''}</option>`).join('');
-    if(seleccionActual && clientesCache.some(c => c.id === seleccionActual)){
-      estacionesClienteSelect.value = seleccionActual;
-    }
+    filtrarSelectClientes(estacionesClienteSelect, clientesCache, estacionesClienteBuscar.value, 'Selecciona...');
   }
 
   async function cargarEstacionesDeCliente(clienteId){
@@ -4941,6 +4968,10 @@
   let servicioEditandoId = null;
 
   const serviciosClienteSelect = document.getElementById('serviciosClienteSelect');
+  const serviciosClienteBuscar = document.getElementById('serviciosClienteBuscar');
+  serviciosClienteBuscar.addEventListener('input', ()=>{
+    filtrarSelectClientes(serviciosClienteSelect, serviciosClientesCache, serviciosClienteBuscar.value, 'Selecciona...');
+  });
   const serviciosClienteVacio = document.getElementById('serviciosClienteVacio');
   const serviciosContenido = document.getElementById('serviciosContenido');
   const serviciosListaEl = document.getElementById('serviciosLista');
@@ -4948,7 +4979,7 @@
   async function cargarClientesParaServicios(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono')
+      .select('id, nombre, telefono, direccion')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
@@ -4956,12 +4987,7 @@
       return;
     }
     serviciosClientesCache = data || [];
-    const seleccionActual = serviciosClienteSelect.value;
-    serviciosClienteSelect.innerHTML = '<option value="">Selecciona...</option>' +
-      serviciosClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}${c.telefono ? ' — ' + escapeHtml(c.telefono) : ''}</option>`).join('');
-    if(seleccionActual && serviciosClientesCache.some(c => c.id === seleccionActual)){
-      serviciosClienteSelect.value = seleccionActual;
-    }
+    filtrarSelectClientes(serviciosClienteSelect, serviciosClientesCache, serviciosClienteBuscar.value, 'Selecciona...');
   }
 
   async function cargarServiciosDeCliente(clienteId){
@@ -5530,6 +5556,10 @@
   const calMesLabel = document.getElementById('calMesLabel');
   const calFiltroTecnico = document.getElementById('calFiltroTecnico');
   const calFiltroCliente = document.getElementById('calFiltroCliente');
+  const calFiltroClienteBuscar = document.getElementById('calFiltroClienteBuscar');
+  calFiltroClienteBuscar.addEventListener('input', ()=>{
+    filtrarSelectClientes(calFiltroCliente, calClientesCache, calFiltroClienteBuscar.value, 'Todos');
+  });
   const visitaOverlay = document.getElementById('visitaOverlay');
   const visitaTecnicoSelect = document.getElementById('visitaTecnico');
 
@@ -5572,7 +5602,7 @@
   async function cargarClientesParaCalendarioFiltro(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre')
+      .select('id, nombre, telefono, direccion')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
@@ -5580,8 +5610,7 @@
       return;
     }
     calClientesCache = data || [];
-    calFiltroCliente.innerHTML = '<option value="">Todos</option>' +
-      calClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    filtrarSelectClientes(calFiltroCliente, calClientesCache, calFiltroClienteBuscar.value, 'Todos');
   }
 
   async function cargarVisitasDelAnio(){
@@ -5778,9 +5807,14 @@
   // ---------- Agendar refuerzo/garantia (oficina, fuera del plan normal) ----------
   const refuerzoOverlay = document.getElementById('refuerzoOverlay');
 
+  const refuerzoClienteBuscar = document.getElementById('refuerzoClienteBuscar');
+  refuerzoClienteBuscar.addEventListener('input', ()=>{
+    filtrarSelectClientes(document.getElementById('refuerzoCliente'), calClientesCache, refuerzoClienteBuscar.value, 'Selecciona...');
+  });
+
   document.getElementById('btnAgendarRefuerzo').addEventListener('click', ()=>{
-    document.getElementById('refuerzoCliente').innerHTML = '<option value="">Selecciona...</option>' +
-      calClientesCache.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    refuerzoClienteBuscar.value = '';
+    filtrarSelectClientes(document.getElementById('refuerzoCliente'), calClientesCache, '', 'Selecciona...');
     document.getElementById('refuerzoServicio').innerHTML = '<option value="">Selecciona un cliente primero...</option>';
     document.getElementById('refuerzoTecnico').innerHTML = '<option value="">Sin asignar</option>' +
       calTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
