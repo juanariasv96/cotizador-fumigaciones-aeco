@@ -699,6 +699,16 @@
   .cal-chip.cancelada{background:#fde8e8;color:#b3261e;text-decoration:line-through;}
   .cal-chip.refuerzo{border-left:3px solid #b3261e;font-weight:700;}
 
+  /* ---------- Documentación (oficina) ---------- */
+  .documentacion-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:12px 14px;margin-bottom:10px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:var(--blanco);
+  }
+  .documentacion-info{display:flex;flex-direction:column;gap:3px;}
+  .documentacion-meta{font-size:12px;color:#666;}
+  .badge.doc-reporte{background:#e7f0fd;color:#1d4ed8;}
+  .badge.doc-certificado{background:#e3f5e1;color:#016937;}
+
   /* ---------- Seguimiento de cotizaciones ---------- */
   .badge.etapa-enviada{background:#e7f0fd;color:#1d4ed8;}
   .badge.etapa-seguimiento-1{background:#fff3cd;color:#8a6d00;}
@@ -773,22 +783,30 @@
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
   .estacion-reporte-card{
-    border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--blanco);
+    border:1px solid var(--gris-borde);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--blanco);
   }
-  .estacion-reporte-header{font-size:14px;margin-bottom:10px;}
+  .estacion-reporte-header{font-size:13px;margin-bottom:8px;}
   .estacion-reporte-header strong{color:var(--verde-oscuro);}
-  .estacion-reporte-grupo{margin-bottom:10px;}
-  .estacion-reporte-grupo:last-of-type{margin-bottom:8px;}
-  .estacion-reporte-grupo-label{font-size:12px;font-weight:600;color:var(--verde-oscuro);margin-bottom:5px;}
-  .chips-grupo{display:flex;flex-wrap:wrap;gap:6px;}
+  .estacion-reporte-grupo{margin-bottom:7px;}
+  .estacion-reporte-grupo:last-of-type{margin-bottom:6px;}
+  .estacion-reporte-grupo-label{font-size:11px;font-weight:600;color:var(--verde-oscuro);margin-bottom:3px;}
+  /* Chips en linea, compactos y con envoltura: varios por renglon incluso
+     en pantallas de 360-390px, en vez de uno apilado por renglon. */
+  .chips-grupo{display:flex;flex-wrap:wrap;gap:4px;}
   .chip-opcion{
-    padding:7px 12px;border:1.5px solid var(--gris-borde);border-radius:16px;
-    background:var(--blanco);color:var(--texto);font-size:13px;font-family:inherit;
-    cursor:pointer;user-select:none;line-height:1.2;-webkit-tap-highlight-color:transparent;
+    flex:0 0 auto;
+    padding:6px 8px;border:1.5px solid var(--gris-borde);border-radius:13px;
+    background:var(--blanco);color:var(--texto);font-size:11.5px;font-family:inherit;
+    cursor:pointer;user-select:none;line-height:1.25;-webkit-tap-highlight-color:transparent;
+    min-height:32px;box-sizing:border-box;
   }
   .chip-opcion.activo{background:var(--verde);border-color:var(--verde-oscuro);color:#fff;font-weight:600;}
   .chip-opcion:active{transform:scale(0.97);}
   .estacion-reporte-card textarea{margin-top:2px;}
+  @media (max-width:480px){
+    #reporteOverlay{padding:14px 6px;}
+    #reportePanel{padding:12px;}
+  }
   .firma-bloque{border:1px solid var(--gris-borde);border-radius:8px;padding:12px;}
   .firma-canvas{
     display:block;width:100%;max-width:320px;height:120px;
@@ -965,6 +983,7 @@
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
+  <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
   <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
 </nav>
@@ -1488,6 +1507,15 @@
             </select>
           </div>
           <div class="field">
+            <label for="estacionTipoFauna">Tipo de fauna</label>
+            <select id="estacionTipoFauna">
+              <option value="Roedores">Roedores</option>
+              <option value="Serpientes">Serpientes</option>
+              <option value="Gatos">Gatos</option>
+              <option value="Tlacuaches">Tlacuaches</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="estacionNotas">Notas (opcional)</label>
             <input type="text" id="estacionNotas" placeholder="Ej. Junto a la puerta trasera">
           </div>
@@ -1521,6 +1549,15 @@
                 <option value="Trampa de captura">Trampa de captura</option>
                 <option value="Lámpara UV">Lámpara UV</option>
                 <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="loteTipoFauna">Tipo de fauna</label>
+              <select id="loteTipoFauna">
+                <option value="Roedores">Roedores</option>
+                <option value="Serpientes">Serpientes</option>
+                <option value="Gatos">Gatos</option>
+                <option value="Tlacuaches">Tlacuaches</option>
               </select>
             </div>
             <div class="field" style="max-width:200px;">
@@ -1668,6 +1705,33 @@
         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
       </div>
       <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: DOCUMENTACIÓN (oficina: dueño y asistente) ================= -->
+  <section id="tab-documentacion" class="hidden">
+    <div class="panel">
+      <h2>Documentación</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Reportes de visita y certificados generados por los técnicos en campo. Consulta y reimprime lo ya generado; visible solo para dueño y asistente.</p>
+
+      <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:260px;">
+          <label for="docFiltroCliente">Filtrar por cliente</label>
+          <input type="text" id="docFiltroClienteBuscar" placeholder="Buscar cliente..." style="margin-bottom:6px;">
+          <select id="docFiltroCliente">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:180px;">
+          <label for="docFiltroMes">Mes</label>
+          <input type="month" id="docFiltroMes">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn secondary small" id="btnDocLimpiarFiltros" style="width:100%;">Quitar filtros</button>
+        </div>
+      </div>
+
+      <div id="documentacionLista" style="margin-top:16px;"></div>
     </div>
   </section>
 
@@ -2092,6 +2156,8 @@
     document.getElementById('tabBtnDispositivos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnDocumentacion').classList.toggle('hidden',
+      !['dueño', 'asistente'].includes(usuarioActual.rol));
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
     // sus reportes de visita). El resto de pestanas quedan ocultas.
@@ -2776,6 +2842,7 @@
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
+    documentacion: document.getElementById('tab-documentacion'),
     accesos: document.getElementById('tab-accesos'),
     dispositivos: document.getElementById('tab-dispositivos'),
   };
@@ -2789,6 +2856,7 @@
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
+    if(nombre === 'documentacion') cargarDocumentacion().then(renderDocumentacionLista);
     if(nombre === 'dispositivos') cargarYRenderDispositivos();
   }
   tabButtons.forEach(btn=>{
@@ -4626,7 +4694,7 @@
         <div class="estacion-qr" id="qr-${e.id}"></div>
         <div class="estacion-info">
           <div class="estacion-numero">Estación #${e.numero}${e.activo ? '' : ' (inactiva)'}</div>
-          <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
+          <div class="estacion-meta">${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)} · ${escapeHtml(e.tipo_fauna || 'Roedores')}${e.notas ? ' · ' + escapeHtml(e.notas) : ''}</div>
         </div>
         <div class="estacion-acciones">
           <button type="button" class="btn secondary small" data-toggle-estacion="${e.id}" data-activo="${e.activo}">${e.activo ? 'Desactivar' : 'Activar'}</button>
@@ -4666,6 +4734,7 @@
     }
     const ubicacion = document.getElementById('estacionUbicacion').value;
     const tipoEstacion = document.getElementById('estacionTipo').value;
+    const tipoFauna = document.getElementById('estacionTipoFauna').value;
     const notas = document.getElementById('estacionNotas').value.trim();
     const siguienteNumero = estacionesCache.reduce((max, e) => Math.max(max, e.numero), 0) + 1;
 
@@ -4676,6 +4745,7 @@
       numero: siguienteNumero,
       ubicacion,
       tipo_estacion: tipoEstacion,
+      tipo_fauna: tipoFauna,
       notas: notas || null,
       creado_por: (usuarioActual && usuarioActual.id) || null,
     });
@@ -4710,6 +4780,7 @@
     }
     const ubicacion = document.getElementById('loteUbicacion').value;
     const tipoEstacion = document.getElementById('loteTipo').value;
+    const tipoFauna = document.getElementById('loteTipoFauna').value;
     const base = estacionesCache.reduce((max, e) => Math.max(max, e.numero), 0);
 
     const nuevas = [];
@@ -4719,6 +4790,7 @@
         numero: base + i,
         ubicacion,
         tipo_estacion: tipoEstacion,
+        tipo_fauna: tipoFauna,
         creado_por: (usuarioActual && usuarioActual.id) || null,
       });
     }
@@ -5975,6 +6047,20 @@
   const CATALOGO_ACTIVIDAD = [['Nh','No hay'],['Cr','Consumo roedor'],['Ci','Consumo insecto'],['Hu','Huellas'],['Ex','Excremento'],['Cs','Captura de serpiente'],['Cro','Captura de roedor']];
   const CATALOGO_ACCION = [['Ss','Sin servicio'],['Cc','Cambio cebo'],['Cg','Cambio goma'],['Ld','Limpieza'],['Re','Reparación'],['Rp','Reposición'],['In','Instalación'],['Rf','Reubicación de fauna']];
 
+  // Tipo de fauna: a diferencia de Condicion/Actividad/Accion, es de
+  // seleccion UNICA (una estacion monitorea un tipo de fauna a la vez).
+  // Es un atributo de la estacion (tabla estaciones), no del reporte: se
+  // presenta aqui para que el tecnico lo corrija sobre la marcha si hace
+  // falta, y el cambio se guarda de vuelta en la estacion.
+  // Lampara UV queda FUERA a proposito: sera un reporte separado y
+  // distinto (formato pendiente), no parte de esta revision.
+  const CATALOGO_TIPO_FAUNA = [
+    ['Roedores', 'Roedores'],
+    ['Serpientes', 'Serpientes'],
+    ['Gatos', 'Gatos'],
+    ['Tlacuaches', 'Tlacuaches'],
+  ];
+
   let reporteVisitaActualId = null;
   let reporteClienteActualId = null;
   let reporteEstacionesCache = [];
@@ -6023,6 +6109,15 @@
     ).join('');
   }
 
+  // Chips de tipo de fauna: seleccion unica, sin prefijo de codigo (el
+  // valor guardado es el nombre completo, igual que tipo_estacion).
+  function chipsFaunaHtml(valorActual){
+    const actual = valorActual || 'Roedores';
+    return CATALOGO_TIPO_FAUNA.map(([cod, label]) =>
+      `<button type="button" class="chip-opcion ${actual === cod ? 'activo' : ''}" data-codigo="${cod}">${escapeHtml(label)}</button>`
+    ).join('');
+  }
+
   function renderReporteEstaciones(detalleMap){
     const cont = document.getElementById('reporteEstacionesLista');
     if(reporteEstacionesCache.length === 0){
@@ -6036,6 +6131,10 @@
         <div class="estacion-reporte-card" data-estacion-id="${e.id}">
           <div class="estacion-reporte-header">
             <strong>#${e.numero}</strong> ${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}
+          </div>
+          <div class="estacion-reporte-grupo">
+            <div class="estacion-reporte-grupo-label">Tipo de fauna</div>
+            <div class="chips-grupo" data-campo="tipo_fauna" data-modo="unico">${chipsFaunaHtml(e.tipo_fauna)}</div>
           </div>
           <div class="estacion-reporte-grupo">
             <div class="estacion-reporte-grupo-label">Condición (toca para marcar varias)</div>
@@ -6061,7 +6160,15 @@
   document.getElementById('reporteEstacionesLista').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip-opcion');
     if(!chip) return;
-    chip.classList.toggle('activo');
+    const grupo = chip.closest('.chips-grupo');
+    if(grupo && grupo.dataset.modo === 'unico'){
+      // Tipo de fauna: selección única, como un radio (marcar uno desmarca
+      // los demás del mismo grupo).
+      grupo.querySelectorAll('.chip-opcion.activo').forEach(c => { if(c !== chip) c.classList.remove('activo'); });
+      chip.classList.add('activo');
+    } else {
+      chip.classList.toggle('activo');
+    }
   });
 
   async function abrirReporteVisita(visitaId){
@@ -6128,7 +6235,11 @@
 
     document.getElementById('reporteObservaciones').value = (reporteExistente && reporteExistente.observaciones) || '';
     document.getElementById('firmaClienteNombre').value = (reporteExistente && reporteExistente.firma_cliente_nombre) || '';
-    document.getElementById('firmaTecnicoNombre').value = (reporteExistente && reporteExistente.firma_tecnico_nombre) || '';
+    // Pre-llenar (sin forzar) el nombre del técnico logueado: si nunca dibuja
+    // su firma a mano, que al menos quede su nombre como respaldo en vez de
+    // quedar en blanco (antes este campo no tenía ningún valor por defecto).
+    document.getElementById('firmaTecnicoNombre').value =
+      (reporteExistente && reporteExistente.firma_tecnico_nombre) || (usuarioActual && usuarioActual.nombre) || '';
     document.getElementById('reporteNuevoAviso').value = '';
     reporteFirmaClienteExistente = (reporteExistente && reporteExistente.firma_cliente_imagen) || null;
     reporteFirmaTecnicoExistente = (reporteExistente && reporteExistente.firma_tecnico_imagen) || null;
@@ -6168,6 +6279,7 @@
           <td>${e.numero || '-'}</td>
           <td>${escapeHtml(e.ubicacion || '-')}</td>
           <td>${escapeHtml(e.tipo_estacion || '-')}</td>
+          <td>${escapeHtml(e.tipo_fauna || 'Roedores')}</td>
           <td>${formatCodigosMultiples(f.condicion)}</td>
           <td>${formatCodigosMultiples(f.actividad)}</td>
           <td>${formatCodigosMultiples(f.accion)}</td>
@@ -6195,8 +6307,8 @@
 
       <h3>Estaciones revisadas</h3>
       <table>
-        <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
-        <tbody>${filasHtml || '<tr><td colspan="7">Sin estaciones registradas.</td></tr>'}</tbody>
+        <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Fauna</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
+        <tbody>${filasHtml || '<tr><td colspan="8">Sin estaciones registradas.</td></tr>'}</tbody>
       </table>
 
       ${payloadReporte.observaciones ? `<h3>Observaciones</h3><p style="white-space:pre-wrap;">${escapeHtml(payloadReporte.observaciones)}</p>` : ''}
@@ -6233,6 +6345,37 @@
       accion: leerChipsActivos(card, 'accion').join(',') || null,
       notas: card.querySelector('.reporte-notas').value.trim() || null,
     }));
+
+    // Tipo de fauna es un atributo de la ESTACIÓN (no del reporte): si el
+    // técnico lo corrigió aquí, se actualiza de vuelta en "estaciones",
+    // solo para las que realmente cambiaron.
+    const cambiosFauna = Array.from(document.querySelectorAll('#reporteEstacionesLista [data-estacion-id]'))
+      .map(card => {
+        const estacionId = card.dataset.estacionId;
+        const chipActivo = card.querySelector('.chips-grupo[data-campo="tipo_fauna"] .chip-opcion.activo');
+        const nuevaFauna = chipActivo ? chipActivo.dataset.codigo : null;
+        const estacion = reporteEstacionesCache.find(e => e.id === estacionId);
+        if(!nuevaFauna || !estacion || nuevaFauna === estacion.tipo_fauna) return null;
+        return { id: estacionId, tipo_fauna: nuevaFauna };
+      })
+      .filter(Boolean);
+
+    if(cambiosFauna.length > 0){
+      const resultadosFauna = await Promise.all(cambiosFauna.map(c =>
+        supabaseClient.from('estaciones').update({ tipo_fauna: c.tipo_fauna }).eq('id', c.id)
+      ));
+      const errorFauna = resultadosFauna.find(r => r.error);
+      if(errorFauna){
+        alert('No se pudo actualizar el tipo de fauna de alguna estación: ' + errorFauna.error.message);
+      } else {
+        // Refleja el cambio en la cache en memoria para que la impresión
+        // inmediata ya muestre la fauna corregida, sin esperar un recargo.
+        cambiosFauna.forEach(c => {
+          const estacion = reporteEstacionesCache.find(e => e.id === c.id);
+          if(estacion) estacion.tipo_fauna = c.tipo_fauna;
+        });
+      }
+    }
 
     const payloadReporte = {
       visita_id: reporteVisitaActualId,
@@ -6623,6 +6766,217 @@
     certificadoOverlay.classList.add('hidden');
     abrirImpresionCertificado(payloadCertificado);
   });
+
+
+  // ---------- Documentación (oficina: dueño y asistente) ----------
+  // Lista de solo consulta: reutiliza abrirImpresionReporte/abrirImpresionCertificado
+  // ya construidos para el técnico, pero llamándolos directo (sin pasar por
+  // guardarReporteVisitaActual ni por el formulario del certificado), así
+  // nunca se dispara un guardado — es puramente ver/reimprimir.
+  let documentacionCache = [];
+  let documentacionClientesCache = [];
+
+  const docFiltroCliente = document.getElementById('docFiltroCliente');
+  const docFiltroClienteBuscar = document.getElementById('docFiltroClienteBuscar');
+  const docFiltroMes = document.getElementById('docFiltroMes');
+
+  docFiltroClienteBuscar.addEventListener('input', ()=>{
+    filtrarSelectClientes(docFiltroCliente, documentacionClientesCache, docFiltroClienteBuscar.value, 'Todos');
+  });
+  docFiltroCliente.addEventListener('change', renderDocumentacionLista);
+  docFiltroMes.addEventListener('change', renderDocumentacionLista);
+  document.getElementById('btnDocLimpiarFiltros').addEventListener('click', ()=>{
+    docFiltroClienteBuscar.value = '';
+    filtrarSelectClientes(docFiltroCliente, documentacionClientesCache, '', 'Todos');
+    docFiltroMes.value = '';
+    renderDocumentacionLista();
+  });
+
+  async function cargarDocumentacion(){
+    const [
+      { data: clientesData, error: errClientes },
+      { data: reportes, error: errRep },
+      { data: certificados, error: errCert },
+      { data: perfiles, error: errPerf },
+    ] = await Promise.all([
+      supabaseClient.from('clientes').select('id, nombre, telefono, direccion').order('nombre'),
+      supabaseClient.from('reportes_visita')
+        .select('id, visita_id, fecha_creacion, tecnico_id, visitas_programadas(cliente_id, tipo, fecha_programada, clientes(nombre))'),
+      supabaseClient.from('certificados_visita')
+        .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
+      supabaseClient.from('perfiles_usuario').select('id, nombre'),
+    ]);
+
+    if(errClientes) console.error('No se pudieron cargar los clientes para Documentación:', errClientes);
+    if(errRep) console.error('No se pudieron cargar los reportes de visita:', errRep);
+    if(errCert) console.error('No se pudieron cargar los certificados:', errCert);
+    if(errPerf) console.error('No se pudieron cargar los perfiles de usuario (nombres de técnico):', errPerf);
+
+    documentacionClientesCache = clientesData || [];
+    filtrarSelectClientes(docFiltroCliente, documentacionClientesCache, docFiltroClienteBuscar.value, 'Todos');
+
+    const nombrePorId = {};
+    (perfiles || []).forEach(p => { nombrePorId[p.id] = p.nombre; });
+
+    const itemsReporte = (reportes || []).map(r => {
+      const visita = r.visitas_programadas || {};
+      return {
+        tipo: 'reporte',
+        visitaId: r.visita_id,
+        clienteId: visita.cliente_id || null,
+        clienteNombre: (visita.clientes && visita.clientes.nombre) || '(cliente no encontrado)',
+        fecha: visita.fecha_programada || (r.fecha_creacion || '').slice(0, 10),
+        tipoVisita: visita.tipo || 'Mantenimiento',
+        tecnicoNombre: nombrePorId[r.tecnico_id] || '-',
+        folio: null,
+      };
+    });
+
+    const itemsCertificado = (certificados || []).map(c => {
+      const visita = c.visitas_programadas || {};
+      return {
+        tipo: 'certificado',
+        visitaId: c.visita_id,
+        clienteId: c.cliente_id,
+        clienteNombre: (c.clientes && c.clientes.nombre) || '(cliente no encontrado)',
+        fecha: c.fecha,
+        tipoVisita: visita.tipo || 'Mantenimiento',
+        tecnicoNombre: nombrePorId[c.tecnico_id] || '-',
+        folio: c.folio,
+      };
+    });
+
+    documentacionCache = [...itemsReporte, ...itemsCertificado]
+      .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  }
+
+  function renderDocumentacionLista(){
+    const clienteFiltro = docFiltroCliente.value;
+    const mesFiltro = docFiltroMes.value; // "YYYY-MM" o ""
+
+    const filtrados = documentacionCache.filter(d => {
+      if(clienteFiltro && d.clienteId !== clienteFiltro) return false;
+      if(mesFiltro && !(d.fecha || '').startsWith(mesFiltro)) return false;
+      return true;
+    });
+
+    const cont = document.getElementById('documentacionLista');
+    if(filtrados.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay reportes ni certificados con estos filtros.</div>`;
+      return;
+    }
+
+    cont.innerHTML = filtrados.map(d => `
+      <div class="documentacion-card">
+        <div class="documentacion-info">
+          <div>
+            <strong>${escapeHtml(d.clienteNombre)}</strong>
+            <span class="badge ${d.tipo === 'certificado' ? 'doc-certificado' : 'doc-reporte'}">${d.tipo === 'certificado' ? 'Certificado' : 'Reporte de visita'}</span>
+          </div>
+          <div class="documentacion-meta">
+            ${formatDate(d.fecha)} · ${escapeHtml(d.tipoVisita)} · Técnico: ${escapeHtml(d.tecnicoNombre)}${d.folio ? ' · Folio: ' + d.folio : ''}
+          </div>
+        </div>
+        <button type="button" class="btn secondary small" data-ver-doc="${d.tipo}" data-visita-id="${d.visitaId}">Ver / Reimprimir</button>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('documentacionLista').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-ver-doc]');
+    if(!btn) return;
+    btn.disabled = true;
+    await asegurarVisitaEnCache(btn.dataset.visitaId);
+    if(btn.dataset.verDoc === 'reporte'){
+      await verReporteDesdeOficina(btn.dataset.visitaId);
+    } else {
+      await verCertificadoDesdeOficina(btn.dataset.visitaId);
+    }
+    btn.disabled = false;
+  });
+
+  // abrirImpresionReporte/abrirImpresionCertificado buscan la visita en
+  // calVisitasCache (la cache del Calendario, limitada al año que se esté
+  // viendo ahí). Desde Documentación puede pedirse una visita de cualquier
+  // fecha, así que si no está ya cargada, se trae puntual y se agrega.
+  async function asegurarVisitaEnCache(visitaId){
+    if(calVisitasCache.some(v => v.id === visitaId)) return;
+    const { data, error } = await supabaseClient
+      .from('visitas_programadas')
+      .select('*, clientes(nombre, direccion, telefono, zona), servicios_cliente(tipo_servicio)')
+      .eq('id', visitaId)
+      .maybeSingle();
+    if(error || !data){
+      console.error('No se pudo cargar la visita para consulta:', error);
+      return;
+    }
+    calVisitasCache.push(data);
+  }
+
+  async function verReporteDesdeOficina(visitaId){
+    const visita = calVisitasCache.find(v => v.id === visitaId);
+    if(!visita){
+      alert('No se pudo cargar la visita de este reporte.');
+      return;
+    }
+    reporteVisitaActualId = visitaId;
+    reporteClienteActualId = visita.cliente_id;
+
+    const { data: estaciones, error: errEst } = await supabaseClient
+      .from('estaciones')
+      .select('*')
+      .eq('cliente_id', reporteClienteActualId)
+      .order('numero');
+    if(errEst) console.error('No se pudieron cargar las estaciones:', errEst);
+    reporteEstacionesCache = estaciones || [];
+
+    const { data: reporteGuardado, error: errRep } = await supabaseClient
+      .from('reportes_visita')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(errRep || !reporteGuardado){
+      alert('No se encontró el reporte de visita guardado.');
+      return;
+    }
+
+    const { data: detalle, error: errDetalle } = await supabaseClient
+      .from('reportes_visita_estaciones')
+      .select('*')
+      .eq('reporte_id', reporteGuardado.id);
+    if(errDetalle) console.error('No se pudo cargar el detalle de estaciones:', errDetalle);
+
+    const filasEstaciones = (detalle || []).map(d => ({
+      estacion_id: d.estacion_id,
+      condicion: d.condicion,
+      actividad: d.actividad,
+      accion: d.accion,
+      notas: d.notas,
+    }));
+
+    const { data: avisosResueltos, error: errAvisos } = await supabaseClient
+      .from('avisos_cliente')
+      .select('descripcion')
+      .eq('resuelto_en_visita_id', visitaId);
+    if(errAvisos) console.error('No se pudieron cargar los avisos atendidos:', errAvisos);
+    const avisosResueltosDescripciones = (avisosResueltos || []).map(a => a.descripcion);
+
+    abrirImpresionReporte(reporteGuardado, filasEstaciones, avisosResueltosDescripciones);
+  }
+
+  async function verCertificadoDesdeOficina(visitaId){
+    certificadoVisitaActualId = visitaId;
+    const { data: cert, error } = await supabaseClient
+      .from('certificados_visita')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(error || !cert){
+      alert('No se encontró el certificado guardado.');
+      return;
+    }
+    abrirImpresionCertificado(cert);
+  }
 
 
   // ---------- Panel de Dispositivos autorizados (solo dueño) ----------

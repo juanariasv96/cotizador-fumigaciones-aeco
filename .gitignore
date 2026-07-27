@@ -8,3 +8,6 @@ dispositivos_setup.sql
 seguimiento_cotizaciones_setup.sql
 certificado_setup.sql
 reportes_estaciones_multiselect_setup.sql
+estaciones_tipo_fauna_setup.sql
+documentacion_oficina_setup.sql
+visitas_cascade_setup.sql
