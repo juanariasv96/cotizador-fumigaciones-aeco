@@ -835,9 +835,9 @@
   .doc-checklist-col{display:flex;flex-direction:column;gap:5px;min-width:190px;flex:1;font-size:13px;}
   .doc-checkbox{display:flex;align-items:center;gap:7px;}
   .doc-checkbox .box{
-    width:13px;height:13px;border:1.5px solid #333;flex-shrink:0;display:inline-block;
+    width:14px;height:14px;border:1.5px solid #333;flex-shrink:0;display:inline-flex;
+    align-items:center;justify-content:center;font-size:11px;line-height:1;font-weight:700;color:#000;
   }
-  .doc-checkbox .box.marcado{background:#333;}
   .doc-cliente-folio{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;font-size:13px;}
   .doc-cliente-folio .cliente-bloque p{margin:2px 0;}
   .doc-cliente-folio .folio-bloque{text-align:right;white-space:nowrap;}
@@ -5972,8 +5972,8 @@
 
   // ---------- Reporte de visita (Mantenimiento y Refuerzo) ----------
   const CATALOGO_CONDICION = [['Bn','Bien'],['Da','Dañada'],['Fa','Faltante'],['Su','Sucia'],['Ob','Obstruida']];
-  const CATALOGO_ACTIVIDAD = [['Nh','No hay'],['Cr','Consumo roedor'],['Ci','Consumo insecto'],['Hu','Huellas'],['Ex','Excremento']];
-  const CATALOGO_ACCION = [['Ss','Sin servicio'],['Cc','Cambio cebo'],['Cg','Cambio goma'],['Ld','Limpieza'],['Re','Reparación'],['Rp','Reposición']];
+  const CATALOGO_ACTIVIDAD = [['Nh','No hay'],['Cr','Consumo roedor'],['Ci','Consumo insecto'],['Hu','Huellas'],['Ex','Excremento'],['Cs','Captura de serpiente'],['Cro','Captura de roedor']];
+  const CATALOGO_ACCION = [['Ss','Sin servicio'],['Cc','Cambio cebo'],['Cg','Cambio goma'],['Ld','Limpieza'],['Re','Reparación'],['Rp','Reposición'],['In','Instalación'],['Rf','Reubicación de fauna']];
 
   let reporteVisitaActualId = null;
   let reporteClienteActualId = null;
@@ -6504,7 +6504,7 @@
     return `<div class="doc-checklist">${columnas.map(col => `
       <div class="doc-checklist-col">
         ${col.map(([key, label]) => `
-          <div class="doc-checkbox"><span class="box ${v[key] ? 'marcado' : ''}"></span> ${escapeHtml(label)}</div>
+          <div class="doc-checkbox"><span class="box">${v[key] ? '&#10003;' : ''}</span> ${escapeHtml(label)}</div>
         `).join('')}
       </div>
     `).join('')}</div>`;
