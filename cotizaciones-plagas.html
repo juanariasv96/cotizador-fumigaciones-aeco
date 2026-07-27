@@ -696,6 +696,23 @@
   .cal-chip.reprogramada{background:#fff3cd;color:#8a6d00;}
   .cal-chip.cancelada{background:#fde8e8;color:#b3261e;text-decoration:line-through;}
   .cal-chip.refuerzo{border-left:3px solid #b3261e;font-weight:700;}
+
+  /* ---------- Seguimiento de cotizaciones ---------- */
+  .badge.etapa-enviada{background:#e7f0fd;color:#1d4ed8;}
+  .badge.etapa-seguimiento-1{background:#fff3cd;color:#8a6d00;}
+  .badge.etapa-seguimiento-2{background:#ffe0b2;color:#8a4b00;}
+  .badge.etapa-seguimiento-final{background:#fde8e8;color:#b3261e;}
+  .seguimiento-resumen{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:18px;}
+  .seguimiento-resumen .stat .valor{font-size:22px;font-weight:700;color:var(--verde-oscuro);}
+  .seguimiento-resumen .stat.atrasadas .valor{color:var(--rojo);}
+  .seguimiento-resumen .stat .label{font-size:12px;color:#777;}
+  .seguimiento-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:14px;
+    margin-bottom:10px;background:var(--blanco);
+  }
+  .seguimiento-card.atrasada{border-left:4px solid var(--rojo);}
+  .seguimiento-llamada.atrasada{color:var(--rojo);font-weight:700;}
+  .seguimiento-vendedores-tabla{margin-top:10px;}
   #visitaOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
@@ -711,6 +728,15 @@
     padding:30px 15px;overflow:auto;z-index:999;
   }
   #refuerzoPanel{
+    background:var(--blanco);width:100%;max-width:480px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #seguimientoOverlay, #reabrirCotizacionOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #seguimientoPanel, #reabrirCotizacionPanel{
     background:var(--blanco);width:100%;max-width:480px;border-radius:6px;
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
@@ -873,6 +899,7 @@
 <nav class="tabs">
   <button class="tab-btn active" data-tab="nueva">Nueva Cotización</button>
   <button class="tab-btn" data-tab="lista">Cotizaciones Guardadas</button>
+  <button class="tab-btn" data-tab="seguimiento" id="tabBtnSeguimiento">Seguimiento</button>
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
@@ -1236,6 +1263,18 @@
         <button class="btn secondary" id="btnExportar">Exportar respaldo (JSON)</button>
       </div>
       <div id="listaContainer"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: SEGUIMIENTO DE COTIZACIONES ================= -->
+  <section id="tab-seguimiento" class="hidden">
+    <div class="panel">
+      <h2>Seguimiento de cotizaciones</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Cotizaciones pendientes por cerrar: llamada de seguimiento cada 2 semanas. Si pasan 2 meses sin cerrar, se marcan automáticamente como Perdida/Rechazada (reversible desde "Cotizaciones Guardadas").</p>
+
+      <div class="seguimiento-resumen" id="seguimientoResumen"></div>
+
+      <div id="seguimientoLista"></div>
     </div>
   </section>
 
@@ -1791,6 +1830,57 @@
   </div>
 </div>
 
+<!-- ================= OVERLAY DE REGISTRAR SEGUIMIENTO ================= -->
+<div id="seguimientoOverlay" class="hidden">
+  <div id="seguimientoPanel">
+    <h3 style="margin-top:0;" id="seguimientoPanelTitulo">Seguimiento</h3>
+    <div id="seguimientoGuia"></div>
+    <div id="seguimientoHistorial" style="margin-bottom:14px;"></div>
+    <div class="field">
+      <label for="seguimientoMedio">Medio de contacto</label>
+      <select id="seguimientoMedio">
+        <option value="llamada">Llamada</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="correo">Correo</option>
+        <option value="visita">Visita</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="seguimientoNota">Nota (qué se habló con el cliente, con detalle)</label>
+      <textarea id="seguimientoNota" rows="6" placeholder="Describe con detalle qué se platicó, dudas del cliente, próximos pasos..."></textarea>
+    </div>
+    <div class="field">
+      <label for="seguimientoResultado">Resultado (opcional)</label>
+      <input type="text" id="seguimientoResultado" placeholder="Ej. Interesado, pidió esperar, no contestó">
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarSeguimiento">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarSeguimiento">Registrar y avanzar etapa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE REABRIR COTIZACIÓN VENCIDA ================= -->
+<div id="reabrirCotizacionOverlay" class="hidden">
+  <div id="reabrirCotizacionPanel">
+    <h3 style="margin-top:0;">Reabrir cotización vencida</h3>
+    <p class="hint">Esta cotización se marcó como Perdida automáticamente por pasar 2 meses sin cerrar. Elige en qué etapa de seguimiento continuar.</p>
+    <div class="field">
+      <label for="reabrirEtapaSelect">Etapa de seguimiento</label>
+      <select id="reabrirEtapaSelect">
+        <option value="Enviada">Enviada</option>
+        <option value="Seguimiento 1">Seguimiento 1</option>
+        <option value="Seguimiento 2">Seguimiento 2</option>
+        <option value="Seguimiento final">Seguimiento final</option>
+      </select>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarReabrirCotizacion">Cancelar</button>
+      <button type="button" class="btn" id="btnConfirmarReabrirCotizacion">Reabrir</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= OVERLAY DE IMPRESIÓN ================= -->
 <div id="printOverlay" class="hidden">
   <div id="printSheet">
@@ -2240,6 +2330,10 @@
       folio: fila.folio,
       estado: fila.estado,
       cliente_id: fila.cliente_id,
+      etapa_seguimiento: fila.etapa_seguimiento || 'Enviada',
+      fecha_envio: fila.fecha_envio || fechaCreacionCompleta,
+      proxima_llamada: fila.proxima_llamada || null,
+      vencida_por_2meses: !!fila.vencida_por_2meses,
       fechaCreacion: fechaCreacionCompleta.slice(0,10),
       fechaActualizacion: fechaActualizacion,
       editada: editada,
@@ -2255,6 +2349,16 @@
   }
 
   async function cargarCotizaciones(){
+    // Revisa y marca como Perdida cualquier cotizacion pendiente que ya
+    // lleve 2 meses (56 dias) sin cerrar. No depende de un cron: se
+    // ejecuta cada vez que se carga la lista (Cotizaciones Guardadas o
+    // Seguimiento), asi que se mantiene al dia con el uso normal de la app.
+    try{
+      await supabaseClient.rpc('vencer_cotizaciones_2meses');
+    }catch(e){
+      console.warn('No se pudo revisar cotizaciones vencidas:', e);
+    }
+
     const { data, error } = await supabaseClient
       .from('cotizaciones')
       .select('*, clientes(*)')
@@ -2323,15 +2427,24 @@
   // (con folio e id ya asignados por la base de datos) o null si falló.
   async function guardarCotizacion(cotizacion){
     const clienteId = await upsertCliente(cotizacion.cliente, cotizacion.categoriaServicio);
+    const estadoInicial = cotizacion.estado || 'Pendiente';
 
     const { data, error } = await supabaseClient
       .from('cotizaciones')
       .insert({
         cliente_id: clienteId,
-        estado: cotizacion.estado || 'Pendiente',
+        estado: estadoInicial,
         vendedor: cotizacion.generadoPorNombre || cotizacion.generadoPorRol || null,
         creado_por: (usuarioActual && usuarioActual.id) || null,
         datos: cotizacion,
+        // Arranca el embudo de seguimiento: fecha_envio la pone el default
+        // now() de la columna (misma fecha que fecha_creacion); la primera
+        // llamada se agenda a 3 dias (mas pronto que las siguientes, que ya
+        // son cada 14 dias una vez que arranca el seguimiento).
+        ...(estadoInicial === 'Pendiente' ? {
+          etapa_seguimiento: 'Enviada',
+          proxima_llamada: fechaALocalISO(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)),
+        } : {}),
       })
       .select()
       .single();
@@ -2504,6 +2617,7 @@
   const tabs = {
     nueva: document.getElementById('tab-nueva'),
     lista: document.getElementById('tab-lista'),
+    seguimiento: document.getElementById('tab-seguimiento'),
     empresa: document.getElementById('tab-empresa'),
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
@@ -2516,6 +2630,7 @@
     Object.values(tabs).forEach(s=>s.classList.add('hidden'));
     tabs[nombre].classList.remove('hidden');
     if(nombre === 'lista') renderLista();
+    if(nombre === 'seguimiento') cargarCotizaciones().then(renderSeguimientoLista);
     if(nombre === 'accesos') cargarRegistroAccesos();
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
@@ -4141,12 +4256,16 @@
         <td>${formatMoney(montoTotalConIva(c))}</td>
         <td>${formatDate(c.vigencia)} ${esVigente(c.vigencia)?'<span class="badge vigente">Vigente</span>':'<span class="badge vencida">Vencida</span>'}</td>
         <td>${escapeHtml(c.generadoPorRol||"-")}</td>
-        <td>${estadoSelectHtml(c)}</td>
+        <td>
+          ${estadoSelectHtml(c)}
+          ${c.vencida_por_2meses ? `<div class="badge vencida" style="margin-top:4px;" title="Se marcó Perdida automáticamente por 2 meses sin cerrar">Vencida 2m</div>` : ''}
+        </td>
         <td>
           <button class="btn secondary small" data-action="ver" data-id="${c.id}">Ver / Imprimir</button>
           <button class="btn secondary small" data-action="editar" data-id="${c.id}">Editar</button>
           <button class="btn secondary small" data-action="pdf" data-id="${c.id}" title="Abre el diálogo de impresión: elige 'Guardar como PDF' como destino">Exportar PDF</button>
           <button class="btn secondary small" data-action="email" data-id="${c.id}" title="Descarga el PDF y abre Gmail en una pestaña nueva para redactar el correo">Enviar por correo</button>
+          ${c.vencida_por_2meses && usuarioActual && usuarioActual.rol === 'dueño' ? `<button class="btn secondary small" data-action="reabrir" data-id="${c.id}">Reabrir</button>` : ''}
           <button class="btn danger small" data-action="eliminar" data-id="${c.id}">Eliminar</button>
         </td>
       </tr>
@@ -4201,7 +4320,52 @@
         if(ok) renderLista();
         else btn.disabled = false;
       }
+    } else if(btn.dataset.action === 'reabrir'){
+      abrirReabrirCotizacionOverlay(id, cot.etapa_seguimiento || 'Enviada');
     }
+  });
+
+  // ---------- Reabrir cotización vencida por 2 meses (solo dueño) ----------
+  const reabrirCotizacionOverlay = document.getElementById('reabrirCotizacionOverlay');
+  let reabrirCotizacionActualId = null;
+
+  function abrirReabrirCotizacionOverlay(id, etapaActual){
+    reabrirCotizacionActualId = id;
+    document.getElementById('reabrirEtapaSelect').value = etapaActual;
+    reabrirCotizacionOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarReabrirCotizacion').addEventListener('click', ()=>{
+    reabrirCotizacionOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnConfirmarReabrirCotizacion').addEventListener('click', async ()=>{
+    if(!reabrirCotizacionActualId) return;
+    const btn = document.getElementById('btnConfirmarReabrirCotizacion');
+    btn.disabled = true;
+    const etapaElegida = document.getElementById('reabrirEtapaSelect').value;
+    // Si se reabre desde "Enviada" es como arrancar de nuevo: primera
+    // llamada a 3 dias. Cualquier otra etapa ya sigue la cadencia normal
+    // de 14 dias.
+    const diasHastaProximaLlamada = etapaElegida === 'Enviada' ? 3 : 14;
+    const { error } = await supabaseClient
+      .from('cotizaciones')
+      .update({
+        estado: 'Pendiente',
+        vencida_por_2meses: false,
+        etapa_seguimiento: etapaElegida,
+        proxima_llamada: fechaALocalISO(new Date(Date.now() + diasHastaProximaLlamada * 24 * 60 * 60 * 1000)),
+      })
+      .eq('id', reabrirCotizacionActualId);
+    btn.disabled = false;
+    if(error){
+      alert('No se pudo reabrir la cotización: ' + error.message);
+      return;
+    }
+    mostrarToast('Cotización reabierta.');
+    reabrirCotizacionOverlay.classList.add('hidden');
+    await cargarCotizaciones();
+    renderLista();
   });
 
   // ---------- Exportar / importar respaldo ----------
@@ -6031,6 +6195,252 @@
       return;
     }
     await cargarYRenderDispositivos();
+  });
+
+
+  // ---------- Seguimiento de cotizaciones (embudo de ventas) ----------
+  const ETAPAS_SEGUIMIENTO = ['Enviada', 'Seguimiento 1', 'Seguimiento 2', 'Seguimiento final'];
+
+  // Guía de abordaje por etapa: se muestra al vendedor al registrar un
+  // seguimiento, como apoyo (no bloquea nada, es solo sugerencia).
+  const GUIA_SEGUIMIENTO = {
+    'Enviada': {
+      cuando: 'primera llamada, a los 3 días',
+      objetivo: 'confirmar que recibió la cotización y resolver dudas iniciales.',
+      guion: 'Hola [cliente], le llamo de Fumigaciones AECO. ¿Recibió la cotización que le enviamos para [servicio]? Quería confirmar que le llegó bien y ver si tiene alguna duda sobre el servicio, el alcance o el precio.',
+      tip: 'escucha objeciones y ofrece aclarar alcance y garantía.',
+    },
+    'Seguimiento 1': {
+      cuando: 'a las 2 semanas',
+      objetivo: 'mantener el interés y entender en qué está su decisión.',
+      guion: 'Hola [cliente], le doy seguimiento a su cotización de [servicio]. ¿Ha tenido oportunidad de revisarla? ¿Hay algo que le detenga para agendar?',
+      tip: 'identifica si el freno es precio, tiempo o que está comparando con otro proveedor.',
+    },
+    'Seguimiento 2': {
+      cuando: 'a las 4 semanas',
+      objetivo: 'generar urgencia suave y ofrecer valor.',
+      guion: 'Hola [cliente], sigo pendiente de su servicio de control de plagas. Si le sirve, podemos agendar una fecha tentativa o ajustar lo que necesite. ¿Le parece si lo dejamos programado?',
+      tip: 'ofrece una fecha concreta y recuérdale beneficios y garantía.',
+    },
+    'Seguimiento final': {
+      cuando: 'a las 6 semanas',
+      objetivo: 'cierre o descarte claro.',
+      guion: 'Hola [cliente], quiero cerrar bien su solicitud. ¿Le interesa que avancemos con el servicio o prefiere dejarlo para más adelante? Así sé cómo apoyarle.',
+      tip: 'haz una pregunta de cierre directa; si no hay interés, márcala como perdida y anota el motivo.',
+    },
+  };
+
+  function renderGuiaSeguimiento(etapa){
+    const guia = GUIA_SEGUIMIENTO[etapa] || GUIA_SEGUIMIENTO['Enviada'];
+    return `
+      <div class="hint" style="background:#f6f8fa;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+        <div style="margin-bottom:4px;"><strong>Guía para esta llamada (${escapeHtml(etapa)} — ${escapeHtml(guia.cuando)})</strong></div>
+        <div><strong>Objetivo:</strong> ${escapeHtml(guia.objetivo)}</div>
+        <div style="margin-top:4px;"><strong>Guion sugerido:</strong> "${escapeHtml(guia.guion)}"</div>
+        <div style="margin-top:4px;"><strong>Tip:</strong> ${escapeHtml(guia.tip)}</div>
+      </div>
+    `;
+  }
+
+  // El vendedor puede registrar seguimientos sin límite: 'Seguimiento final'
+  // es un techo de ETIQUETA nomás (para no tocar el CHECK de la columna),
+  // pero nunca bloquea nuevas llamadas — ver btnGuardarSeguimiento más abajo,
+  // que siempre inserta el registro sin impedirlo cuando ya se llegó ahí.
+  function siguienteEtapaSeguimiento(etapaActual){
+    const idx = ETAPAS_SEGUIMIENTO.indexOf(etapaActual);
+    if(idx === -1 || idx === ETAPAS_SEGUIMIENTO.length - 1) return ETAPAS_SEGUIMIENTO[ETAPAS_SEGUIMIENTO.length - 1];
+    return ETAPAS_SEGUIMIENTO[idx + 1];
+  }
+
+  function claseEtapa(etapa){
+    return 'etapa-' + (etapa || 'Enviada').toLowerCase().replace(/\s+/g, '-');
+  }
+
+  function cotizacionAtrasada(c){
+    if(!c.proxima_llamada) return false;
+    return c.proxima_llamada < fechaALocalISO(new Date());
+  }
+
+  function pendientesOrdenadasPorUrgencia(){
+    return getCotizaciones()
+      .filter(c => estadoDe(c) === 'Pendiente')
+      .slice()
+      .sort((a, b) => {
+        const aAtr = cotizacionAtrasada(a) ? 0 : 1;
+        const bAtr = cotizacionAtrasada(b) ? 0 : 1;
+        if(aAtr !== bAtr) return aAtr - bAtr;
+        const fa = a.proxima_llamada || '9999-99-99';
+        const fb = b.proxima_llamada || '9999-99-99';
+        return fa < fb ? -1 : (fa > fb ? 1 : 0);
+      });
+  }
+
+  function renderSeguimientoResumen(pendientes){
+    const en7dias = fechaALocalISO(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    const atrasadas = pendientes.filter(cotizacionAtrasada).length;
+    const porVencerPronto = pendientes.filter(c => c.proxima_llamada && !cotizacionAtrasada(c) && c.proxima_llamada <= en7dias).length;
+
+    const cierresPorVendedor = {};
+    getCotizaciones().forEach(c => {
+      if(estadoDe(c) === 'Cerrada'){
+        const nombre = c.vendedor || c.generadoPorRol || 'Sin asignar';
+        cierresPorVendedor[nombre] = (cierresPorVendedor[nombre] || 0) + 1;
+      }
+    });
+    const filasVendedores = Object.entries(cierresPorVendedor)
+      .sort((a, b) => b[1] - a[1])
+      .map(([nombre, cuenta]) => `<tr><td>${escapeHtml(nombre)}</td><td>${cuenta}</td></tr>`)
+      .join('');
+
+    document.getElementById('seguimientoResumen').innerHTML = `
+      <div class="stat"><div class="valor">${pendientes.length}</div><div class="label">Pendientes</div></div>
+      <div class="stat atrasadas"><div class="valor">${atrasadas}</div><div class="label">Atrasadas</div></div>
+      <div class="stat"><div class="valor">${porVencerPronto}</div><div class="label">Por llamar en 7 días</div></div>
+      ${filasVendedores ? `
+        <div class="stat" style="min-width:220px;">
+          <div class="label">Cierres por vendedor</div>
+          <table class="seguimiento-vendedores-tabla"><tbody>${filasVendedores}</tbody></table>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  function renderSeguimientoLista(){
+    const pendientes = pendientesOrdenadasPorUrgencia();
+    renderSeguimientoResumen(pendientes);
+
+    const cont = document.getElementById('seguimientoLista');
+    if(pendientes.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay cotizaciones pendientes de seguimiento.</div>`;
+      return;
+    }
+
+    cont.innerHTML = pendientes.map(c => {
+      const atrasada = cotizacionAtrasada(c);
+      return `
+        <div class="seguimiento-card ${atrasada ? 'atrasada' : ''}" data-id="${c.id}">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <strong>${escapeHtml(c.cliente.nombre)}</strong>
+              <span class="badge ${claseEtapa(c.etapa_seguimiento)}">${escapeHtml(c.etapa_seguimiento || 'Enviada')}</span>
+            </div>
+            <div>${formatMoney(montoTotalConIva(c))}</div>
+          </div>
+          <div class="seguimiento-llamada ${atrasada ? 'atrasada' : ''}" style="margin-top:4px;font-size:13px;">
+            Próxima llamada: ${c.proxima_llamada ? formatDate(c.proxima_llamada) : '-'} ${atrasada ? '(atrasada)' : ''}
+          </div>
+          <div class="actions-row" style="margin-top:10px;">
+            <button type="button" class="btn small" data-action="registrar" data-id="${c.id}">Bitácora / Registrar seguimiento</button>
+            <button type="button" class="btn secondary small" data-action="ganada" data-id="${c.id}">Marcar Ganada</button>
+            <button type="button" class="btn danger small" data-action="perdida" data-id="${c.id}">Marcar Perdida</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const seguimientoOverlay = document.getElementById('seguimientoOverlay');
+  let seguimientoCotizacionActualId = null;
+
+  async function abrirSeguimientoOverlay(cotizacionId){
+    seguimientoCotizacionActualId = cotizacionId;
+    const cot = getCotizaciones().find(c => c.id === cotizacionId);
+    document.getElementById('seguimientoPanelTitulo').textContent = `Seguimiento — ${cot ? cot.cliente.nombre : ''}`;
+    document.getElementById('seguimientoGuia').innerHTML = renderGuiaSeguimiento(cot ? (cot.etapa_seguimiento || 'Enviada') : 'Enviada');
+
+    const { data, error } = await supabaseClient
+      .from('seguimientos_cotizacion')
+      .select('*')
+      .eq('cotizacion_id', cotizacionId)
+      .order('fecha', { ascending: false });
+    if(error) console.error('No se pudo cargar el historial de seguimiento:', error);
+    const historial = data || [];
+    // Bitácora completa: sin límite de entradas, siempre de la más reciente
+    // a la más antigua, sin recortar la nota (el vendedor puede escribir
+    // con detalle todo lo que platicó con el cliente).
+    document.getElementById('seguimientoHistorial').innerHTML = `
+      <div class="hint" style="margin-bottom:6px;"><strong>Bitácora (${historial.length} registro${historial.length === 1 ? '' : 's'}, más reciente primero):</strong></div>
+      ${historial.length ? `
+        <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+          ${historial.map(h => `
+            <div style="border:1px solid #e2e2e2;border-radius:8px;padding:8px 10px;font-size:13px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <strong>${formatFechaHora(h.fecha)}</strong>
+                <span class="badge">${escapeHtml(h.medio)}</span>
+              </div>
+              ${h.nota ? `<div style="margin-top:4px;white-space:pre-wrap;">${escapeHtml(h.nota)}</div>` : ''}
+              ${h.resultado ? `<div style="margin-top:4px;"><em>Resultado: ${escapeHtml(h.resultado)}</em></div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : `<div class="empty-msg">Sin seguimientos registrados todavía.</div>`}
+    `;
+
+    document.getElementById('seguimientoMedio').value = 'llamada';
+    document.getElementById('seguimientoNota').value = '';
+    document.getElementById('seguimientoResultado').value = '';
+    seguimientoOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarSeguimiento').addEventListener('click', ()=>{
+    seguimientoOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnGuardarSeguimiento').addEventListener('click', async ()=>{
+    if(!seguimientoCotizacionActualId) return;
+    const cot = getCotizaciones().find(c => c.id === seguimientoCotizacionActualId);
+    if(!cot) return;
+
+    const btn = document.getElementById('btnGuardarSeguimiento');
+    btn.disabled = true;
+
+    const { error: errInsert } = await supabaseClient.from('seguimientos_cotizacion').insert({
+      cotizacion_id: seguimientoCotizacionActualId,
+      medio: document.getElementById('seguimientoMedio').value,
+      nota: document.getElementById('seguimientoNota').value.trim() || null,
+      resultado: document.getElementById('seguimientoResultado').value.trim() || null,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    if(errInsert){
+      btn.disabled = false;
+      alert('No se pudo registrar el seguimiento: ' + errInsert.message);
+      return;
+    }
+
+    const nuevaEtapa = siguienteEtapaSeguimiento(cot.etapa_seguimiento || 'Enviada');
+    const nuevaProximaLlamada = fechaALocalISO(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
+    const { error: errUpdate } = await supabaseClient
+      .from('cotizaciones')
+      .update({ etapa_seguimiento: nuevaEtapa, proxima_llamada: nuevaProximaLlamada })
+      .eq('id', seguimientoCotizacionActualId);
+
+    btn.disabled = false;
+    if(errUpdate){
+      alert('El seguimiento se registró, pero no se pudo avanzar la etapa: ' + errUpdate.message);
+      return;
+    }
+
+    mostrarToast('Seguimiento registrado.');
+    seguimientoOverlay.classList.add('hidden');
+    await cargarCotizaciones();
+    renderSeguimientoLista();
+  });
+
+  document.getElementById('tab-seguimiento').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const accion = btn.dataset.action;
+
+    if(accion === 'registrar' || accion === 'historial'){
+      await abrirSeguimientoOverlay(id);
+    } else if(accion === 'ganada' || accion === 'perdida'){
+      const nuevoEstado = accion === 'ganada' ? 'Cerrada' : 'Perdida';
+      btn.disabled = true;
+      const ok = await actualizarEstadoCotizacion(id, nuevoEstado);
+      btn.disabled = false;
+      if(ok) renderSeguimientoLista();
+    }
   });
 
 
