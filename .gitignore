@@ -6,3 +6,4 @@ plan_trabajo_setup.sql
 reportes_campo_setup.sql
 dispositivos_setup.sql
 seguimiento_cotizaciones_setup.sql
+certificado_setup.sql
