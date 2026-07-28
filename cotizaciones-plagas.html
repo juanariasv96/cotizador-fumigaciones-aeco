@@ -782,30 +782,44 @@
     background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
-  .estacion-reporte-card{
-    border:1px solid var(--gris-borde);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--blanco);
+  /* Tabla compacta de estaciones: todas visibles juntas de un vistazo,
+     una fila por estacion. Con scroll horizontal de respaldo en pantallas
+     angostas (el dueño prefiere ver todo aunque quede algo apretado). */
+  .reporte-tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .reporte-tabla-estaciones{width:100%;border-collapse:collapse;font-size:11px;}
+  .reporte-tabla-estaciones th,
+  .reporte-tabla-estaciones td{
+    border:1px solid var(--gris-borde);padding:3px 4px;vertical-align:top;text-align:left;
   }
-  .estacion-reporte-header{font-size:13px;margin-bottom:8px;}
-  .estacion-reporte-header strong{color:var(--verde-oscuro);}
-  .estacion-reporte-grupo{margin-bottom:7px;}
-  .estacion-reporte-grupo:last-of-type{margin-bottom:6px;}
-  .estacion-reporte-grupo-label{font-size:11px;font-weight:600;color:var(--verde-oscuro);margin-bottom:3px;}
-  /* Chips en linea, compactos y con envoltura: varios por renglon incluso
-     en pantallas de 360-390px, en vez de uno apilado por renglon. */
-  .chips-grupo{display:flex;flex-wrap:wrap;gap:4px;}
+  .reporte-tabla-estaciones th{
+    background:var(--verde-suave);color:var(--verde-oscuro);font-size:9.5px;
+    text-transform:uppercase;letter-spacing:.1px;line-height:1.15;
+  }
+  .reporte-tabla-estaciones td:first-child,
+  .reporte-tabla-estaciones th:first-child{text-align:center;width:20px;}
+  .reporte-tabla-tipo{font-size:9.5px;color:#555;white-space:nowrap;margin-bottom:2px;}
+  .reporte-tabla-estaciones select.reporte-fauna{
+    width:100%;min-width:64px;max-width:80px;font-size:9.5px;padding:2px 1px;
+    border:1px solid var(--gris-borde);border-radius:4px;background:var(--blanco);color:var(--texto);
+  }
+  /* Chips MUY compactos: solo el codigo, envuelven varios por celda. */
+  .chips-grupo{display:flex;flex-wrap:wrap;gap:2px;max-width:96px;}
   .chip-opcion{
     flex:0 0 auto;
-    padding:6px 8px;border:1.5px solid var(--gris-borde);border-radius:13px;
-    background:var(--blanco);color:var(--texto);font-size:11.5px;font-family:inherit;
-    cursor:pointer;user-select:none;line-height:1.25;-webkit-tap-highlight-color:transparent;
-    min-height:32px;box-sizing:border-box;
+    padding:3px 5px;border:1px solid var(--gris-borde);border-radius:8px;
+    background:var(--blanco);color:var(--texto);font-size:10px;font-family:inherit;font-weight:600;
+    cursor:pointer;user-select:none;line-height:1.15;-webkit-tap-highlight-color:transparent;
+    min-height:22px;box-sizing:border-box;
   }
-  .chip-opcion.activo{background:var(--verde);border-color:var(--verde-oscuro);color:#fff;font-weight:600;}
-  .chip-opcion:active{transform:scale(0.97);}
-  .estacion-reporte-card textarea{margin-top:2px;}
+  .chip-opcion.activo{background:var(--verde);border-color:var(--verde-oscuro);color:#fff;}
+  .chip-opcion:active{transform:scale(0.95);}
+  .reporte-tabla-estaciones textarea.reporte-notas{
+    width:100%;min-width:72px;font-size:10px;padding:2px 3px;resize:vertical;min-height:24px;
+  }
   @media (max-width:480px){
     #reporteOverlay{padding:14px 6px;}
     #reportePanel{padding:12px;}
+    #reporteOverlay .panel{padding:8px;margin-bottom:12px;}
   }
   .firma-bloque{border:1px solid var(--gris-borde);border-radius:8px;padding:12px;}
   .firma-canvas{
@@ -6102,19 +6116,21 @@
     return codigos.length ? escapeHtml(codigos.join(', ')) : '-';
   }
 
+  // Chips MUY compactos para caber varios por celda: solo el código, con
+  // el nombre completo como title (tooltip) para consulta.
   function chipsHtml(valorGuardado, catalogo){
     const seleccionados = codigosSeleccionados(valorGuardado);
     return catalogo.map(([cod, label]) =>
-      `<button type="button" class="chip-opcion ${seleccionados.includes(cod) ? 'activo' : ''}" data-codigo="${cod}">${cod} (${label})</button>`
+      `<button type="button" class="chip-opcion ${seleccionados.includes(cod) ? 'activo' : ''}" data-codigo="${cod}" title="${escapeHtml(label)}">${cod}</button>`
     ).join('');
   }
 
-  // Chips de tipo de fauna: seleccion unica, sin prefijo de codigo (el
-  // valor guardado es el nombre completo, igual que tipo_estacion).
-  function chipsFaunaHtml(valorActual){
+  // Tipo de fauna: select nativo (una sola opción), mucho más compacto que
+  // chips dentro de una celda angosta de tabla.
+  function opcionesFaunaHtml(valorActual){
     const actual = valorActual || 'Roedores';
     return CATALOGO_TIPO_FAUNA.map(([cod, label]) =>
-      `<button type="button" class="chip-opcion ${actual === cod ? 'activo' : ''}" data-codigo="${cod}">${escapeHtml(label)}</button>`
+      `<option value="${cod}" ${actual === cod ? 'selected' : ''}>${escapeHtml(label)}</option>`
     ).join('');
   }
 
@@ -6125,50 +6141,43 @@
       return;
     }
 
-    cont.innerHTML = reporteEstacionesCache.map(e => {
+    const filas = reporteEstacionesCache.map(e => {
       const d = detalleMap[e.id] || {};
       return `
-        <div class="estacion-reporte-card" data-estacion-id="${e.id}">
-          <div class="estacion-reporte-header">
-            <strong>#${e.numero}</strong> ${escapeHtml(e.ubicacion)} · ${escapeHtml(e.tipo_estacion)}
-          </div>
-          <div class="estacion-reporte-grupo">
-            <div class="estacion-reporte-grupo-label">Tipo de fauna</div>
-            <div class="chips-grupo" data-campo="tipo_fauna" data-modo="unico">${chipsFaunaHtml(e.tipo_fauna)}</div>
-          </div>
-          <div class="estacion-reporte-grupo">
-            <div class="estacion-reporte-grupo-label">Condición (toca para marcar varias)</div>
-            <div class="chips-grupo" data-campo="condicion">${chipsHtml(d.condicion, CATALOGO_CONDICION)}</div>
-          </div>
-          <div class="estacion-reporte-grupo">
-            <div class="estacion-reporte-grupo-label">Actividad (toca para marcar varias)</div>
-            <div class="chips-grupo" data-campo="actividad">${chipsHtml(d.actividad, CATALOGO_ACTIVIDAD)}</div>
-          </div>
-          <div class="estacion-reporte-grupo">
-            <div class="estacion-reporte-grupo-label">Acción (toca para marcar varias)</div>
-            <div class="chips-grupo" data-campo="accion">${chipsHtml(d.accion, CATALOGO_ACCION)}</div>
-          </div>
-          <textarea class="reporte-notas" rows="2" placeholder="Notas de esta estación (opcional)">${escapeHtml(d.notas || '')}</textarea>
-        </div>
+        <tr data-estacion-id="${e.id}">
+          <td>${e.numero}</td>
+          <td>${escapeHtml(e.ubicacion)}</td>
+          <td>
+            <div class="reporte-tabla-tipo">${escapeHtml(e.tipo_estacion)}</div>
+            <select class="reporte-fauna">${opcionesFaunaHtml(e.tipo_fauna)}</select>
+          </td>
+          <td><div class="chips-grupo" data-campo="condicion">${chipsHtml(d.condicion, CATALOGO_CONDICION)}</div></td>
+          <td><div class="chips-grupo" data-campo="actividad">${chipsHtml(d.actividad, CATALOGO_ACTIVIDAD)}</div></td>
+          <td><div class="chips-grupo" data-campo="accion">${chipsHtml(d.accion, CATALOGO_ACCION)}</div></td>
+          <td><textarea class="reporte-notas" rows="1" placeholder="Notas...">${escapeHtml(d.notas || '')}</textarea></td>
+        </tr>
       `;
     }).join('');
+
+    cont.innerHTML = `
+      <div class="reporte-tabla-scroll">
+        <table class="reporte-tabla-estaciones">
+          <thead>
+            <tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    `;
   }
 
   // Delegado una sola vez sobre el contenedor fijo (aunque su contenido se
   // reconstruya en cada render): tocar un chip solo alterna su estado
-  // visual, sin recargar nada ni disparar el guardado.
+  // visual (multi-selección), sin recargar nada ni disparar el guardado.
   document.getElementById('reporteEstacionesLista').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip-opcion');
     if(!chip) return;
-    const grupo = chip.closest('.chips-grupo');
-    if(grupo && grupo.dataset.modo === 'unico'){
-      // Tipo de fauna: selección única, como un radio (marcar uno desmarca
-      // los demás del mismo grupo).
-      grupo.querySelectorAll('.chip-opcion.activo').forEach(c => { if(c !== chip) c.classList.remove('activo'); });
-      chip.classList.add('activo');
-    } else {
-      chip.classList.toggle('activo');
-    }
+    chip.classList.toggle('activo');
   });
 
   async function abrirReporteVisita(visitaId){
@@ -6350,10 +6359,10 @@
     // técnico lo corrigió aquí, se actualiza de vuelta en "estaciones",
     // solo para las que realmente cambiaron.
     const cambiosFauna = Array.from(document.querySelectorAll('#reporteEstacionesLista [data-estacion-id]'))
-      .map(card => {
-        const estacionId = card.dataset.estacionId;
-        const chipActivo = card.querySelector('.chips-grupo[data-campo="tipo_fauna"] .chip-opcion.activo');
-        const nuevaFauna = chipActivo ? chipActivo.dataset.codigo : null;
+      .map(fila => {
+        const estacionId = fila.dataset.estacionId;
+        const selectFauna = fila.querySelector('.reporte-fauna');
+        const nuevaFauna = selectFauna ? selectFauna.value : null;
         const estacion = reporteEstacionesCache.find(e => e.id === estacionId);
         if(!nuevaFauna || !estacion || nuevaFauna === estacion.tipo_fauna) return null;
         return { id: estacionId, tipo_fauna: nuevaFauna };
