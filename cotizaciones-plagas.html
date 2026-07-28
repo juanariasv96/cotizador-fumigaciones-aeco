@@ -7044,19 +7044,28 @@
   // factor tope 1) — asi jsPDF siempre recibe una imagen con la
   // proporcion de 1 sola hoja.
   //
-  // OJO (leccion aprendida): un primer intento de esto capturaba una
-  // COPIA del contenido en un contenedor fuera de pantalla (position:
-  // fixed; left:-99999px) en vez del documento visible. Eso rompio el
+  // OJO (leccion aprendida, ronda 1): un primer intento de esto capturaba
+  // una COPIA del contenido en un contenedor fuera de pantalla (position:
+  // fixed; left:-99999px) en vez del documento visible. Eso rompia el
   // PDF (salia en blanco): el paso interno de html2pdf que envuelve el
   // elemento a capturar en su propio contenedor no maneja bien un
   // "position:fixed" tan lejos de la pantalla, y el canvas resultante
-  // salia con alto 0. Por eso aqui se aplica el ajuste de ancho/escala
-  // DIRECTAMENTE sobre el #certificadoDocContent real y visible (mismo
-  // elemento que ya se ve en pantalla al abrir el certificado), y se
-  // restauran sus estilos originales al terminar — nunca se crea una
-  // copia fuera de pantalla. Verificado capturando el canvas real (no
-  // solo contando paginas) y confirmando que SI tiene contenido visible
-  // (no esta en blanco), con y sin necesidad de escalar.
+  // salia con alto 0. Se corrigio aplicando el ajuste DIRECTAMENTE sobre
+  // el #certificadoDocContent real y visible, restaurando sus estilos al
+  // terminar — nunca una copia fuera de pantalla.
+  //
+  // OJO (leccion aprendida, ronda 2): tambien se habia agregado un
+  // "transform: scale()" como red de seguridad por si el contenido no
+  // cabia a lo alto. html2canvas tiene problemas conocidos capturando
+  // nodos con transform CSS (bounding box mal calculado segun el
+  // navegador), asi que se quito por completo: en su lugar, si el
+  // contenido no cabe (algo que en la practica no pasa con datos reales,
+  // ni siquiera con textos largos — medido varias veces), solo se deja
+  // un aviso en consola y se genera igual (puede llegar a 2 paginas en
+  // ese caso extremo, pero NUNCA en blanco). Tambien se espera a que
+  // todas las imagenes (logo, sello, licencia) esten completamente
+  // decodificadas antes de capturar, por si una imagen base64 grande
+  // todavia no terminaba de decodificarse al momento de la captura.
   document.getElementById('btnDescargarCertificadoPDF').addEventListener('click', async ()=>{
     const btn = document.getElementById('btnDescargarCertificadoPDF');
     const textoOriginal = btn.textContent;
@@ -7092,11 +7101,20 @@
     certificadoDocContent.style.boxSizing = 'border-box';
 
     try{
+      // Esperar a que todas las imagenes (logo, sello, licencia) esten
+      // decodificadas antes de capturar.
+      const imagenes = certificadoDocContent.querySelectorAll('img');
+      await Promise.all(Array.from(imagenes).map((img) => {
+        if (img.complete) return img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        });
+      }));
+
       const altoNatural = certificadoDocContent.scrollHeight;
-      const factor = Math.min(1, AREA_ALTO_PX / altoNatural);
-      if (factor < 1){
-        certificadoDocContent.style.transformOrigin = 'top left';
-        certificadoDocContent.style.transform = `scale(${factor})`;
+      if (altoNatural > AREA_ALTO_PX){
+        console.warn('Certificado: el contenido (' + altoNatural + 'px) supera el area imprimible de 1 hoja carta (' + AREA_ALTO_PX + 'px). Se genera el PDF igual, sin recortar ni escalar (para no arriesgar una captura en blanco); podria salir en 2 paginas en este caso.');
       }
 
       await html2pdf()
