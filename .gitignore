@@ -11,3 +11,4 @@ reportes_estaciones_multiselect_setup.sql
 estaciones_tipo_fauna_setup.sql
 documentacion_oficina_setup.sql
 visitas_cascade_setup.sql
+resumen_dia_setup.sql

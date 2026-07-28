@@ -709,6 +709,15 @@
   .badge.doc-reporte{background:#e7f0fd;color:#1d4ed8;}
   .badge.doc-certificado{background:#e3f5e1;color:#016937;}
 
+  /* ---------- Resumen del día (oficina) ---------- */
+  .resumen-tecnico-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--blanco);
+  }
+  .resumen-tecnico-nombre{font-weight:700;color:var(--verde-oscuro);margin-bottom:6px;}
+  .resumen-tecnico-datos{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;}
+  .resumen-tecnico-datos > div{display:flex;flex-direction:column;gap:2px;}
+  .resumen-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.3px;}
+
   /* ---------- Seguimiento de cotizaciones ---------- */
   .badge.etapa-enviada{background:#e7f0fd;color:#1d4ed8;}
   .badge.etapa-seguimiento-1{background:#fff3cd;color:#8a6d00;}
@@ -998,6 +1007,7 @@
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
+  <button class="tab-btn hidden" data-tab="resumen" id="tabBtnResumen">Resumen del día</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
   <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
 </nav>
@@ -1749,6 +1759,21 @@
     </div>
   </section>
 
+  <!-- ================= TAB: RESUMEN DEL DÍA (oficina: dueño y asistente) ================= -->
+  <section id="tab-resumen" class="hidden">
+    <div class="panel">
+      <h2>Resumen del día</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Actividad de cada técnico en la fecha elegida: primer inicio de sesión, última actividad registrada, visitas atendidas, reportes y certificados generados.</p>
+
+      <div class="field" style="max-width:200px;">
+        <label for="resumenFecha">Fecha</label>
+        <input type="date" id="resumenFecha">
+      </div>
+
+      <div id="resumenDiaLista" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
   <!-- ================= TAB: ACCESOS (solo dueño) ================= -->
   <section id="tab-accesos" class="hidden">
     <div class="panel">
@@ -2172,6 +2197,8 @@
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnDocumentacion').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnResumen').classList.toggle('hidden',
+      !['dueño', 'asistente'].includes(usuarioActual.rol));
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
     // sus reportes de visita). El resto de pestanas quedan ocultas.
@@ -2426,6 +2453,69 @@
       await iniciarApp(data.session.user);
     }
   }
+
+  // ---------- Auto-cierre de sesión por inactividad (todos los roles) ----------
+  // 3 horas sin ninguna interacción (click/touch/tecla/scroll/mouse) cierra la
+  // sesión sola y regresa al login con un mensaje. No usa nada del service
+  // worker: es puro JS en memoria, un setInterval que compara contra la
+  // marca de tiempo de la ultima interaccion.
+  const INACTIVIDAD_LIMITE_MS = 3 * 60 * 60 * 1000; // 3 horas
+  const MENSAJE_LOGIN_STORAGE_KEY = 'aeco_mensaje_login';
+  let ultimaActividadTs = Date.now();
+  let cerrandoSesionPorInactividad = false;
+  let mousemoveThrottleId = null;
+
+  function marcarActividad(){
+    ultimaActividadTs = Date.now();
+  }
+
+  // mousemove dispara decenas de eventos por segundo con solo mover el
+  // dedo/mouse; se limita a registrar como maximo una vez cada 5s para no
+  // generar trabajo de mas sin necesidad (para el temporizador de 3 horas,
+  // esa resolucion sobra).
+  function marcarActividadConThrottle(){
+    if(mousemoveThrottleId) return;
+    marcarActividad();
+    mousemoveThrottleId = setTimeout(() => { mousemoveThrottleId = null; }, 5000);
+  }
+
+  ['click', 'touchstart', 'keydown'].forEach(evento => {
+    document.addEventListener(evento, marcarActividad, { passive: true });
+  });
+  // scroll no burbujea, pero si se escucha en fase de captura sobre
+  // document si se detecta el scroll de CUALQUIER contenedor interno
+  // (overlays, tablas con scroll horizontal, etc.), no solo el de la
+  // ventana completa.
+  document.addEventListener('scroll', marcarActividad, { capture: true, passive: true });
+  document.addEventListener('mousemove', marcarActividadConThrottle, { passive: true });
+
+  async function cerrarSesionPorInactividad(){
+    if(cerrandoSesionPorInactividad) return;
+    // Solo si de verdad hay una sesión de la app abierta (appRoot visible);
+    // si el usuario esta en el login o en la pantalla de dispositivo
+    // pendiente, no hay nada que cerrar y no se interfiere con nada.
+    if(appRoot.classList.contains('hidden')) return;
+
+    cerrandoSesionPorInactividad = true;
+    try{
+      await supabaseClient.auth.signOut();
+    }catch(e){
+      console.error('No se pudo cerrar la sesión por inactividad:', e);
+    }
+    try{
+      sessionStorage.setItem(MENSAJE_LOGIN_STORAGE_KEY, 'Tu sesión se cerró por inactividad. Vuelve a iniciar sesión.');
+    }catch(e){
+      // sessionStorage no disponible (modo privado, etc.): no es critico,
+      // simplemente no se vera el mensaje tras el reload.
+    }
+    window.location.reload();
+  }
+
+  setInterval(() => {
+    if(Date.now() - ultimaActividadTs >= INACTIVIDAD_LIMITE_MS){
+      cerrarSesionPorInactividad();
+    }
+  }, 60000); // revisa cada minuto; no necesita mas resolucion para 3 horas
 
   // Imagenes fijas del Certificado oficial (extraidas del PDF real del dueno,
   // Folio 4949): el sello combinado ISO 9001:2015 / EGAC y la licencia
@@ -2857,6 +2947,7 @@
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     documentacion: document.getElementById('tab-documentacion'),
+    resumen: document.getElementById('tab-resumen'),
     accesos: document.getElementById('tab-accesos'),
     dispositivos: document.getElementById('tab-dispositivos'),
   };
@@ -2871,6 +2962,7 @@
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'documentacion') cargarDocumentacion().then(renderDocumentacionLista);
+    if(nombre === 'resumen') cargarYRenderResumenDia();
     if(nombre === 'dispositivos') cargarYRenderDispositivos();
   }
   tabButtons.forEach(btn=>{
@@ -6988,6 +7080,115 @@
   }
 
 
+  // ---------- Resumen del día (oficina: dueño y asistente) ----------
+  const resumenFechaInput = document.getElementById('resumenFecha');
+  resumenFechaInput.addEventListener('change', () => {
+    cargarYRenderResumenDia();
+  });
+
+  function formatHoraSolamente(ms){
+    if(ms == null) return '-';
+    return new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Convierte una fecha "YYYY-MM-DD" en el rango [00:00:00.000, 23:59:59.999)
+  // de ESE día en la hora local del navegador, en ISO (UTC) para comparar
+  // contra columnas timestamptz en Supabase.
+  function rangoDiaLocalISO(fechaISO){
+    const inicio = new Date(fechaISO + 'T00:00:00');
+    const fin = new Date(fechaISO + 'T23:59:59.999');
+    return { inicio: inicio.toISOString(), fin: fin.toISOString() };
+  }
+
+  async function cargarYRenderResumenDia(){
+    if(!resumenFechaInput.value){
+      resumenFechaInput.value = fechaALocalISO(new Date());
+    }
+    const fechaISO = resumenFechaInput.value;
+    const { inicio, fin } = rangoDiaLocalISO(fechaISO);
+
+    const cont = document.getElementById('resumenDiaLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+
+    const [
+      { data: tecnicos, error: errTecnicos },
+      { data: accesos, error: errAccesos },
+      { data: visitas, error: errVisitas },
+      { data: reportes, error: errReportes },
+      { data: certificados, error: errCertificados },
+    ] = await Promise.all([
+      supabaseClient.from('perfiles_usuario').select('id, nombre').eq('rol', 'tecnico').order('nombre'),
+      supabaseClient.from('registro_accesos').select('usuario_id, fecha_hora')
+        .eq('exitoso', true).not('usuario_id', 'is', null)
+        .gte('fecha_hora', inicio).lte('fecha_hora', fin),
+      supabaseClient.from('visitas_programadas').select('tecnico_asignado')
+        .eq('estatus', 'Realizada').eq('fecha_realizada', fechaISO),
+      supabaseClient.from('reportes_visita').select('tecnico_id, fecha_creacion')
+        .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
+      supabaseClient.from('certificados_visita').select('tecnico_id, fecha_creacion')
+        .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
+    ]);
+
+    if(errTecnicos) console.error('No se pudieron cargar los técnicos:', errTecnicos);
+    if(errAccesos) console.error('No se pudieron cargar los accesos del día:', errAccesos);
+    if(errVisitas) console.error('No se pudieron cargar las visitas del día:', errVisitas);
+    if(errReportes) console.error('No se pudieron cargar los reportes del día:', errReportes);
+    if(errCertificados) console.error('No se pudieron cargar los certificados del día:', errCertificados);
+
+    renderResumenDiaLista(
+      tecnicos || [],
+      accesos || [],
+      visitas || [],
+      reportes || [],
+      certificados || []
+    );
+  }
+
+  function renderResumenDiaLista(tecnicos, accesos, visitas, reportes, certificados){
+    const cont = document.getElementById('resumenDiaLista');
+    if(tecnicos.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay técnicos registrados.</div>`;
+      return;
+    }
+
+    const filas = tecnicos.map(t => {
+      const susAccesos = accesos.filter(a => a.usuario_id === t.id).map(a => new Date(a.fecha_hora).getTime());
+      const susReportes = reportes.filter(r => r.tecnico_id === t.id);
+      const susCertificados = certificados.filter(c => c.tecnico_id === t.id);
+      const susVisitas = visitas.filter(v => v.tecnico_asignado === t.id);
+
+      const timestampsActividad = [
+        ...susAccesos,
+        ...susReportes.map(r => new Date(r.fecha_creacion).getTime()),
+        ...susCertificados.map(c => new Date(c.fecha_creacion).getTime()),
+      ];
+
+      const primerLogin = susAccesos.length ? Math.min(...susAccesos) : null;
+      const ultimaActividad = timestampsActividad.length ? Math.max(...timestampsActividad) : null;
+      const sinActividad = timestampsActividad.length === 0 && susVisitas.length === 0;
+
+      return `
+        <div class="resumen-tecnico-card">
+          <div class="resumen-tecnico-nombre">${escapeHtml(t.nombre)}</div>
+          ${sinActividad ? `
+            <div class="empty-msg">Sin actividad este día.</div>
+          ` : `
+            <div class="resumen-tecnico-datos">
+              <div><span class="resumen-label">Primer login</span>${formatHoraSolamente(primerLogin)}</div>
+              <div><span class="resumen-label">Última actividad</span>${formatHoraSolamente(ultimaActividad)}</div>
+              <div><span class="resumen-label">Visitas</span>${susVisitas.length}</div>
+              <div><span class="resumen-label">Reportes</span>${susReportes.length}</div>
+              <div><span class="resumen-label">Certificados</span>${susCertificados.length}</div>
+            </div>
+          `}
+        </div>
+      `;
+    }).join('');
+
+    cont.innerHTML = filas;
+  }
+
+
   // ---------- Panel de Dispositivos autorizados (solo dueño) ----------
   let dispositivosCache = [];
 
@@ -7359,6 +7560,18 @@
 
   document.getElementById('loginLogo').src = document.getElementById('headerLogo').src;
   document.getElementById('dispositivoLogo').src = document.getElementById('headerLogo').src;
+
+  // Si el cierre de sesión anterior fue por inactividad, aquí se muestra el
+  // aviso (se guardó en sessionStorage justo antes del reload porque, tras
+  // recargar, ya no queda nada en memoria para mostrarlo directamente).
+  try{
+    const mensajePendiente = sessionStorage.getItem(MENSAJE_LOGIN_STORAGE_KEY);
+    if(mensajePendiente){
+      mostrarErrorLogin(mensajePendiente);
+      sessionStorage.removeItem(MENSAJE_LOGIN_STORAGE_KEY);
+    }
+  }catch(e){ /* sessionStorage no disponible: sin mensaje, no es critico */ }
+
   verificarSesionExistente();
 
 })();
