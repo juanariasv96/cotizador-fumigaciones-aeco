@@ -6955,10 +6955,12 @@
       <div class="doc-cliente-folio">
         <div class="cliente-bloque">
           <p><strong>Cliente:</strong></p>
-          <p>${escapeHtml(cliente.nombre || '-')}</p>
-          <p>${escapeHtml(cliente.direccion || '-')}</p>
-          <p>${escapeHtml(cliente.zona ? cliente.zona + ', N.L., México' : 'N.L., México')}</p>
-          <p>${escapeHtml(cliente.telefono || '-')}</p>
+          ${[
+            cliente.nombre,
+            cliente.direccion,
+            cliente.zona ? cliente.zona + ', N.L., México' : '',
+            cliente.telefono,
+          ].filter(Boolean).map(linea => `<p>${escapeHtml(linea)}</p>`).join('')}
         </div>
         <div class="folio-bloque">
           <p><strong>Folio:</strong> ${cert.folio}</p>
