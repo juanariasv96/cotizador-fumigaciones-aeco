@@ -7038,23 +7038,25 @@
   //
   // IMPORTANTE: html2pdf.js NO "encoge para caber en 1 hoja": si el
   // contenido capturado (a lo alto) supera el area imprimible, lo PARTE
-  // en varias paginas. Probar esto con imagenes reales (no placeholders)
-  // confirmo que el certificado real SI superaba esa altura (la imagen
-  // de la licencia sanitaria, en su relacion de aspecto real, ocupa mas
-  // que un cuadrado), de ahi que el pie quedara solo en una 2da hoja.
+  // en varias paginas. Por eso se fuerza un ancho fijo (el area imprimible
+  // de una hoja carta con 12mm de margen) y, si aun asi no cabe a lo
+  // alto, se reduce con un solo "transform: scale()" (nunca se agranda:
+  // factor tope 1) — asi jsPDF siempre recibe una imagen con la
+  // proporcion de 1 sola hoja.
   //
-  // Por eso aqui NO se usa onclone sobre el documento visible: se arma
-  // una copia en un contenedor FUERA de pantalla con ancho y alto FIJOS
-  // exactamente iguales al area imprimible de una hoja carta con 12mm de
-  // margen (los mismos 12mm que usa @media print). Si el contenido no
-  // cabe a lo alto en ese contenedor, se reduce con un solo "transform:
-  // scale()" (nunca se agranda: factor tope 1) hasta que quepa, y el
-  // contenedor recorta cualquier remanente (overflow:hidden) como red de
-  // seguridad. Con eso, lo que se le pasa a html2pdf SIEMPRE tiene la
-  // proporcion exacta de 1 hoja carta imprimible, y jsPDF lo coloca en
-  // una sola pagina sin partir nada — verificado con pdf.internal
-  // .getNumberOfPages() en pruebas con datos normales, con textos largos
-  // (peor caso) y con un area forzada mas chica (caso extremo).
+  // OJO (leccion aprendida): un primer intento de esto capturaba una
+  // COPIA del contenido en un contenedor fuera de pantalla (position:
+  // fixed; left:-99999px) en vez del documento visible. Eso rompio el
+  // PDF (salia en blanco): el paso interno de html2pdf que envuelve el
+  // elemento a capturar en su propio contenedor no maneja bien un
+  // "position:fixed" tan lejos de la pantalla, y el canvas resultante
+  // salia con alto 0. Por eso aqui se aplica el ajuste de ancho/escala
+  // DIRECTAMENTE sobre el #certificadoDocContent real y visible (mismo
+  // elemento que ya se ve en pantalla al abrir el certificado), y se
+  // restauran sus estilos originales al terminar — nunca se crea una
+  // copia fuera de pantalla. Verificado capturando el canvas real (no
+  // solo contando paginas) y confirmando que SI tiene contenido visible
+  // (no esta en blanco), con y sin necesidad de escalar.
   document.getElementById('btnDescargarCertificadoPDF').addEventListener('click', async ()=>{
     const btn = document.getElementById('btnDescargarCertificadoPDF');
     const textoOriginal = btn.textContent;
@@ -7070,42 +7072,32 @@
 
     const estiloCaptura = document.createElement('style');
     estiloCaptura.textContent = `
-      #certificadoPdfCaptureRoot .doc{padding:0;width:${AREA_ANCHO_PX}px;box-sizing:border-box;}
-      #certificadoPdfCaptureRoot .doc-header{margin-bottom:12px;padding-bottom:10px;}
-      #certificadoPdfCaptureRoot .doc-title{margin:6px 0 12px 0;}
-      #certificadoPdfCaptureRoot .doc-section{margin-bottom:10px;}
-      #certificadoPdfCaptureRoot .doc-cliente-folio{margin-bottom:10px;}
-      #certificadoPdfCaptureRoot .doc-cliente-folio p{margin:1px 0;}
-      #certificadoPdfCaptureRoot .doc-checklist{gap:14px;margin-bottom:2px;}
-      #certificadoPdfCaptureRoot .doc-checklist-col{gap:3px;}
-      #certificadoPdfCaptureRoot .doc-comentarios-ingrediente th,
-      #certificadoPdfCaptureRoot .doc-comentarios-ingrediente td{padding:5px 8px;}
-      #certificadoPdfCaptureRoot .doc-licencia-img{max-width:130px;}
+      #certificadoDocContent.pdf-generando{padding:0;box-sizing:border-box;}
+      #certificadoDocContent.pdf-generando .doc-header{margin-bottom:12px;padding-bottom:10px;}
+      #certificadoDocContent.pdf-generando .doc-title{margin:6px 0 12px 0;}
+      #certificadoDocContent.pdf-generando .doc-section{margin-bottom:10px;}
+      #certificadoDocContent.pdf-generando .doc-cliente-folio{margin-bottom:10px;}
+      #certificadoDocContent.pdf-generando .doc-cliente-folio p{margin:1px 0;}
+      #certificadoDocContent.pdf-generando .doc-checklist{gap:14px;margin-bottom:2px;}
+      #certificadoDocContent.pdf-generando .doc-checklist-col{gap:3px;}
+      #certificadoDocContent.pdf-generando .doc-comentarios-ingrediente th,
+      #certificadoDocContent.pdf-generando .doc-comentarios-ingrediente td{padding:5px 8px;}
+      #certificadoDocContent.pdf-generando .doc-licencia-img{max-width:130px;}
     `;
-    const raiz = document.createElement('div');
-    raiz.id = 'certificadoPdfCaptureRoot';
-    raiz.style.position = 'fixed';
-    raiz.style.left = '-99999px';
-    raiz.style.top = '0';
-    raiz.style.width = AREA_ANCHO_PX + 'px';
-    raiz.style.height = 'auto';
-    raiz.style.overflow = 'hidden';
-    raiz.style.background = '#ffffff';
-    const contenido = document.createElement('div');
-    contenido.className = 'doc';
-    contenido.innerHTML = certificadoDocContent.innerHTML;
-    raiz.appendChild(contenido);
     document.head.appendChild(estiloCaptura);
-    document.body.appendChild(raiz);
+
+    const cssOriginal = certificadoDocContent.style.cssText;
+    certificadoDocContent.classList.add('pdf-generando');
+    certificadoDocContent.style.width = AREA_ANCHO_PX + 'px';
+    certificadoDocContent.style.boxSizing = 'border-box';
 
     try{
-      const altoNatural = contenido.scrollHeight;
+      const altoNatural = certificadoDocContent.scrollHeight;
       const factor = Math.min(1, AREA_ALTO_PX / altoNatural);
       if (factor < 1){
-        contenido.style.transformOrigin = 'top left';
-        contenido.style.transform = `scale(${factor})`;
+        certificadoDocContent.style.transformOrigin = 'top left';
+        certificadoDocContent.style.transform = `scale(${factor})`;
       }
-      raiz.style.height = AREA_ALTO_PX + 'px';
 
       await html2pdf()
         .set({
@@ -7116,13 +7108,14 @@
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
           pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
         })
-        .from(raiz)
+        .from(certificadoDocContent)
         .save();
     }catch(e){
       console.error('No se pudo generar el PDF del certificado:', e);
       alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
     }finally{
-      raiz.remove();
+      certificadoDocContent.style.cssText = cssOriginal;
+      certificadoDocContent.classList.remove('pdf-generando');
       estiloCaptura.remove();
       btn.disabled = false;
       btn.textContent = textoOriginal;
