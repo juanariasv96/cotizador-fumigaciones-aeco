@@ -7111,13 +7111,15 @@
     cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
 
     const [
-      { data: tecnicos, error: errTecnicos },
+      { data: personas, error: errPersonas },
       { data: accesos, error: errAccesos },
       { data: visitas, error: errVisitas },
       { data: reportes, error: errReportes },
       { data: certificados, error: errCertificados },
+      { data: cotizaciones, error: errCotizaciones },
+      { data: avisos, error: errAvisos },
     ] = await Promise.all([
-      supabaseClient.from('perfiles_usuario').select('id, nombre').eq('rol', 'tecnico').order('nombre'),
+      supabaseClient.from('perfiles_usuario').select('id, nombre, rol').in('rol', ['tecnico', 'asistente']).order('rol').order('nombre'),
       supabaseClient.from('registro_accesos').select('usuario_id, fecha_hora')
         .eq('exitoso', true).not('usuario_id', 'is', null)
         .gte('fecha_hora', inicio).lte('fecha_hora', fin),
@@ -7127,65 +7129,115 @@
         .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
       supabaseClient.from('certificados_visita').select('tecnico_id, fecha_creacion')
         .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
+      supabaseClient.from('cotizaciones').select('creado_por, fecha_creacion')
+        .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
+      supabaseClient.from('avisos_cliente').select('creado_por, fecha_creacion')
+        .gte('fecha_creacion', inicio).lte('fecha_creacion', fin),
     ]);
 
-    if(errTecnicos) console.error('No se pudieron cargar los técnicos:', errTecnicos);
+    if(errPersonas) console.error('No se pudieron cargar técnicos/asistentes:', errPersonas);
     if(errAccesos) console.error('No se pudieron cargar los accesos del día:', errAccesos);
     if(errVisitas) console.error('No se pudieron cargar las visitas del día:', errVisitas);
     if(errReportes) console.error('No se pudieron cargar los reportes del día:', errReportes);
     if(errCertificados) console.error('No se pudieron cargar los certificados del día:', errCertificados);
+    if(errCotizaciones) console.error('No se pudieron cargar las cotizaciones del día:', errCotizaciones);
+    if(errAvisos) console.error('No se pudieron cargar los avisos del día:', errAvisos);
 
     renderResumenDiaLista(
-      tecnicos || [],
+      personas || [],
       accesos || [],
       visitas || [],
       reportes || [],
-      certificados || []
+      certificados || [],
+      cotizaciones || [],
+      avisos || []
     );
   }
 
-  function renderResumenDiaLista(tecnicos, accesos, visitas, reportes, certificados){
+  // Misma cuenta para cualquier rol (no se fuerza a 0 por rol): un
+  // técnico normalmente solo tendrá visitas/reportes/certificados, y un
+  // asistente normalmente solo cotizaciones/avisos, pero si alguien llega
+  // a generar algo fuera de lo típico de su rol, se refleja igual.
+  function calcularMetricasPersona(p, accesos, visitas, reportes, certificados, cotizaciones, avisos){
+    const susAccesos = accesos.filter(a => a.usuario_id === p.id).map(a => new Date(a.fecha_hora).getTime());
+    const susVisitas = visitas.filter(v => v.tecnico_asignado === p.id);
+    const susReportes = reportes.filter(r => r.tecnico_id === p.id);
+    const susCertificados = certificados.filter(c => c.tecnico_id === p.id);
+    const susCotizaciones = cotizaciones.filter(q => q.creado_por === p.id);
+    const susAvisos = avisos.filter(av => av.creado_por === p.id);
+
+    const timestampsActividad = [
+      ...susAccesos,
+      ...susReportes.map(r => new Date(r.fecha_creacion).getTime()),
+      ...susCertificados.map(c => new Date(c.fecha_creacion).getTime()),
+      ...susCotizaciones.map(q => new Date(q.fecha_creacion).getTime()),
+      ...susAvisos.map(av => new Date(av.fecha_creacion).getTime()),
+    ];
+
+    const primerLogin = susAccesos.length ? Math.min(...susAccesos) : null;
+    const ultimaActividad = timestampsActividad.length ? Math.max(...timestampsActividad) : null;
+    const sinActividad = timestampsActividad.length === 0 && susVisitas.length === 0;
+
+    return {
+      primerLogin, ultimaActividad, sinActividad,
+      visitas: susVisitas.length,
+      reportes: susReportes.length,
+      certificados: susCertificados.length,
+      cotizaciones: susCotizaciones.length,
+      avisos: susAvisos.length,
+    };
+  }
+
+  function resumenTarjetaHtml(p, m, camposMostrados){
+    if(m.sinActividad){
+      return `
+        <div class="resumen-tecnico-card">
+          <div class="resumen-tecnico-nombre">${escapeHtml(p.nombre)}</div>
+          <div class="empty-msg">Sin actividad este día.</div>
+        </div>
+      `;
+    }
+    return `
+      <div class="resumen-tecnico-card">
+        <div class="resumen-tecnico-nombre">${escapeHtml(p.nombre)}</div>
+        <div class="resumen-tecnico-datos">
+          <div><span class="resumen-label">Primer login</span>${formatHoraSolamente(m.primerLogin)}</div>
+          <div><span class="resumen-label">Última actividad</span>${formatHoraSolamente(m.ultimaActividad)}</div>
+          ${camposMostrados.map(([etiqueta, valor]) => `<div><span class="resumen-label">${escapeHtml(etiqueta)}</span>${valor}</div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderResumenDiaLista(personas, accesos, visitas, reportes, certificados, cotizaciones, avisos){
     const cont = document.getElementById('resumenDiaLista');
-    if(tecnicos.length === 0){
-      cont.innerHTML = `<div class="empty-msg">No hay técnicos registrados.</div>`;
+    if(personas.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay técnicos ni asistentes registrados.</div>`;
       return;
     }
 
-    const filas = tecnicos.map(t => {
-      const susAccesos = accesos.filter(a => a.usuario_id === t.id).map(a => new Date(a.fecha_hora).getTime());
-      const susReportes = reportes.filter(r => r.tecnico_id === t.id);
-      const susCertificados = certificados.filter(c => c.tecnico_id === t.id);
-      const susVisitas = visitas.filter(v => v.tecnico_asignado === t.id);
+    const tecnicos = personas.filter(p => p.rol === 'tecnico');
+    const asistentes = personas.filter(p => p.rol === 'asistente');
 
-      const timestampsActividad = [
-        ...susAccesos,
-        ...susReportes.map(r => new Date(r.fecha_creacion).getTime()),
-        ...susCertificados.map(c => new Date(c.fecha_creacion).getTime()),
-      ];
+    const seccionHtml = (titulo, lista, camposFn) => {
+      if(lista.length === 0) return '';
+      const tarjetas = lista.map(p => {
+        const m = calcularMetricasPersona(p, accesos, visitas, reportes, certificados, cotizaciones, avisos);
+        return resumenTarjetaHtml(p, m, camposFn(m));
+      }).join('');
+      return `<h3 style="margin-top:18px;">${escapeHtml(titulo)}</h3>${tarjetas}`;
+    };
 
-      const primerLogin = susAccesos.length ? Math.min(...susAccesos) : null;
-      const ultimaActividad = timestampsActividad.length ? Math.max(...timestampsActividad) : null;
-      const sinActividad = timestampsActividad.length === 0 && susVisitas.length === 0;
-
-      return `
-        <div class="resumen-tecnico-card">
-          <div class="resumen-tecnico-nombre">${escapeHtml(t.nombre)}</div>
-          ${sinActividad ? `
-            <div class="empty-msg">Sin actividad este día.</div>
-          ` : `
-            <div class="resumen-tecnico-datos">
-              <div><span class="resumen-label">Primer login</span>${formatHoraSolamente(primerLogin)}</div>
-              <div><span class="resumen-label">Última actividad</span>${formatHoraSolamente(ultimaActividad)}</div>
-              <div><span class="resumen-label">Visitas</span>${susVisitas.length}</div>
-              <div><span class="resumen-label">Reportes</span>${susReportes.length}</div>
-              <div><span class="resumen-label">Certificados</span>${susCertificados.length}</div>
-            </div>
-          `}
-        </div>
-      `;
-    }).join('');
-
-    cont.innerHTML = filas;
+    cont.innerHTML =
+      seccionHtml('Técnicos', tecnicos, m => [
+        ['Visitas', m.visitas],
+        ['Reportes', m.reportes],
+        ['Certificados', m.certificados],
+      ]) +
+      seccionHtml('Asistentes (oficina)', asistentes, m => [
+        ['Cotizaciones', m.cotizaciones],
+        ['Avisos', m.avisos],
+      ]);
   }
 
 
