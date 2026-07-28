@@ -798,7 +798,7 @@
   .reporte-tabla-estaciones{width:100%;border-collapse:collapse;font-size:11px;}
   .reporte-tabla-estaciones th,
   .reporte-tabla-estaciones td{
-    border:1px solid var(--gris-borde);padding:3px 4px;vertical-align:top;text-align:left;
+    border:1px solid var(--gris-borde);padding:2px 3px;vertical-align:top;text-align:left;
   }
   .reporte-tabla-estaciones th{
     background:var(--verde-suave);color:var(--verde-oscuro);font-size:9.5px;
@@ -811,8 +811,9 @@
     width:100%;min-width:64px;max-width:80px;font-size:9.5px;padding:2px 1px;
     border:1px solid var(--gris-borde);border-radius:4px;background:var(--blanco);color:var(--texto);
   }
-  /* Chips MUY compactos: solo el codigo, envuelven varios por celda. */
-  .chips-grupo{display:flex;flex-wrap:wrap;gap:2px;max-width:96px;}
+  /* Los chips reales (fuente de verdad de lo marcado) quedan ocultos: el
+     desplegable de la celda los sincroniza, ya no se ven inline. */
+  .chips-grupo.hidden{display:none;}
   .chip-opcion{
     flex:0 0 auto;
     padding:3px 5px;border:1px solid var(--gris-borde);border-radius:8px;
@@ -821,7 +822,20 @@
     min-height:22px;box-sizing:border-box;
   }
   .chip-opcion.activo{background:var(--verde);border-color:var(--verde-oscuro);color:#fff;}
-  .chip-opcion:active{transform:scale(0.95);}
+  /* Botón compacto por celda: cerrado muestra un resumen ("Bn, Da" o
+     "Seleccionar"); al tocarlo abre el panel con todas las opciones. */
+  .celda-selector-resumen{
+    width:100%;min-width:46px;max-width:72px;
+    padding:3px 3px;font-size:9px;font-family:inherit;text-align:left;
+    border:1px solid var(--gris-borde);border-radius:5px;background:var(--blanco);color:#888;
+    cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;justify-content:space-between;gap:2px;
+    min-height:24px;box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+  }
+  .celda-selector-resumen::after{content:'▾';font-size:7px;color:#999;flex-shrink:0;margin-left:1px;}
+  .celda-selector-resumen.tiene-seleccion{
+    border-color:var(--verde);background:var(--verde-suave);color:var(--verde-oscuro);font-weight:600;
+  }
   .reporte-tabla-estaciones textarea.reporte-notas{
     width:100%;min-width:72px;font-size:10px;padding:2px 3px;resize:vertical;min-height:24px;
   }
@@ -830,6 +844,27 @@
     #reportePanel{padding:12px;}
     #reporteOverlay .panel{padding:8px;margin-bottom:12px;}
   }
+  /* Panel desplegable de Condición/Actividad/Acción: fijo a la pantalla
+     (no a la tabla ni a su contenedor con scroll horizontal), así nunca
+     queda cortado sin importar en qué parte de la tabla se abra. Estilo
+     "hoja inferior" (bottom sheet): cómodo de tocar en celular. */
+  #celdaSelectorOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-end;justify-content:center;
+    padding:0;z-index:1000;
+  }
+  #celdaSelectorPanel{
+    background:var(--blanco);width:100%;max-width:420px;
+    border-radius:14px 14px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.3);
+    padding:18px 18px 14px 18px;max-height:75vh;overflow-y:auto;box-sizing:border-box;
+  }
+  .celda-selector-opcion{
+    display:flex;align-items:center;gap:12px;padding:10px 4px;
+    border-bottom:1px solid var(--gris-borde);font-size:14px;cursor:pointer;
+  }
+  .celda-selector-opcion:last-child{border-bottom:none;}
+  .celda-selector-opcion input[type="checkbox"]{width:20px;height:20px;flex-shrink:0;accent-color:var(--verde);}
+  .celda-selector-codigo{color:#999;font-size:12px;}
   .firma-bloque{border:1px solid var(--gris-borde);border-radius:8px;padding:12px;}
   .firma-canvas{
     display:block;width:100%;max-width:320px;height:120px;
@@ -1948,6 +1983,17 @@
       <button type="button" class="btn secondary small" id="btnCerrarReporteVisita">Cancelar</button>
       <button type="button" class="btn secondary" id="btnGenerarCertificado">Generar Certificado</button>
       <button type="button" class="btn" id="btnGuardarReporteVisita">Guardar reporte</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DESPLEGABLE DE CONDICIÓN/ACTIVIDAD/ACCIÓN (celda de la tabla) ================= -->
+<div id="celdaSelectorOverlay" class="hidden">
+  <div id="celdaSelectorPanel">
+    <h3 id="celdaSelectorTitulo" style="margin-top:0;"></h3>
+    <div id="celdaSelectorOpciones"></div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn" id="btnCerrarCeldaSelector">Listo</button>
     </div>
   </div>
 </div>
@@ -6208,13 +6254,24 @@
     return codigos.length ? escapeHtml(codigos.join(', ')) : '-';
   }
 
-  // Chips MUY compactos para caber varios por celda: solo el código, con
-  // el nombre completo como title (tooltip) para consulta.
+  // Chips ocultos: siguen siendo la fuente de verdad del estado marcado
+  // (mismo .chip-opcion/.activo/data-codigo de siempre, para que el
+  // guardado y la lectura no cambien en nada), pero ya no se muestran
+  // inline: viven escondidos dentro de la celda y el desplegable los
+  // sincroniza. Solo el código en el botón (no aplica, ya no es visible),
+  // el title queda por si acaso.
   function chipsHtml(valorGuardado, catalogo){
     const seleccionados = codigosSeleccionados(valorGuardado);
     return catalogo.map(([cod, label]) =>
       `<button type="button" class="chip-opcion ${seleccionados.includes(cod) ? 'activo' : ''}" data-codigo="${cod}" title="${escapeHtml(label)}">${cod}</button>`
     ).join('');
+  }
+
+  // Texto compacto para el botón cerrado de la celda: "Bn, Da" o
+  // "Seleccionar" si no hay nada marcado.
+  function resumenSeleccionCelda(valorGuardado){
+    const codigos = codigosSeleccionados(valorGuardado);
+    return codigos.length ? codigos.join(', ') : 'Seleccionar';
   }
 
   // Tipo de fauna: select nativo (una sola opción), mucho más compacto que
@@ -6243,9 +6300,18 @@
             <div class="reporte-tabla-tipo">${escapeHtml(e.tipo_estacion)}</div>
             <select class="reporte-fauna">${opcionesFaunaHtml(e.tipo_fauna)}</select>
           </td>
-          <td><div class="chips-grupo" data-campo="condicion">${chipsHtml(d.condicion, CATALOGO_CONDICION)}</div></td>
-          <td><div class="chips-grupo" data-campo="actividad">${chipsHtml(d.actividad, CATALOGO_ACTIVIDAD)}</div></td>
-          <td><div class="chips-grupo" data-campo="accion">${chipsHtml(d.accion, CATALOGO_ACCION)}</div></td>
+          <td>
+            <button type="button" class="celda-selector-resumen ${codigosSeleccionados(d.condicion).length ? 'tiene-seleccion' : ''}" data-campo="condicion">${resumenSeleccionCelda(d.condicion)}</button>
+            <div class="chips-grupo hidden" data-campo="condicion">${chipsHtml(d.condicion, CATALOGO_CONDICION)}</div>
+          </td>
+          <td>
+            <button type="button" class="celda-selector-resumen ${codigosSeleccionados(d.actividad).length ? 'tiene-seleccion' : ''}" data-campo="actividad">${resumenSeleccionCelda(d.actividad)}</button>
+            <div class="chips-grupo hidden" data-campo="actividad">${chipsHtml(d.actividad, CATALOGO_ACTIVIDAD)}</div>
+          </td>
+          <td>
+            <button type="button" class="celda-selector-resumen ${codigosSeleccionados(d.accion).length ? 'tiene-seleccion' : ''}" data-campo="accion">${resumenSeleccionCelda(d.accion)}</button>
+            <div class="chips-grupo hidden" data-campo="accion">${chipsHtml(d.accion, CATALOGO_ACCION)}</div>
+          </td>
           <td><textarea class="reporte-notas" rows="1" placeholder="Notas...">${escapeHtml(d.notas || '')}</textarea></td>
         </tr>
       `;
@@ -6268,8 +6334,87 @@
   // visual (multi-selección), sin recargar nada ni disparar el guardado.
   document.getElementById('reporteEstacionesLista').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip-opcion');
-    if(!chip) return;
-    chip.classList.toggle('activo');
+    if(chip){
+      chip.classList.toggle('activo');
+      return;
+    }
+    const boton = e.target.closest('.celda-selector-resumen');
+    if(boton){
+      const fila = boton.closest('[data-estacion-id]');
+      if(fila) abrirCeldaSelector(fila.dataset.estacionId, boton.dataset.campo);
+    }
+  });
+
+  // ---------- Desplegable de Condición/Actividad/Acción por celda ----------
+  // Panel compartido (uno solo, reutilizado para cualquier celda que se
+  // toque): dentro solo se ven las etiquetas legibles con checkboxes; el
+  // estado real sigue viviendo en los chips ocultos de la celda (mismo
+  // .chip-opcion/.activo de siempre), este panel solo los sincroniza.
+  const CATALOGOS_POR_CAMPO = {
+    condicion: CATALOGO_CONDICION,
+    actividad: CATALOGO_ACTIVIDAD,
+    accion: CATALOGO_ACCION,
+  };
+  const ETIQUETAS_CAMPO = { condicion: 'Condición', actividad: 'Actividad', accion: 'Acción' };
+
+  const celdaSelectorOverlay = document.getElementById('celdaSelectorOverlay');
+  let celdaSelectorEstacionId = null;
+  let celdaSelectorCampo = null;
+
+  function chipsGrupoDeCelda(estacionId, campo){
+    return document.querySelector(`#reporteEstacionesLista [data-estacion-id="${estacionId}"] .chips-grupo[data-campo="${campo}"]`);
+  }
+  function botonResumenDeCelda(estacionId, campo){
+    return document.querySelector(`#reporteEstacionesLista [data-estacion-id="${estacionId}"] .celda-selector-resumen[data-campo="${campo}"]`);
+  }
+
+  function actualizarResumenCelda(estacionId, campo){
+    const grupo = chipsGrupoDeCelda(estacionId, campo);
+    const boton = botonResumenDeCelda(estacionId, campo);
+    if(!grupo || !boton) return;
+    const activos = Array.from(grupo.querySelectorAll('.chip-opcion.activo')).map(c => c.dataset.codigo);
+    const hay = activos.length > 0;
+    boton.textContent = hay ? activos.join(', ') : 'Seleccionar';
+    boton.classList.toggle('tiene-seleccion', hay);
+  }
+
+  function abrirCeldaSelector(estacionId, campo){
+    celdaSelectorEstacionId = estacionId;
+    celdaSelectorCampo = campo;
+    const catalogo = CATALOGOS_POR_CAMPO[campo];
+    const grupo = chipsGrupoDeCelda(estacionId, campo);
+    const activos = grupo ? Array.from(grupo.querySelectorAll('.chip-opcion.activo')).map(c => c.dataset.codigo) : [];
+
+    document.getElementById('celdaSelectorTitulo').textContent = ETIQUETAS_CAMPO[campo] || '';
+    document.getElementById('celdaSelectorOpciones').innerHTML = catalogo.map(([cod, label]) => `
+      <label class="celda-selector-opcion">
+        <input type="checkbox" data-codigo="${cod}" ${activos.includes(cod) ? 'checked' : ''}>
+        <span>${escapeHtml(label)} <span class="celda-selector-codigo">(${cod})</span></span>
+      </label>
+    `).join('');
+
+    celdaSelectorOverlay.classList.remove('hidden');
+  }
+
+  function cerrarCeldaSelector(){
+    celdaSelectorOverlay.classList.add('hidden');
+    celdaSelectorEstacionId = null;
+    celdaSelectorCampo = null;
+  }
+
+  document.getElementById('celdaSelectorOpciones').addEventListener('change', (e) => {
+    const check = e.target.closest('input[type="checkbox"]');
+    if(!check || !celdaSelectorEstacionId || !celdaSelectorCampo) return;
+    const grupo = chipsGrupoDeCelda(celdaSelectorEstacionId, celdaSelectorCampo);
+    if(!grupo) return;
+    const chip = grupo.querySelector(`.chip-opcion[data-codigo="${check.dataset.codigo}"]`);
+    if(chip) chip.classList.toggle('activo', check.checked);
+    actualizarResumenCelda(celdaSelectorEstacionId, celdaSelectorCampo);
+  });
+
+  document.getElementById('btnCerrarCeldaSelector').addEventListener('click', cerrarCeldaSelector);
+  celdaSelectorOverlay.addEventListener('click', (e) => {
+    if(e.target === celdaSelectorOverlay) cerrarCeldaSelector();
   });
 
   async function abrirReporteVisita(visitaId){
