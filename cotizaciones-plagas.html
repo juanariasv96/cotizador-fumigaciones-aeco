@@ -469,6 +469,14 @@
     margin-bottom:4px;
   }
   .toolbar input[type=text]{max-width:280px;}
+  .buscador-wrap{position:relative;flex:0 1 280px;min-width:180px;}
+  .buscador-wrap input[type=text]{width:100%;max-width:none;padding-right:28px;}
+  #btnLimpiarBuscador{
+    position:absolute;right:4px;top:50%;transform:translateY(-50%);
+    border:none;background:none;cursor:pointer;color:#888;font-size:15px;line-height:1;
+    padding:4px 6px;border-radius:50%;
+  }
+  #btnLimpiarBuscador:hover{background:var(--gris-fondo);color:var(--texto);}
   .logo-upload{
     display:flex;
     align-items:center;
@@ -1398,9 +1406,13 @@
     <div class="panel">
       <h2>Clientes y cotizaciones guardadas</h2>
       <div class="toolbar">
-        <input type="text" id="buscador" placeholder="Buscar por cliente, folio o servicio...">
+        <div class="buscador-wrap">
+          <input type="text" id="buscador" placeholder="Buscar por cliente, folio o servicio...">
+          <button type="button" id="btnLimpiarBuscador" class="hidden" aria-label="Limpiar búsqueda">✕</button>
+        </div>
         <button class="btn secondary" id="btnExportar">Exportar respaldo (JSON)</button>
       </div>
+      <div id="listaFiltroAviso" class="hint hidden" style="margin-bottom:8px;"></div>
       <div id="listaContainer"></div>
     </div>
   </section>
@@ -3001,7 +3013,13 @@
     tabButtons.forEach(b=>b.classList.toggle('active', b.dataset.tab === nombre));
     Object.values(tabs).forEach(s=>s.classList.add('hidden'));
     tabs[nombre].classList.remove('hidden');
-    if(nombre === 'lista') renderLista();
+    if(nombre === 'lista'){
+      // Siempre entra con la búsqueda vacía: si quedó texto de una
+      // búsqueda anterior, la lista se veía filtrada (o vacía) sin que
+      // se notara por qué — quien entra a esta pestaña espera ver todo.
+      buscador.value = '';
+      renderLista();
+    }
     if(nombre === 'seguimiento') cargarCotizaciones().then(renderSeguimientoLista);
     if(nombre === 'accesos') cargarRegistroAccesos();
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
@@ -4615,13 +4633,26 @@
   function renderLista(){
     renderReporte();
     const filtro = (buscador.value || "").toLowerCase();
-    const all = getCotizaciones().filter(c=>{
+    const todas = getCotizaciones();
+    const all = todas.filter(c=>{
       if(!filtro) return true;
       return (c.cliente.nombre + " " + c.folio + " " + nombresPlagasCot(c)).toLowerCase().includes(filtro);
     });
 
+    document.getElementById('btnLimpiarBuscador').classList.toggle('hidden', !filtro);
+
+    const avisoEl = document.getElementById('listaFiltroAviso');
+    if(filtro){
+      avisoEl.textContent = `Mostrando ${all.length} de ${todas.length} cotizaciones (filtrado por "${buscador.value.trim()}")`;
+      avisoEl.classList.remove('hidden');
+    } else {
+      avisoEl.classList.add('hidden');
+    }
+
     if(all.length === 0){
-      listaContainer.innerHTML = `<div class="empty-msg">No hay cotizaciones guardadas todavía.</div>`;
+      listaContainer.innerHTML = filtro
+        ? `<div class="empty-msg">No hay cotizaciones que coincidan con esta búsqueda.</div>`
+        : `<div class="empty-msg">No hay cotizaciones guardadas todavía.</div>`;
       return;
     }
 
@@ -4665,6 +4696,11 @@
   }
 
   buscador.addEventListener('input', renderLista);
+  document.getElementById('btnLimpiarBuscador').addEventListener('click', () => {
+    buscador.value = '';
+    renderLista();
+    buscador.focus();
+  });
   document.getElementById('filtroEstadoTotales').addEventListener('change', renderReporte);
 
   listaContainer.addEventListener('change', async (e)=>{
