@@ -634,7 +634,8 @@
 
   @media print{
     @page{
-      margin:10mm;
+      size:letter;
+      margin:12mm;
     }
     body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
@@ -658,6 +659,19 @@
     .doc-seals{margin-top:14px;padding-top:10px;}
     .doc-seals .seal img{height:42px;}
     .doc-footer{margin-top:8px;padding-top:8px;}
+
+    /* Certificado: el contenido completo (encabezado, cliente, servicios,
+       areas, tabla, firmas y licencia sanitaria) debe caber en 1 sola hoja
+       carta. La licencia (imagen alta, formato retrato) es lo que mas
+       espacio ocupa: se reduce solo al imprimir (en pantalla se ve mas
+       grande para poder revisarla comoda). El resto son ajustes chicos de
+       espaciado, sin tocar contenido ni orden. */
+    .doc-cliente-folio{margin-bottom:10px;}
+    .doc-cliente-folio p{margin:1px 0;}
+    .doc-checklist{gap:14px;margin-bottom:2px;}
+    .doc-checklist-col{gap:3px;}
+    .doc-comentarios-ingrediente th,.doc-comentarios-ingrediente td{padding:5px 8px;}
+    .doc-licencia-img{max-width:130px;}
   }
 
   /* ---------- Estaciones / QRs ---------- */
@@ -927,6 +941,7 @@
   .doc-cliente-folio .folio-bloque{text-align:right;white-space:nowrap;}
   .doc-comentarios-ingrediente{
     width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;table-layout:fixed;
+    page-break-inside:avoid;break-inside:avoid;
   }
   .doc-comentarios-ingrediente th,.doc-comentarios-ingrediente td{
     border:1px solid var(--gris-borde);padding:8px 10px;vertical-align:top;
@@ -6985,7 +7000,7 @@
         <tbody><tr><td style="white-space:pre-wrap;">${escapeHtml(cert.comentarios || '')}</td><td style="white-space:pre-wrap;">${escapeHtml(cert.ingrediente_dosis || '')}</td></tr></tbody>
       </table>
 
-      <div class="doc-section" style="margin-top:24px;">
+      <div class="doc-section" style="margin-top:14px;page-break-inside:avoid;break-inside:avoid;">
         <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
           <div style="flex:1 1 220px;">${firmaHtml(cert.firma_tecnico_imagen, cert.firma_tecnico_nombre, 'Firma del Técnico')}</div>
           <div style="flex:1 1 220px;">
