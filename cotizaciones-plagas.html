@@ -7034,51 +7034,96 @@
   // mismo contenido que ya se imprime, pero sin depender del dialogo de
   // impresion del navegador ni de "Background graphics" — los colores
   // quedan quemados en la imagen y el tamano/margenes los define jsPDF
-  // directamente. onclone aplica los MISMOS ajustes de @media print
-  // (encabezados, huecos del checklist, tamano de la licencia) sobre una
-  // copia del documento antes de capturarla, para que quepa igual de
-  // bien en 1 sola hoja que al imprimir desde el navegador.
+  // directamente.
+  //
+  // IMPORTANTE: html2pdf.js NO "encoge para caber en 1 hoja": si el
+  // contenido capturado (a lo alto) supera el area imprimible, lo PARTE
+  // en varias paginas. Probar esto con imagenes reales (no placeholders)
+  // confirmo que el certificado real SI superaba esa altura (la imagen
+  // de la licencia sanitaria, en su relacion de aspecto real, ocupa mas
+  // que un cuadrado), de ahi que el pie quedara solo en una 2da hoja.
+  //
+  // Por eso aqui NO se usa onclone sobre el documento visible: se arma
+  // una copia en un contenedor FUERA de pantalla con ancho y alto FIJOS
+  // exactamente iguales al area imprimible de una hoja carta con 12mm de
+  // margen (los mismos 12mm que usa @media print). Si el contenido no
+  // cabe a lo alto en ese contenedor, se reduce con un solo "transform:
+  // scale()" (nunca se agranda: factor tope 1) hasta que quepa, y el
+  // contenedor recorta cualquier remanente (overflow:hidden) como red de
+  // seguridad. Con eso, lo que se le pasa a html2pdf SIEMPRE tiene la
+  // proporcion exacta de 1 hoja carta imprimible, y jsPDF lo coloca en
+  // una sola pagina sin partir nada — verificado con pdf.internal
+  // .getNumberOfPages() en pruebas con datos normales, con textos largos
+  // (peor caso) y con un area forzada mas chica (caso extremo).
   document.getElementById('btnDescargarCertificadoPDF').addEventListener('click', async ()=>{
     const btn = document.getElementById('btnDescargarCertificadoPDF');
     const textoOriginal = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Generando PDF...';
+
+    const MARGEN_MM = 12;
+    const PAGINA_ANCHO_MM = 215.9; // carta
+    const PAGINA_ALTO_MM = 279.4;  // carta
+    const PX_POR_MM = 96 / 25.4;
+    const AREA_ANCHO_PX = Math.round((PAGINA_ANCHO_MM - MARGEN_MM * 2) * PX_POR_MM);
+    const AREA_ALTO_PX = Math.round((PAGINA_ALTO_MM - MARGEN_MM * 2) * PX_POR_MM);
+
+    const estiloCaptura = document.createElement('style');
+    estiloCaptura.textContent = `
+      #certificadoPdfCaptureRoot .doc{padding:0;width:${AREA_ANCHO_PX}px;box-sizing:border-box;}
+      #certificadoPdfCaptureRoot .doc-header{margin-bottom:12px;padding-bottom:10px;}
+      #certificadoPdfCaptureRoot .doc-title{margin:6px 0 12px 0;}
+      #certificadoPdfCaptureRoot .doc-section{margin-bottom:10px;}
+      #certificadoPdfCaptureRoot .doc-cliente-folio{margin-bottom:10px;}
+      #certificadoPdfCaptureRoot .doc-cliente-folio p{margin:1px 0;}
+      #certificadoPdfCaptureRoot .doc-checklist{gap:14px;margin-bottom:2px;}
+      #certificadoPdfCaptureRoot .doc-checklist-col{gap:3px;}
+      #certificadoPdfCaptureRoot .doc-comentarios-ingrediente th,
+      #certificadoPdfCaptureRoot .doc-comentarios-ingrediente td{padding:5px 8px;}
+      #certificadoPdfCaptureRoot .doc-licencia-img{max-width:130px;}
+    `;
+    const raiz = document.createElement('div');
+    raiz.id = 'certificadoPdfCaptureRoot';
+    raiz.style.position = 'fixed';
+    raiz.style.left = '-99999px';
+    raiz.style.top = '0';
+    raiz.style.width = AREA_ANCHO_PX + 'px';
+    raiz.style.height = 'auto';
+    raiz.style.overflow = 'hidden';
+    raiz.style.background = '#ffffff';
+    const contenido = document.createElement('div');
+    contenido.className = 'doc';
+    contenido.innerHTML = certificadoDocContent.innerHTML;
+    raiz.appendChild(contenido);
+    document.head.appendChild(estiloCaptura);
+    document.body.appendChild(raiz);
+
     try{
+      const altoNatural = contenido.scrollHeight;
+      const factor = Math.min(1, AREA_ALTO_PX / altoNatural);
+      if (factor < 1){
+        contenido.style.transformOrigin = 'top left';
+        contenido.style.transform = `scale(${factor})`;
+      }
+      raiz.style.height = AREA_ALTO_PX + 'px';
+
       await html2pdf()
         .set({
           filename: certificadoNombreArchivoActual + '.pdf',
-          margin: 12,
+          margin: MARGEN_MM,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 3,
-            backgroundColor: '#ffffff',
-            useCORS: true,
-            onclone: (clonedDoc) => {
-              const estilo = clonedDoc.createElement('style');
-              estilo.textContent = `
-                .doc{padding:0;}
-                .doc-header{margin-bottom:12px;padding-bottom:10px;}
-                .doc-title{margin:6px 0 12px 0;}
-                .doc-section{margin-bottom:10px;}
-                .doc-cliente-folio{margin-bottom:10px;}
-                .doc-cliente-folio p{margin:1px 0;}
-                .doc-checklist{gap:14px;margin-bottom:2px;}
-                .doc-checklist-col{gap:3px;}
-                .doc-comentarios-ingrediente th,.doc-comentarios-ingrediente td{padding:5px 8px;}
-                .doc-licencia-img{max-width:130px;}
-              `;
-              clonedDoc.head.appendChild(estilo);
-            },
-          },
+          html2canvas: { scale: 3, backgroundColor: '#ffffff', useCORS: true },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
           pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
         })
-        .from(certificadoDocContent)
+        .from(raiz)
         .save();
     }catch(e){
       console.error('No se pudo generar el PDF del certificado:', e);
       alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
     }finally{
+      raiz.remove();
+      estiloCaptura.remove();
       btn.disabled = false;
       btn.textContent = textoOriginal;
     }
