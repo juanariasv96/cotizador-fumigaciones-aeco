@@ -5,10 +5,11 @@
 // igual si en el futuro se sirve desde una subruta. Nada aqui debe
 // empezar con "/".
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = 'aeco-shell-' + CACHE_VERSION;
 
 const QR_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+const HTML2PDF_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
 
 // Documentos HTML: se actualizan seguido (nuevas pestanas/funciones), asi
 // que van con network-first mas abajo, nunca cache-first.
@@ -39,6 +40,13 @@ self.addEventListener('install', (event) => {
       await cache.add(QR_LIB_URL);
     } catch (e) {
       console.warn('SW: no se pudo precachear la libreria de QR (se cacheara en el primer uso online):', e);
+    }
+    try {
+      // Igual para html2pdf.js (Descargar PDF del certificado): si no hay
+      // red al instalar, se cachea sola la primera vez que se use online.
+      await cache.add(HTML2PDF_LIB_URL);
+    } catch (e) {
+      console.warn('SW: no se pudo precachear html2pdf.js (se cacheara en el primer uso online):', e);
     }
     // Toma control de inmediato: no espera a que se cierren las pestanas
     // viejas para que el SW nuevo (y su CACHE_VERSION) entre en accion.
@@ -103,8 +111,9 @@ self.addEventListener('fetch', (event) => {
 
   const esMismoOrigen = url.origin === self.location.origin;
   const esLibreriaQr = req.url.startsWith('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/');
+  const esLibreriaHtml2pdf = req.url.startsWith('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/');
 
-  if (!esMismoOrigen && !esLibreriaQr) return; // cualquier otro origen: pasa de largo
+  if (!esMismoOrigen && !esLibreriaQr && !esLibreriaHtml2pdf) return; // cualquier otro origen: pasa de largo
 
   if (esMismoOrigen && esDocumentoHtml(req, url)) {
     event.respondWith(networkFirstConFallback(req));

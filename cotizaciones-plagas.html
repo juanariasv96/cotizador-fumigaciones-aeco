@@ -14,6 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   :root{
     --verde-oscuro:#016937;
@@ -2096,6 +2097,7 @@
   <div id="certificadoPrintSheet">
     <div class="print-toolbar">
       <button class="btn secondary" id="btnCerrarCertificadoPreview">Cerrar</button>
+      <button class="btn secondary" id="btnDescargarCertificadoPDF">Descargar PDF</button>
       <button class="btn" id="btnImprimirCertificadoDoc">Imprimir</button>
     </div>
     <div class="doc" id="certificadoDocContent"><!-- contenido generado por JS --></div>
@@ -6828,6 +6830,7 @@
   let certificadoClienteActualId = null;
   let certificadoExistenteIdActual = null;
   let certificadoFirmasActuales = { firma_tecnico_imagen: null, firma_tecnico_nombre: null, firma_cliente_imagen: null, firma_cliente_nombre: null };
+  let certificadoNombreArchivoActual = 'Certificado';
 
   const certificadoOverlay = document.getElementById('certificadoOverlay');
   const certificadoPrintOverlay = document.getElementById('certificadoPrintOverlay');
@@ -7015,6 +7018,8 @@
 
       <div class="doc-footer"><span>${escapeHtml(emp.codigoDocumentoCertificado || '')}</span></div>
     `;
+    certificadoNombreArchivoActual = `Certificado-${cert.folio}-${cliente.nombre || 'cliente'}`
+      .replace(/[^a-zA-Z0-9_\-]+/g, '_');
     certificadoPrintOverlay.classList.remove('hidden');
   }
 
@@ -7023,6 +7028,60 @@
   });
   document.getElementById('btnImprimirCertificadoDoc').addEventListener('click', ()=>{
     window.print();
+  });
+
+  // Descargar PDF real (html2pdf.js = html2canvas + jsPDF): captura el
+  // mismo contenido que ya se imprime, pero sin depender del dialogo de
+  // impresion del navegador ni de "Background graphics" — los colores
+  // quedan quemados en la imagen y el tamano/margenes los define jsPDF
+  // directamente. onclone aplica los MISMOS ajustes de @media print
+  // (encabezados, huecos del checklist, tamano de la licencia) sobre una
+  // copia del documento antes de capturarla, para que quepa igual de
+  // bien en 1 sola hoja que al imprimir desde el navegador.
+  document.getElementById('btnDescargarCertificadoPDF').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnDescargarCertificadoPDF');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generando PDF...';
+    try{
+      await html2pdf()
+        .set({
+          filename: certificadoNombreArchivoActual + '.pdf',
+          margin: 12,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 3,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            onclone: (clonedDoc) => {
+              const estilo = clonedDoc.createElement('style');
+              estilo.textContent = `
+                .doc{padding:0;}
+                .doc-header{margin-bottom:12px;padding-bottom:10px;}
+                .doc-title{margin:6px 0 12px 0;}
+                .doc-section{margin-bottom:10px;}
+                .doc-cliente-folio{margin-bottom:10px;}
+                .doc-cliente-folio p{margin:1px 0;}
+                .doc-checklist{gap:14px;margin-bottom:2px;}
+                .doc-checklist-col{gap:3px;}
+                .doc-comentarios-ingrediente th,.doc-comentarios-ingrediente td{padding:5px 8px;}
+                .doc-licencia-img{max-width:130px;}
+              `;
+              clonedDoc.head.appendChild(estilo);
+            },
+          },
+          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        })
+        .from(certificadoDocContent)
+        .save();
+    }catch(e){
+      console.error('No se pudo generar el PDF del certificado:', e);
+      alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
+    }finally{
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   });
 
   document.getElementById('btnGuardarCertificado').addEventListener('click', async ()=>{
