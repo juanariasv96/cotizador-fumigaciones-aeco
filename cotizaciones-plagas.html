@@ -2591,7 +2591,7 @@
 
     <div class="vehiculo-ficha-grid" id="vehiculoFichaGrid"></div>
 
-    <div class="vehiculo-subseccion">
+    <div class="vehiculo-subseccion" id="vehiculoDesgloseMensualSeccion">
       <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Gasto mensual de este vehículo</h3>
       <div id="vehiculoDesgloseMensual"></div>
     </div>
@@ -8437,6 +8437,13 @@
   function esDuenoParaVehiculos(){
     return !!usuarioActual && usuarioActual.rol === 'dueño';
   }
+  // El tecnico solo da de alta cargas de gasolina de su vehiculo asignado
+  // (litros/monto de ESA carga + foto de ticket); no debe ver cifras
+  // monetarias agregadas ni el historico de costos (gasto por km, gasto
+  // total, desglose mensual, costos de mantenimiento, montos de multas).
+  function esTecnicoParaVehiculos(){
+    return !!usuarioActual && usuarioActual.rol === 'tecnico';
+  }
 
   // Comprime una foto (ticket/factura) en el navegador antes de mandarla
   // como base64: la redimensiona a un maximo de maxDim px (lado mas
@@ -8795,6 +8802,7 @@
     if(!v) return;
     const oficina = esOficinaActual();
     const dueno = esDuenoParaVehiculos();
+    const esTecnico = esTecnicoParaVehiculos();
 
     document.getElementById('vehiculoDetalleAlias').textContent = v.alias;
     document.getElementById('vehiculoDetallePlacas').textContent = v.placas || '';
@@ -8807,8 +8815,10 @@
     document.getElementById('vehiculoResumen').innerHTML = `
       <div class="stat"><div class="valor">${metricas.kmActual.toLocaleString('es-MX')} km</div><div class="label">Km actual</div></div>
       <div class="stat"><div class="valor">${metricas.rendimiento != null ? metricas.rendimiento.toFixed(1) : 'N/D'}</div><div class="label">Rendimiento (km/l)</div></div>
+      ${esTecnico ? '' : `
       <div class="stat"><div class="valor">${metricas.gastoPorKm != null ? formatMoney(metricas.gastoPorKm) : 'N/D'}</div><div class="label">Gasto por km (gasolina)</div></div>
       <div class="stat"><div class="valor">${formatMoney(metricas.gastoTotal)}</div><div class="label">Gasto total (gasolina + mtto.)</div></div>
+      `}
     `;
 
     const tecnico = vehiculosTecnicosCache.find(t => t.id === v.asignado_usuario_id);
@@ -8830,7 +8840,10 @@
       ${v.nota ? `<div style="grid-column:1/-1;"><span>Nota:</span> ${escapeHtml(v.nota)}</div>` : ''}
     `;
 
-    renderTablaDesgloseMensual('vehiculoDesgloseMensual', calcularDesgloseMensual(vehiculoCargasCache, vehiculoMantenimientosCache));
+    document.getElementById('vehiculoDesgloseMensualSeccion').classList.toggle('hidden', esTecnico);
+    if(!esTecnico){
+      renderTablaDesgloseMensual('vehiculoDesgloseMensual', calcularDesgloseMensual(vehiculoCargasCache, vehiculoMantenimientosCache));
+    }
 
     // Alta de mantenimientos/multas: solo oficina. Cargas de gasolina: el
     // tecnico tambien puede (si esta viendo el detalle, por RLS es su
@@ -8838,12 +8851,12 @@
     document.getElementById('vehiculoMantenimientoForm').classList.toggle('hidden', !oficina);
     document.getElementById('vehiculoMultaForm').classList.toggle('hidden', !oficina);
 
-    renderVehiculoCargasLista(dueno);
-    renderVehiculoMantenimientosLista(dueno);
-    renderVehiculoMultasLista(dueno, oficina);
+    renderVehiculoCargasLista(dueno, esTecnico);
+    renderVehiculoMantenimientosLista(dueno, esTecnico);
+    renderVehiculoMultasLista(dueno, oficina, esTecnico);
   }
 
-  function renderVehiculoCargasLista(dueno){
+  function renderVehiculoCargasLista(dueno, esTecnico){
     const cont = document.getElementById('vehiculoCargasLista');
     if(!vehiculoCargasCache.length){
       cont.innerHTML = `<div class="empty-msg">Sin cargas registradas.</div>`;
@@ -8854,7 +8867,7 @@
         <div class="vehiculo-registro-info">
           ${c.ticket_foto ? `<img class="vehiculo-ticket-thumb" src="${c.ticket_foto}" data-action="ver-imagen" data-src="${c.ticket_foto}" alt="Ticket">` : ''}
           <div>
-            <strong>${formatDate(c.fecha)}</strong> — ${formatMoney(c.monto || 0)}${c.litros ? ' · ' + Number(c.litros).toFixed(1) + ' L' : ''}
+            <strong>${formatDate(c.fecha)}</strong>${esTecnico ? '' : ` — ${formatMoney(c.monto || 0)}`}${c.litros ? ' · ' + Number(c.litros).toFixed(1) + ' L' : ''}
             <div class="hint">${[c.gasolinera, c.tipo_combustible, c.odometro ? Number(c.odometro).toLocaleString('es-MX') + ' km' : ''].filter(Boolean).map(escapeHtml).join(' · ')}</div>
             ${c.nota ? `<div class="hint">${escapeHtml(c.nota)}</div>` : ''}
           </div>
@@ -8864,7 +8877,7 @@
     `).join('');
   }
 
-  function renderVehiculoMantenimientosLista(dueno){
+  function renderVehiculoMantenimientosLista(dueno, esTecnico){
     const cont = document.getElementById('vehiculoMantenimientosLista');
     if(!vehiculoMantenimientosCache.length){
       cont.innerHTML = `<div class="empty-msg">Sin mantenimientos registrados.</div>`;
@@ -8879,7 +8892,7 @@
         <div class="vehiculo-registro-info">
           ${m.factura_foto ? `<img class="vehiculo-ticket-thumb" src="${m.factura_foto}" data-action="ver-imagen" data-src="${m.factura_foto}" alt="Factura">` : ''}
           <div>
-            <strong>${escapeHtml(MANTENIMIENTO_TIPO_LABEL[m.tipo] || m.tipo || 'Mantenimiento')}</strong> — ${formatDate(m.fecha)} — ${formatMoney(m.costo || 0)}
+            <strong>${escapeHtml(MANTENIMIENTO_TIPO_LABEL[m.tipo] || m.tipo || 'Mantenimiento')}</strong> — ${formatDate(m.fecha)}${esTecnico ? '' : ` — ${formatMoney(m.costo || 0)}`}
             <div class="hint">${[m.descripcion, m.hecho_por ? 'Hecho por: ' + m.hecho_por : '', m.odometro ? Number(m.odometro).toLocaleString('es-MX') + ' km' : ''].filter(Boolean).map(escapeHtml).join(' · ')}</div>
             ${proximoPartes.length ? `<div class="hint">Próximo: ${escapeHtml(proximoPartes.join(' / '))}</div>` : ''}
             ${m.nota ? `<div class="hint">${escapeHtml(m.nota)}</div>` : ''}
@@ -8891,7 +8904,7 @@
     }).join('');
   }
 
-  function renderVehiculoMultasLista(dueno, oficina){
+  function renderVehiculoMultasLista(dueno, oficina, esTecnico){
     const cont = document.getElementById('vehiculoMultasLista');
     if(!vehiculoMultasCache.length){
       cont.innerHTML = `<div class="empty-msg">Sin multas registradas.</div>`;
@@ -8904,7 +8917,7 @@
       return `
         <div class="vehiculo-registro-card">
           <div>
-            <strong>${formatMoney(m.monto || 0)}</strong>
+            ${esTecnico ? '' : `<strong>${formatMoney(m.monto || 0)}</strong>`}
             ${m.pagada ? '<span class="badge vigente">Pagada</span>' : '<span class="badge vencida">Pendiente</span>'}
             <div class="hint">${[m.fecha ? formatDate(m.fecha) : '', m.descripcion].filter(Boolean).map(escapeHtml).join(' · ')}</div>
             ${m.nota ? `<div class="hint">${escapeHtml(m.nota)}</div>` : ''}
