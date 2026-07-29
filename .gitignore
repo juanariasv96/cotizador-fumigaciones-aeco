@@ -13,3 +13,4 @@ documentacion_oficina_setup.sql
 visitas_cascade_setup.sql
 resumen_dia_setup.sql
 resumen_dia_rpc_setup.sql
+empleados_setup.sql

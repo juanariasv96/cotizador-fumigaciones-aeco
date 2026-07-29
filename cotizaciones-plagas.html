@@ -757,6 +757,39 @@
   .seguimiento-card.atrasada{border-left:4px solid var(--rojo);}
   .seguimiento-llamada.atrasada{color:var(--rojo);font-weight:700;}
   .seguimiento-vendedores-tabla{margin-top:10px;}
+
+  /* ---------- Empleados / Personal ---------- */
+  .empleado-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:14px;
+    margin-bottom:10px;background:var(--blanco);cursor:pointer;
+  }
+  .empleado-card:hover{border-color:var(--verde);}
+  .empleado-card.inactivo{opacity:.6;}
+  .empleado-resumen{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:18px;}
+  .empleado-resumen .stat .valor{font-size:22px;font-weight:700;color:var(--verde-oscuro);}
+  .empleado-resumen .stat.alerta .valor{color:var(--rojo);}
+  .empleado-resumen .stat .label{font-size:12px;color:#777;}
+  .empleado-ficha-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin-bottom:16px;}
+  .empleado-ficha-grid div span{color:#666;}
+  .empleado-subseccion{border-top:1px solid var(--gris-borde);padding-top:14px;margin-top:14px;}
+  .empleado-registro-card{
+    border:1px solid var(--gris-borde);border-radius:6px;padding:10px 12px;
+    margin-bottom:8px;background:var(--gris-fondo);font-size:13px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  #empleadoDetalleOverlay, #empleadoFormOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #empleadoDetallePanel{
+    background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #empleadoFormPanel{
+    background:var(--blanco);width:100%;max-width:560px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
   #visitaOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
@@ -1066,6 +1099,7 @@
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
+  <button class="tab-btn hidden" data-tab="empleados" id="tabBtnEmpleados">Empleados</button>
   <button class="tab-btn hidden" data-tab="resumen" id="tabBtnResumen">Resumen del día</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
   <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
@@ -1822,6 +1856,24 @@
     </div>
   </section>
 
+  <!-- ================= TAB: EMPLEADOS (oficina: dueño y asistente) ================= -->
+  <section id="tab-empleados" class="hidden">
+    <div class="panel">
+      <h2>Empleados</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Ficha, incidencias (faltas, llegadas tarde, permisos, vacaciones) y préstamos de artículos del negocio. Visible solo para dueño y asistente; editar/borrar es solo del dueño.</p>
+
+      <div class="toolbar">
+        <div class="buscador-wrap">
+          <input type="text" id="empleadosBuscador" placeholder="Buscar por nombre, puesto o teléfono...">
+          <button type="button" id="btnLimpiarEmpleadosBuscador" class="hidden" aria-label="Limpiar búsqueda">✕</button>
+        </div>
+        <button class="btn" id="btnAgregarEmpleado">Agregar empleado</button>
+      </div>
+      <div id="empleadosFiltroAviso" class="hint hidden" style="margin-bottom:8px;"></div>
+      <div id="empleadosLista"></div>
+    </div>
+  </section>
+
   <!-- ================= TAB: RESUMEN DEL DÍA (oficina: dueño y asistente) ================= -->
   <section id="tab-resumen" class="hidden">
     <div class="panel">
@@ -2200,6 +2252,139 @@
   </div>
 </div>
 
+<!-- ================= OVERLAY: AGREGAR / EDITAR EMPLEADO ================= -->
+<div id="empleadoFormOverlay" class="hidden">
+  <div id="empleadoFormPanel">
+    <h3 style="margin-top:0;" id="empleadoFormTitulo">Agregar empleado</h3>
+    <div class="grid">
+      <div class="field">
+        <label for="empleadoNombre">Nombre completo *</label>
+        <input type="text" id="empleadoNombre" required placeholder="Ej. Juan Pérez">
+      </div>
+      <div class="field">
+        <label for="empleadoPuesto">Puesto</label>
+        <input type="text" id="empleadoPuesto" placeholder="Ej. Técnico de campo">
+      </div>
+      <div class="field">
+        <label for="empleadoFechaNacimiento">Fecha de nacimiento</label>
+        <input type="date" id="empleadoFechaNacimiento">
+      </div>
+      <div class="field">
+        <label for="empleadoFechaIngreso">Fecha de ingreso</label>
+        <input type="date" id="empleadoFechaIngreso">
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <label for="empleadoDireccion">Dirección</label>
+        <input type="text" id="empleadoDireccion" placeholder="Calle, número, colonia, ciudad">
+      </div>
+      <div class="field">
+        <label for="empleadoTelefonoEmpleado">Teléfono del empleado</label>
+        <input type="tel" id="empleadoTelefonoEmpleado" placeholder="Ej. 555-123-4567">
+      </div>
+      <div class="field">
+        <label for="empleadoTelefonoNegocio">Teléfono del negocio (si aplica)</label>
+        <input type="tel" id="empleadoTelefonoNegocio" placeholder="Ej. 555-765-4321">
+      </div>
+      <div class="field">
+        <label for="empleadoContactoEmergenciaNombre">Contacto de emergencia — nombre</label>
+        <input type="text" id="empleadoContactoEmergenciaNombre" placeholder="Ej. María Pérez">
+      </div>
+      <div class="field">
+        <label for="empleadoContactoEmergenciaTelefono">Contacto de emergencia — teléfono</label>
+        <input type="tel" id="empleadoContactoEmergenciaTelefono" placeholder="Ej. 555-111-2222">
+      </div>
+      <div class="field">
+        <label for="empleadoVacacionesAnuales">Días de vacaciones al año</label>
+        <input type="number" id="empleadoVacacionesAnuales" min="0" step="1" value="0">
+      </div>
+      <div class="field" style="justify-content:center;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="empleadoActivo" checked style="width:auto;">
+          Activo
+        </label>
+      </div>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarEmpleadoForm">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarEmpleado">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY: DETALLE DE EMPLEADO ================= -->
+<div id="empleadoDetalleOverlay" class="hidden">
+  <div id="empleadoDetallePanel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h3 style="margin:0;" id="empleadoDetalleNombre"></h3>
+        <div class="hint" id="empleadoDetallePuesto"></div>
+      </div>
+      <div class="actions-row" style="margin-top:0;">
+        <button type="button" class="btn secondary small" id="btnEditarEmpleado">Editar</button>
+        <button type="button" class="btn danger small" id="btnEliminarEmpleado">Eliminar</button>
+        <button type="button" class="btn secondary small" id="btnCerrarEmpleadoDetalle">Cerrar</button>
+      </div>
+    </div>
+
+    <div class="empleado-resumen" id="empleadoResumen" style="margin-top:16px;"></div>
+
+    <div class="empleado-ficha-grid" id="empleadoFichaGrid"></div>
+
+    <div class="empleado-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Incidencias</h3>
+      <div class="grid" id="empleadoIncidenciaForm" style="align-items:end;">
+        <div class="field" style="max-width:160px;">
+          <label for="incidenciaTipo">Tipo</label>
+          <select id="incidenciaTipo">
+            <option value="falta">Falta</option>
+            <option value="llegada_tarde">Llegada tarde</option>
+            <option value="permiso">Permiso</option>
+            <option value="vacaciones">Vacaciones</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="incidenciaFecha">Fecha</label>
+          <input type="date" id="incidenciaFecha">
+        </div>
+        <div class="field" style="max-width:100px;">
+          <label for="incidenciaDias">Días</label>
+          <input type="number" id="incidenciaDias" min="0" step="0.5" value="1">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="incidenciaNota">Nota (opcional)</label>
+          <input type="text" id="incidenciaNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn small" id="btnAgregarIncidencia" style="width:100%;">Agregar</button>
+        </div>
+      </div>
+      <div id="empleadoIncidenciasLista" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="empleado-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Préstamos del negocio</h3>
+      <div class="grid" id="empleadoPrestamoForm" style="align-items:end;">
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="prestamoArticulo">Artículo</label>
+          <input type="text" id="prestamoArticulo" placeholder="Ej. Bomba de mochila, celular, uniforme...">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="prestamoFechaEntregado">Fecha entregado</label>
+          <input type="date" id="prestamoFechaEntregado">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="prestamoNota">Nota (opcional)</label>
+          <input type="text" id="prestamoNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn small" id="btnAgregarPrestamo" style="width:100%;">Agregar</button>
+        </div>
+      </div>
+      <div id="empleadoPrestamosLista" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= OVERLAY DE IMPRESIÓN ================= -->
 <div id="printOverlay" class="hidden">
   <div id="printSheet">
@@ -2271,6 +2456,8 @@
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnDocumentacion').classList.toggle('hidden',
+      !['dueño', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnEmpleados').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnResumen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
@@ -3022,6 +3209,7 @@
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     documentacion: document.getElementById('tab-documentacion'),
+    empleados: document.getElementById('tab-empleados'),
     resumen: document.getElementById('tab-resumen'),
     accesos: document.getElementById('tab-accesos'),
     dispositivos: document.getElementById('tab-dispositivos'),
@@ -3043,6 +3231,10 @@
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'documentacion') cargarDocumentacion().then(renderDocumentacionLista);
+    if(nombre === 'empleados'){
+      empleadosBuscador.value = '';
+      cargarYRenderEmpleados();
+    }
     if(nombre === 'resumen') cargarYRenderResumenDia();
     if(nombre === 'dispositivos') cargarYRenderDispositivos();
   }
@@ -7391,6 +7583,348 @@
     }
     abrirImpresionCertificado(cert);
   }
+
+
+  // ---------- Empleados / Personal (oficina: dueño y asistente) ----------
+  // Ver/agregar es de dueño y asistente (equipo compartido); editar/borrar
+  // (ficha, incidencias y prestamos) es solo del dueño — reforzado tambien
+  // por RLS en empleados_setup.sql, esto solo oculta los controles en la UI.
+  let empleadosCache = [];
+  let empleadoDetalleActualId = null;
+  let empleadoFormEditandoId = null;
+  let empleadoIncidenciasCache = [];
+  let empleadoPrestamosCache = [];
+
+  const empleadosBuscador = document.getElementById('empleadosBuscador');
+  const empleadoFormOverlay = document.getElementById('empleadoFormOverlay');
+  const empleadoDetalleOverlay = document.getElementById('empleadoDetalleOverlay');
+
+  const INCIDENCIA_TIPO_LABEL = {
+    falta: 'Falta',
+    llegada_tarde: 'Llegada tarde',
+    permiso: 'Permiso',
+    vacaciones: 'Vacaciones',
+  };
+
+  async function cargarYRenderEmpleados(){
+    const { data, error } = await supabaseClient.from('empleados').select('*').order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los empleados:', error);
+      document.getElementById('empleadosLista').innerHTML =
+        `<div class="empty-msg">No se pudieron cargar los empleados (${escapeHtml(error.message)}).</div>`;
+      return;
+    }
+    empleadosCache = data || [];
+    renderEmpleadosLista();
+  }
+
+  function renderEmpleadosLista(){
+    const filtro = (empleadosBuscador.value || '').trim().toLowerCase();
+    const todos = empleadosCache;
+    const visibles = todos.filter(e => {
+      if(!filtro) return true;
+      return ((e.nombre||'') + ' ' + (e.puesto||'') + ' ' + (e.telefono_empleado||'')).toLowerCase().includes(filtro);
+    });
+
+    document.getElementById('btnLimpiarEmpleadosBuscador').classList.toggle('hidden', !filtro);
+
+    const avisoEl = document.getElementById('empleadosFiltroAviso');
+    if(filtro){
+      avisoEl.textContent = `Mostrando ${visibles.length} de ${todos.length} empleados (filtrado por "${empleadosBuscador.value.trim()}")`;
+      avisoEl.classList.remove('hidden');
+    } else {
+      avisoEl.classList.add('hidden');
+    }
+
+    const cont = document.getElementById('empleadosLista');
+    if(visibles.length === 0){
+      cont.innerHTML = filtro
+        ? `<div class="empty-msg">No hay empleados que coincidan con esta búsqueda.</div>`
+        : `<div class="empty-msg">No hay empleados registrados todavía.</div>`;
+      return;
+    }
+    cont.innerHTML = visibles.map(e => `
+      <div class="empleado-card ${e.activo ? '' : 'inactivo'}" data-id="${e.id}">
+        <strong>${escapeHtml(e.nombre)}</strong> ${e.activo ? '' : '<span class="badge vencida">Inactivo</span>'}
+        <div class="hint">${escapeHtml(e.puesto || 'Sin puesto asignado')}${e.telefono_empleado ? ' · ' + escapeHtml(e.telefono_empleado) : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  empleadosBuscador.addEventListener('input', renderEmpleadosLista);
+  document.getElementById('btnLimpiarEmpleadosBuscador').addEventListener('click', () => {
+    empleadosBuscador.value = '';
+    renderEmpleadosLista();
+    empleadosBuscador.focus();
+  });
+  document.getElementById('empleadosLista').addEventListener('click', (e) => {
+    const card = e.target.closest('.empleado-card');
+    if(!card) return;
+    abrirEmpleadoDetalle(card.dataset.id);
+  });
+
+  // ---- Agregar / Editar empleado ----
+  function abrirEmpleadoForm(empleado){
+    empleadoFormEditandoId = empleado ? empleado.id : null;
+    document.getElementById('empleadoFormTitulo').textContent = empleado ? 'Editar empleado' : 'Agregar empleado';
+    document.getElementById('empleadoNombre').value = empleado ? (empleado.nombre || '') : '';
+    document.getElementById('empleadoPuesto').value = empleado ? (empleado.puesto || '') : '';
+    document.getElementById('empleadoFechaNacimiento').value = empleado ? (empleado.fecha_nacimiento || '') : '';
+    document.getElementById('empleadoFechaIngreso').value = empleado ? (empleado.fecha_ingreso || '') : '';
+    document.getElementById('empleadoDireccion').value = empleado ? (empleado.direccion || '') : '';
+    document.getElementById('empleadoTelefonoEmpleado').value = empleado ? (empleado.telefono_empleado || '') : '';
+    document.getElementById('empleadoTelefonoNegocio').value = empleado ? (empleado.telefono_negocio || '') : '';
+    document.getElementById('empleadoContactoEmergenciaNombre').value = empleado ? (empleado.contacto_emergencia_nombre || '') : '';
+    document.getElementById('empleadoContactoEmergenciaTelefono').value = empleado ? (empleado.contacto_emergencia_telefono || '') : '';
+    document.getElementById('empleadoVacacionesAnuales').value = empleado ? (empleado.vacaciones_anuales ?? 0) : 0;
+    document.getElementById('empleadoActivo').checked = empleado ? !!empleado.activo : true;
+    empleadoFormOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnAgregarEmpleado').addEventListener('click', () => abrirEmpleadoForm(null));
+  document.getElementById('btnCerrarEmpleadoForm').addEventListener('click', () => {
+    empleadoFormOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnGuardarEmpleado').addEventListener('click', async () => {
+    const nombre = document.getElementById('empleadoNombre').value.trim();
+    if(!nombre){ alert('El nombre es obligatorio.'); return; }
+    const payload = {
+      nombre,
+      puesto: document.getElementById('empleadoPuesto').value.trim() || null,
+      fecha_nacimiento: document.getElementById('empleadoFechaNacimiento').value || null,
+      fecha_ingreso: document.getElementById('empleadoFechaIngreso').value || null,
+      direccion: document.getElementById('empleadoDireccion').value.trim() || null,
+      telefono_empleado: document.getElementById('empleadoTelefonoEmpleado').value.trim() || null,
+      telefono_negocio: document.getElementById('empleadoTelefonoNegocio').value.trim() || null,
+      contacto_emergencia_nombre: document.getElementById('empleadoContactoEmergenciaNombre').value.trim() || null,
+      contacto_emergencia_telefono: document.getElementById('empleadoContactoEmergenciaTelefono').value.trim() || null,
+      vacaciones_anuales: Number(document.getElementById('empleadoVacacionesAnuales').value) || 0,
+      activo: document.getElementById('empleadoActivo').checked,
+    };
+
+    const btn = document.getElementById('btnGuardarEmpleado');
+    btn.disabled = true;
+    try{
+      if(empleadoFormEditandoId){
+        const { error } = await supabaseClient.from('empleados').update(payload).eq('id', empleadoFormEditandoId);
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      } else {
+        payload.creado_por = (usuarioActual && usuarioActual.id) || null;
+        const { error } = await supabaseClient.from('empleados').insert(payload);
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      }
+      const editando = empleadoFormEditandoId;
+      empleadoFormOverlay.classList.add('hidden');
+      await cargarYRenderEmpleados();
+      if(editando && !empleadoDetalleOverlay.classList.contains('hidden')){
+        renderEmpleadoDetalle();
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnEditarEmpleado').addEventListener('click', () => {
+    const empleado = empleadosCache.find(e => e.id === empleadoDetalleActualId);
+    if(empleado) abrirEmpleadoForm(empleado);
+  });
+
+  document.getElementById('btnEliminarEmpleado').addEventListener('click', async () => {
+    if(!confirm('¿Eliminar este empleado? Se borrarán también sus incidencias y préstamos registrados.')) return;
+    const { error } = await supabaseClient.from('empleados').delete().eq('id', empleadoDetalleActualId);
+    if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+    empleadoDetalleOverlay.classList.add('hidden');
+    await cargarYRenderEmpleados();
+  });
+
+  document.getElementById('btnCerrarEmpleadoDetalle').addEventListener('click', () => {
+    empleadoDetalleOverlay.classList.add('hidden');
+  });
+
+  // ---- Detalle de empleado: resumen + ficha + incidencias + prestamos ----
+  async function cargarEmpleadoRegistros(empleadoId){
+    const [{ data: incidenciasData, error: errInc }, { data: prestamosData, error: errPre }] = await Promise.all([
+      supabaseClient.from('empleado_incidencias').select('*').eq('empleado_id', empleadoId).order('fecha', { ascending: false }),
+      supabaseClient.from('empleado_prestamos').select('*').eq('empleado_id', empleadoId).order('fecha_entregado', { ascending: false }),
+    ]);
+    if(errInc) console.error('No se pudieron cargar las incidencias:', errInc);
+    if(errPre) console.error('No se pudieron cargar los préstamos:', errPre);
+    empleadoIncidenciasCache = incidenciasData || [];
+    empleadoPrestamosCache = prestamosData || [];
+  }
+
+  async function abrirEmpleadoDetalle(id){
+    empleadoDetalleActualId = id;
+    await cargarEmpleadoRegistros(id);
+    renderEmpleadoDetalle();
+    empleadoDetalleOverlay.classList.remove('hidden');
+  }
+
+  function calcularResumenEmpleado(incidencias, empleado){
+    const sumaTipo = (tipo) => incidencias.filter(i => i.tipo === tipo).reduce((s, i) => s + Number(i.dias || 0), 0);
+    return {
+      vacacionesUsadas: sumaTipo('vacaciones'),
+      vacacionesAnuales: empleado.vacaciones_anuales || 0,
+      faltas: sumaTipo('falta'),
+      llegadasTarde: sumaTipo('llegada_tarde'),
+      permisos: sumaTipo('permiso'),
+    };
+  }
+
+  function renderEmpleadoDetalle(){
+    const empleado = empleadosCache.find(e => e.id === empleadoDetalleActualId);
+    if(!empleado) return;
+    const esDueno = usuarioActual && usuarioActual.rol === 'dueño';
+
+    document.getElementById('empleadoDetalleNombre').textContent = empleado.nombre;
+    document.getElementById('empleadoDetallePuesto').textContent = empleado.puesto || '';
+
+    document.getElementById('btnEditarEmpleado').classList.toggle('hidden', !esDueno);
+    document.getElementById('btnEliminarEmpleado').classList.toggle('hidden', !esDueno);
+
+    const resumen = calcularResumenEmpleado(empleadoIncidenciasCache, empleado);
+    document.getElementById('empleadoResumen').innerHTML = `
+      <div class="stat"><div class="valor">${resumen.vacacionesUsadas} de ${resumen.vacacionesAnuales} días</div><div class="label">Vacaciones usadas</div></div>
+      <div class="stat ${resumen.faltas > 0 ? 'alerta' : ''}"><div class="valor">${resumen.faltas}</div><div class="label">Faltas</div></div>
+      <div class="stat"><div class="valor">${resumen.llegadasTarde}</div><div class="label">Llegadas tarde</div></div>
+      <div class="stat"><div class="valor">${resumen.permisos}</div><div class="label">Permisos (días)</div></div>
+    `;
+
+    document.getElementById('empleadoFichaGrid').innerHTML = `
+      <div><span>Teléfono:</span> ${escapeHtml(empleado.telefono_empleado || '-')}</div>
+      <div><span>Teléfono del negocio:</span> ${escapeHtml(empleado.telefono_negocio || '-')}</div>
+      <div><span>Dirección:</span> ${escapeHtml(empleado.direccion || '-')}</div>
+      <div><span>Fecha de nacimiento:</span> ${empleado.fecha_nacimiento ? formatDate(empleado.fecha_nacimiento) : '-'}</div>
+      <div><span>Fecha de ingreso:</span> ${empleado.fecha_ingreso ? formatDate(empleado.fecha_ingreso) : '-'}</div>
+      <div><span>Contacto de emergencia:</span> ${escapeHtml(empleado.contacto_emergencia_nombre || '-')}${empleado.contacto_emergencia_telefono ? ' (' + escapeHtml(empleado.contacto_emergencia_telefono) + ')' : ''}</div>
+      <div><span>Estado:</span> ${empleado.activo ? '<span class="badge vigente">Activo</span>' : '<span class="badge vencida">Inactivo</span>'}</div>
+    `;
+
+    renderEmpleadoIncidenciasLista(esDueno);
+    renderEmpleadoPrestamosLista(esDueno);
+  }
+
+  function renderEmpleadoIncidenciasLista(esDueno){
+    const cont = document.getElementById('empleadoIncidenciasLista');
+    if(!empleadoIncidenciasCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin incidencias registradas.</div>`;
+      return;
+    }
+    cont.innerHTML = empleadoIncidenciasCache.map(i => `
+      <div class="empleado-registro-card">
+        <div>
+          <strong>${escapeHtml(INCIDENCIA_TIPO_LABEL[i.tipo] || i.tipo)}</strong>
+          — ${formatDate(i.fecha)} — ${i.dias} día(s)
+          ${i.nota ? `<div class="hint">${escapeHtml(i.nota)}</div>` : ''}
+        </div>
+        ${esDueno ? `<button type="button" class="btn danger small" data-action="eliminar-incidencia" data-id="${i.id}">Eliminar</button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderEmpleadoPrestamosLista(esDueno){
+    const cont = document.getElementById('empleadoPrestamosLista');
+    if(!empleadoPrestamosCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin préstamos registrados.</div>`;
+      return;
+    }
+    cont.innerHTML = empleadoPrestamosCache.map(p => {
+      // "Marcar devuelto" es de dueño Y asistente, pero SOLO mientras el
+      // prestamo sigue pendiente (la asistente no puede tocar uno ya
+      // devuelto — ni editarlo ni revertirlo; eso solo es del dueño,
+      // igual que "Eliminar").
+      const acciones = [];
+      if(!p.devuelto){
+        acciones.push(`<button type="button" class="btn secondary small" data-action="marcar-devuelto" data-id="${p.id}">Marcar devuelto</button>`);
+      }
+      if(esDueno){
+        acciones.push(`<button type="button" class="btn danger small" data-action="eliminar-prestamo" data-id="${p.id}">Eliminar</button>`);
+      }
+      return `
+        <div class="empleado-registro-card">
+          <div>
+            <strong>${escapeHtml(p.articulo)}</strong>
+            ${p.devuelto ? '<span class="badge vigente">Devuelto</span>' : '<span class="badge vencida">Pendiente</span>'}
+            <div class="hint">
+              Entregado: ${p.fecha_entregado ? formatDate(p.fecha_entregado) : '-'}
+              ${p.devuelto && p.fecha_devolucion ? ' · Devuelto: ' + formatDate(p.fecha_devolucion) : ''}
+            </div>
+            ${p.nota ? `<div class="hint">${escapeHtml(p.nota)}</div>` : ''}
+          </div>
+          ${acciones.length ? `<div class="actions-row" style="margin-top:0;">${acciones.join('')}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('btnAgregarIncidencia').addEventListener('click', async () => {
+    const tipo = document.getElementById('incidenciaTipo').value;
+    const fecha = document.getElementById('incidenciaFecha').value;
+    const dias = Number(document.getElementById('incidenciaDias').value) || 0;
+    const nota = document.getElementById('incidenciaNota').value.trim() || null;
+    if(!fecha){ alert('Elige una fecha.'); return; }
+    const { error } = await supabaseClient.from('empleado_incidencias').insert({
+      empleado_id: empleadoDetalleActualId,
+      tipo, fecha, dias, nota,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    if(error){ alert('No se pudo registrar la incidencia: ' + error.message); return; }
+    document.getElementById('incidenciaFecha').value = '';
+    document.getElementById('incidenciaNota').value = '';
+    document.getElementById('incidenciaDias').value = '1';
+    await cargarEmpleadoRegistros(empleadoDetalleActualId);
+    renderEmpleadoDetalle();
+  });
+
+  document.getElementById('empleadoIncidenciasLista').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-action="eliminar-incidencia"]');
+    if(!btn) return;
+    if(!confirm('¿Eliminar esta incidencia?')) return;
+    const { error } = await supabaseClient.from('empleado_incidencias').delete().eq('id', btn.dataset.id);
+    if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+    await cargarEmpleadoRegistros(empleadoDetalleActualId);
+    renderEmpleadoDetalle();
+  });
+
+  document.getElementById('btnAgregarPrestamo').addEventListener('click', async () => {
+    const articulo = document.getElementById('prestamoArticulo').value.trim();
+    const fechaEntregado = document.getElementById('prestamoFechaEntregado').value || null;
+    const nota = document.getElementById('prestamoNota').value.trim() || null;
+    if(!articulo){ alert('Escribe qué artículo se prestó.'); return; }
+    const { error } = await supabaseClient.from('empleado_prestamos').insert({
+      empleado_id: empleadoDetalleActualId,
+      articulo, fecha_entregado: fechaEntregado, nota,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    if(error){ alert('No se pudo registrar el préstamo: ' + error.message); return; }
+    document.getElementById('prestamoArticulo').value = '';
+    document.getElementById('prestamoFechaEntregado').value = '';
+    document.getElementById('prestamoNota').value = '';
+    await cargarEmpleadoRegistros(empleadoDetalleActualId);
+    renderEmpleadoDetalle();
+  });
+
+  document.getElementById('empleadoPrestamosLista').addEventListener('click', async (e) => {
+    const btnDevuelto = e.target.closest('button[data-action="marcar-devuelto"]');
+    const btnEliminar = e.target.closest('button[data-action="eliminar-prestamo"]');
+    if(btnDevuelto){
+      const { error } = await supabaseClient.from('empleado_prestamos')
+        .update({ devuelto: true, fecha_devolucion: new Date().toISOString().slice(0, 10) })
+        .eq('id', btnDevuelto.dataset.id);
+      if(error){ alert('No se pudo marcar como devuelto: ' + error.message); return; }
+      await cargarEmpleadoRegistros(empleadoDetalleActualId);
+      renderEmpleadoDetalle();
+      return;
+    }
+    if(btnEliminar){
+      if(!confirm('¿Eliminar este préstamo?')) return;
+      const { error } = await supabaseClient.from('empleado_prestamos').delete().eq('id', btnEliminar.dataset.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      await cargarEmpleadoRegistros(empleadoDetalleActualId);
+      renderEmpleadoDetalle();
+    }
+  });
 
 
   // ---------- Resumen del día (oficina: dueño y asistente) ----------
