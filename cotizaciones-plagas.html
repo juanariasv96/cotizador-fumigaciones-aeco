@@ -8749,6 +8749,15 @@
     vehiculoDetalleOverlay.classList.add('hidden');
   });
 
+  async function refrescarVehiculoEnCache(vehiculoId){
+    const { data, error } = await supabaseClient.from('vehiculos').select('*').eq('id', vehiculoId).single();
+    if(error || !data) return;
+    const idx = vehiculosCache.findIndex(v => v.id === data.id);
+    if(idx >= 0) vehiculosCache[idx] = data; else vehiculosCache.push(data);
+    renderVehiculosAlertaBanner();
+    renderVehiculosLista();
+  }
+
   // ---- Detalle: metricas + ficha + cargas + mantenimientos + multas ----
   async function cargarVehiculoRegistros(vehiculoId){
     const [
@@ -8987,6 +8996,7 @@
       cargaTicketFotoActual = null;
       renderCargaTicketPreview();
       await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      await refrescarVehiculoEnCache(vehiculoDetalleActualId);
       renderVehiculoDetalle();
     } finally {
       btn.disabled = false;
@@ -9053,6 +9063,7 @@
       mantenimientoFacturaFotoActual = null;
       renderMantenimientoFacturaPreview();
       await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      await refrescarVehiculoEnCache(vehiculoDetalleActualId);
       renderVehiculoDetalle();
     } finally {
       btn.disabled = false;
