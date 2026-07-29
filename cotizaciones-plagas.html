@@ -2455,6 +2455,34 @@
       </div>
       <div id="empleadoPrestamosLista" style="margin-top:10px;"></div>
     </div>
+
+    <div class="empleado-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Vacaciones por antigüedad</h3>
+      <p class="hint" style="margin-top:0;">Desglose por año de antigüedad (el derecho crece cada año). Agregar es de dueño y asistente; editar/borrar es solo del dueño.</p>
+      <div class="grid" id="empleadoVacacionAntiguedadForm" style="align-items:end;">
+        <div class="field" style="max-width:140px;">
+          <label for="vacAntiguedadAnio">Año de antigüedad</label>
+          <input type="number" id="vacAntiguedadAnio" min="1" step="1" placeholder="Ej. 1">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="vacAntiguedadDisponibles">Días disponibles</label>
+          <input type="number" id="vacAntiguedadDisponibles" min="0" step="0.5" value="0">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="vacAntiguedadTomados">Días tomados</label>
+          <input type="number" id="vacAntiguedadTomados" min="0" step="0.5" value="0">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="vacAntiguedadNota">Nota (opcional)</label>
+          <input type="text" id="vacAntiguedadNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:180px;">
+          <button type="button" class="btn small" id="btnGuardarVacacionAntiguedad" style="width:100%;">Agregar</button>
+          <button type="button" class="btn secondary small hidden" id="btnCancelarVacacionAntiguedad" style="width:100%;margin-top:4px;">Cancelar edición</button>
+        </div>
+      </div>
+      <div id="empleadoVacacionesAntiguedadLista" style="margin-top:10px;"></div>
+    </div>
   </div>
 </div>
 
@@ -7927,6 +7955,8 @@
   let empleadoFormEditandoId = null;
   let empleadoIncidenciasCache = [];
   let empleadoPrestamosCache = [];
+  let empleadoVacacionesAntiguedadCache = [];
+  let vacacionAntiguedadEditandoId = null;
 
   const empleadosBuscador = document.getElementById('empleadosBuscador');
   const empleadoFormOverlay = document.getElementById('empleadoFormOverlay');
@@ -8075,20 +8105,28 @@
     empleadoDetalleOverlay.classList.add('hidden');
   });
 
-  // ---- Detalle de empleado: resumen + ficha + incidencias + prestamos ----
+  // ---- Detalle de empleado: resumen + ficha + incidencias + prestamos + vacaciones por antiguedad ----
   async function cargarEmpleadoRegistros(empleadoId){
-    const [{ data: incidenciasData, error: errInc }, { data: prestamosData, error: errPre }] = await Promise.all([
+    const [
+      { data: incidenciasData, error: errInc },
+      { data: prestamosData, error: errPre },
+      { data: vacAntigData, error: errVacAntig },
+    ] = await Promise.all([
       supabaseClient.from('empleado_incidencias').select('*').eq('empleado_id', empleadoId).order('fecha', { ascending: false }),
       supabaseClient.from('empleado_prestamos').select('*').eq('empleado_id', empleadoId).order('fecha_entregado', { ascending: false }),
+      supabaseClient.from('empleado_vacaciones_antiguedad').select('*').eq('empleado_id', empleadoId).order('anio_antiguedad', { ascending: true }),
     ]);
     if(errInc) console.error('No se pudieron cargar las incidencias:', errInc);
     if(errPre) console.error('No se pudieron cargar los préstamos:', errPre);
+    if(errVacAntig) console.error('No se pudieron cargar las vacaciones por antigüedad:', errVacAntig);
     empleadoIncidenciasCache = incidenciasData || [];
     empleadoPrestamosCache = prestamosData || [];
+    empleadoVacacionesAntiguedadCache = vacAntigData || [];
   }
 
   async function abrirEmpleadoDetalle(id){
     empleadoDetalleActualId = id;
+    cancelarEdicionVacacionAntiguedad();
     await cargarEmpleadoRegistros(id);
     renderEmpleadoDetalle();
     empleadoDetalleOverlay.classList.remove('hidden');
@@ -8136,6 +8174,7 @@
 
     renderEmpleadoIncidenciasLista(esDueno);
     renderEmpleadoPrestamosLista(esDueno);
+    renderEmpleadoVacacionesAntiguedadLista(esDueno);
   }
 
   function renderEmpleadoIncidenciasLista(esDueno){
@@ -8254,6 +8293,106 @@
       if(!confirm('¿Eliminar este préstamo?')) return;
       const { error } = await supabaseClient.from('empleado_prestamos').delete().eq('id', btnEliminar.dataset.id);
       if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      await cargarEmpleadoRegistros(empleadoDetalleActualId);
+      renderEmpleadoDetalle();
+    }
+  });
+
+  // ---- Vacaciones por antigüedad (agregar/ver: dueño y asistente; editar/borrar: solo dueño) ----
+  function renderEmpleadoVacacionesAntiguedadLista(esDueno){
+    const cont = document.getElementById('empleadoVacacionesAntiguedadLista');
+    if(!empleadoVacacionesAntiguedadCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin años de antigüedad registrados.</div>`;
+      return;
+    }
+    const ordenados = [...empleadoVacacionesAntiguedadCache].sort((a, b) => a.anio_antiguedad - b.anio_antiguedad);
+    cont.innerHTML = ordenados.map(v => {
+      const restan = Number(v.dias_disponibles || 0) - Number(v.dias_tomados || 0);
+      return `
+      <div class="empleado-registro-card">
+        <div>
+          <strong>Año ${v.anio_antiguedad}</strong>
+          — ${v.dias_disponibles} disponibles, ${v.dias_tomados} tomados, ${restan} restan
+          ${v.nota ? `<div class="hint">${escapeHtml(v.nota)}</div>` : ''}
+        </div>
+        ${esDueno ? `
+          <div class="actions-row" style="margin-top:0;">
+            <button type="button" class="btn secondary small" data-action="editar-vacacion-antiguedad" data-id="${v.id}">Editar</button>
+            <button type="button" class="btn danger small" data-action="eliminar-vacacion-antiguedad" data-id="${v.id}">Eliminar</button>
+          </div>
+        ` : ''}
+      </div>
+      `;
+    }).join('');
+  }
+
+  function cancelarEdicionVacacionAntiguedad(){
+    vacacionAntiguedadEditandoId = null;
+    document.getElementById('vacAntiguedadAnio').value = '';
+    document.getElementById('vacAntiguedadDisponibles').value = '0';
+    document.getElementById('vacAntiguedadTomados').value = '0';
+    document.getElementById('vacAntiguedadNota').value = '';
+    document.getElementById('btnGuardarVacacionAntiguedad').textContent = 'Agregar';
+    document.getElementById('btnCancelarVacacionAntiguedad').classList.add('hidden');
+  }
+  document.getElementById('btnCancelarVacacionAntiguedad').addEventListener('click', cancelarEdicionVacacionAntiguedad);
+
+  document.getElementById('btnGuardarVacacionAntiguedad').addEventListener('click', async () => {
+    const anio = Number(document.getElementById('vacAntiguedadAnio').value);
+    if(!anio || anio < 1){ alert('Indica un año de antigüedad válido (1, 2, 3...).'); return; }
+    const disponibles = Number(document.getElementById('vacAntiguedadDisponibles').value) || 0;
+    const tomados = Number(document.getElementById('vacAntiguedadTomados').value) || 0;
+    const nota = document.getElementById('vacAntiguedadNota').value.trim() || null;
+
+    const btn = document.getElementById('btnGuardarVacacionAntiguedad');
+    btn.disabled = true;
+    try{
+      if(vacacionAntiguedadEditandoId){
+        const { error } = await supabaseClient.from('empleado_vacaciones_antiguedad')
+          .update({ anio_antiguedad: anio, dias_disponibles: disponibles, dias_tomados: tomados, nota })
+          .eq('id', vacacionAntiguedadEditandoId);
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      } else {
+        const yaExiste = empleadoVacacionesAntiguedadCache.some(v => v.anio_antiguedad === anio);
+        if(yaExiste){
+          alert(`Ya existe un registro para el año ${anio}. Usa "Editar" en esa fila en vez de agregar uno nuevo.`);
+          return;
+        }
+        const { error } = await supabaseClient.from('empleado_vacaciones_antiguedad').insert({
+          empleado_id: empleadoDetalleActualId,
+          anio_antiguedad: anio, dias_disponibles: disponibles, dias_tomados: tomados, nota,
+          creado_por: (usuarioActual && usuarioActual.id) || null,
+        });
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      }
+      cancelarEdicionVacacionAntiguedad();
+      await cargarEmpleadoRegistros(empleadoDetalleActualId);
+      renderEmpleadoDetalle();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('empleadoVacacionesAntiguedadLista').addEventListener('click', async (e) => {
+    const btnEditar = e.target.closest('[data-action="editar-vacacion-antiguedad"]');
+    if(btnEditar){
+      const v = empleadoVacacionesAntiguedadCache.find(x => x.id === btnEditar.dataset.id);
+      if(!v) return;
+      vacacionAntiguedadEditandoId = v.id;
+      document.getElementById('vacAntiguedadAnio').value = v.anio_antiguedad;
+      document.getElementById('vacAntiguedadDisponibles').value = v.dias_disponibles;
+      document.getElementById('vacAntiguedadTomados').value = v.dias_tomados;
+      document.getElementById('vacAntiguedadNota').value = v.nota || '';
+      document.getElementById('btnGuardarVacacionAntiguedad').textContent = 'Guardar cambios';
+      document.getElementById('btnCancelarVacacionAntiguedad').classList.remove('hidden');
+      return;
+    }
+    const btnEliminar = e.target.closest('[data-action="eliminar-vacacion-antiguedad"]');
+    if(btnEliminar){
+      if(!confirm('¿Eliminar este año de antigüedad?')) return;
+      const { error } = await supabaseClient.from('empleado_vacaciones_antiguedad').delete().eq('id', btnEliminar.dataset.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      if(vacacionAntiguedadEditandoId === btnEliminar.dataset.id) cancelarEdicionVacacionAntiguedad();
       await cargarEmpleadoRegistros(empleadoDetalleActualId);
       renderEmpleadoDetalle();
     }
