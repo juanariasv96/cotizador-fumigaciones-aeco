@@ -790,6 +790,52 @@
     background:var(--blanco);width:100%;max-width:560px;border-radius:6px;
     box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
   }
+
+  /* ---------- Vehiculos / Flotilla ---------- */
+  .badge.por-vencer{background:#fff3cd;color:#8a6d00;}
+  .vehiculo-card{
+    border:1px solid var(--gris-borde);border-radius:8px;padding:14px;
+    margin-bottom:10px;background:var(--blanco);cursor:pointer;
+  }
+  .vehiculo-card:hover{border-color:var(--verde);}
+  .vehiculo-card.inactivo{opacity:.6;}
+  .vehiculo-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .vehiculo-resumen{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:18px;}
+  .vehiculo-resumen .stat .valor{font-size:22px;font-weight:700;color:var(--verde-oscuro);}
+  .vehiculo-resumen .stat .label{font-size:12px;color:#777;}
+  .vehiculo-ficha-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin-bottom:16px;}
+  .vehiculo-ficha-grid div span{color:#666;}
+  .vehiculo-subseccion{border-top:1px solid var(--gris-borde);padding-top:14px;margin-top:14px;}
+  .vehiculo-registro-card{
+    border:1px solid var(--gris-borde);border-radius:6px;padding:10px 12px;
+    margin-bottom:8px;background:var(--gris-fondo);font-size:13px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .vehiculo-registro-info{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .vehiculo-ticket-thumb{width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--gris-borde);cursor:pointer;flex-shrink:0;}
+  .vehiculo-mensual-tabla{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  .vehiculo-mensual-tabla th,.vehiculo-mensual-tabla td{border:1px solid var(--gris-borde);padding:6px 8px;text-align:left;}
+  .vehiculo-mensual-tabla th{background:var(--verde-suave);}
+  #vehiculoDetalleOverlay, #vehiculoFormOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #vehiculoDetallePanel{
+    background:var(--blanco);width:100%;max-width:900px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #vehiculoFormPanel{
+    background:var(--blanco);width:100%;max-width:560px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #vehiculoImagenOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.8);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:1001;cursor:zoom-out;
+  }
+  #vehiculoImagenOverlay img{max-width:100%;max-height:90vh;border-radius:6px;}
+
   #visitaOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
@@ -1100,6 +1146,7 @@
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
   <button class="tab-btn hidden" data-tab="empleados" id="tabBtnEmpleados">Empleados</button>
+  <button class="tab-btn hidden" data-tab="vehiculos" id="tabBtnVehiculos">Vehículos</button>
   <button class="tab-btn hidden" data-tab="resumen" id="tabBtnResumen">Resumen del día</button>
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
   <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
@@ -1874,6 +1921,32 @@
     </div>
   </section>
 
+  <!-- ================= TAB: VEHÍCULOS / FLOTILLA ================= -->
+  <section id="tab-vehiculos" class="hidden">
+    <div class="panel">
+      <h2>Vehículos</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Ficha, cargas de gasolina, mantenimientos y multas. Dueño y asistente administran toda la flotilla; un técnico solo ve y registra cargas de su vehículo asignado.</p>
+
+      <div class="alerta-margen hidden" id="vehiculosAlertaBanner" style="margin-bottom:14px;"></div>
+
+      <div class="toolbar">
+        <div class="buscador-wrap">
+          <input type="text" id="vehiculosBuscador" placeholder="Buscar por alias, placas o marca...">
+          <button type="button" id="btnLimpiarVehiculosBuscador" class="hidden" aria-label="Limpiar búsqueda">✕</button>
+        </div>
+        <button class="btn" id="btnAgregarVehiculo">Agregar vehículo</button>
+      </div>
+      <div id="vehiculosFiltroAviso" class="hint hidden" style="margin-bottom:8px;"></div>
+      <div id="vehiculosLista"></div>
+
+      <div id="vehiculosReporteMensualSeccion" class="vehiculo-subseccion hidden">
+        <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Gasto mensual de flotilla</h3>
+        <p style="font-size:12px;color:#777;margin-top:0;">Gasolina + mantenimiento de todos los vehículos, sumado por mes.</p>
+        <div id="vehiculosReporteMensual"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= TAB: RESUMEN DEL DÍA (oficina: dueño y asistente) ================= -->
   <section id="tab-resumen" class="hidden">
     <div class="panel">
@@ -2385,6 +2458,257 @@
   </div>
 </div>
 
+<!-- ================= OVERLAY: AGREGAR / EDITAR VEHÍCULO ================= -->
+<div id="vehiculoFormOverlay" class="hidden">
+  <div id="vehiculoFormPanel">
+    <h3 style="margin-top:0;" id="vehiculoFormTitulo">Agregar vehículo</h3>
+    <div class="grid">
+      <div class="field">
+        <label for="vehiculoAlias">Alias / nombre corto *</label>
+        <input type="text" id="vehiculoAlias" required placeholder="Ej. Camioneta 1">
+      </div>
+      <div class="field">
+        <label for="vehiculoPlacas">Placas</label>
+        <input type="text" id="vehiculoPlacas" placeholder="Ej. ABC-123-D">
+      </div>
+      <div class="field">
+        <label for="vehiculoMarca">Marca</label>
+        <input type="text" id="vehiculoMarca" placeholder="Ej. Nissan">
+      </div>
+      <div class="field">
+        <label for="vehiculoModelo">Modelo</label>
+        <input type="text" id="vehiculoModelo" placeholder="Ej. NP300">
+      </div>
+      <div class="field">
+        <label for="vehiculoAnio">Año</label>
+        <input type="number" id="vehiculoAnio" min="1900" step="1" placeholder="Ej. 2020">
+      </div>
+      <div class="field">
+        <label for="vehiculoColor">Color</label>
+        <input type="text" id="vehiculoColor" placeholder="Ej. Blanco">
+      </div>
+      <div class="field">
+        <label for="vehiculoKmActual">Km actual</label>
+        <input type="number" id="vehiculoKmActual" min="0" step="1" value="0">
+      </div>
+      <div class="field">
+        <label for="vehiculoAsignado">Técnico asignado</label>
+        <select id="vehiculoAsignado">
+          <option value="">Sin asignar</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="vehiculoAseguradora">Aseguradora</label>
+        <input type="text" id="vehiculoAseguradora" placeholder="Ej. GNP">
+      </div>
+      <div class="field">
+        <label for="vehiculoPoliza">Número de póliza</label>
+        <input type="text" id="vehiculoPoliza">
+      </div>
+      <div class="field">
+        <label for="vehiculoSeguroVence">Seguro vence</label>
+        <input type="date" id="vehiculoSeguroVence">
+      </div>
+      <div class="field">
+        <label for="vehiculoVerificacionVence">Verificación vence</label>
+        <input type="date" id="vehiculoVerificacionVence">
+      </div>
+      <div class="field">
+        <label for="vehiculoTarjetaVence">Tarjeta de circulación vence</label>
+        <input type="date" id="vehiculoTarjetaVence">
+      </div>
+      <div class="field">
+        <label for="vehiculoProximoServicioKm">Próximo servicio (km)</label>
+        <input type="number" id="vehiculoProximoServicioKm" min="0" step="1">
+      </div>
+      <div class="field">
+        <label for="vehiculoProximoServicioFecha">Próximo servicio (fecha)</label>
+        <input type="date" id="vehiculoProximoServicioFecha">
+      </div>
+      <div class="field" style="justify-content:center;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="vehiculoActivo" checked style="width:auto;">
+          Activo
+        </label>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <label for="vehiculoNota">Nota</label>
+        <input type="text" id="vehiculoNota" placeholder="Detalle...">
+      </div>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarVehiculoForm">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarVehiculo">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY: DETALLE DE VEHÍCULO ================= -->
+<div id="vehiculoDetalleOverlay" class="hidden">
+  <div id="vehiculoDetallePanel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h3 style="margin:0;" id="vehiculoDetalleAlias"></h3>
+        <div class="hint" id="vehiculoDetallePlacas"></div>
+        <div class="vehiculo-badges" id="vehiculoDetalleBadges"></div>
+      </div>
+      <div class="actions-row" style="margin-top:0;">
+        <button type="button" class="btn secondary small" id="btnEditarVehiculo">Editar</button>
+        <button type="button" class="btn danger small" id="btnEliminarVehiculo">Eliminar</button>
+        <button type="button" class="btn secondary small" id="btnCerrarVehiculoDetalle">Cerrar</button>
+      </div>
+    </div>
+
+    <div class="vehiculo-resumen" id="vehiculoResumen" style="margin-top:16px;"></div>
+
+    <div class="vehiculo-ficha-grid" id="vehiculoFichaGrid"></div>
+
+    <div class="vehiculo-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Gasto mensual de este vehículo</h3>
+      <div id="vehiculoDesgloseMensual"></div>
+    </div>
+
+    <div class="vehiculo-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Cargas de gasolina</h3>
+      <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:160px;">
+          <label for="cargaFecha">Fecha</label>
+          <input type="date" id="cargaFecha">
+        </div>
+        <div class="field" style="max-width:120px;">
+          <label for="cargaLitros">Litros</label>
+          <input type="number" id="cargaLitros" min="0" step="0.01">
+        </div>
+        <div class="field" style="max-width:120px;">
+          <label for="cargaMonto">Monto</label>
+          <input type="number" id="cargaMonto" min="0" step="0.01">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="cargaOdometro">Odómetro (km)</label>
+          <input type="number" id="cargaOdometro" min="0" step="1">
+        </div>
+        <div class="field" style="min-width:160px;">
+          <label for="cargaGasolinera">Gasolinera</label>
+          <input type="text" id="cargaGasolinera" placeholder="Ej. Pemex Centro">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="cargaTipoCombustible">Combustible</label>
+          <select id="cargaTipoCombustible">
+            <option value="">Selecciona...</option>
+            <option value="Magna">Magna</option>
+            <option value="Premium">Premium</option>
+            <option value="Diesel">Diésel</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="cargaNota">Nota (opcional)</label>
+          <input type="text" id="cargaNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:200px;">
+          <label>Foto del ticket</label>
+          <input type="file" id="cargaTicketInput" accept="image/*" capture="environment" class="hidden">
+          <button type="button" class="btn secondary small" id="btnCargaTicketFoto" style="width:100%;">Tomar / subir foto</button>
+          <div id="cargaTicketPreview" style="margin-top:6px;"></div>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn small" id="btnAgregarCarga" style="width:100%;">Agregar carga</button>
+        </div>
+      </div>
+      <div id="vehiculoCargasLista" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="vehiculo-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Mantenimientos</h3>
+      <div class="grid" id="vehiculoMantenimientoForm" style="align-items:end;">
+        <div class="field" style="max-width:160px;">
+          <label for="mantenimientoTipo">Tipo</label>
+          <select id="mantenimientoTipo">
+            <option value="afinacion">Afinación</option>
+            <option value="cambio_aceite">Cambio de aceite</option>
+            <option value="llantas">Llantas</option>
+            <option value="frenos">Frenos</option>
+            <option value="reparacion">Reparación</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="mantenimientoFecha">Fecha</label>
+          <input type="date" id="mantenimientoFecha">
+        </div>
+        <div class="field" style="max-width:120px;">
+          <label for="mantenimientoCosto">Costo</label>
+          <input type="number" id="mantenimientoCosto" min="0" step="0.01">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="mantenimientoOdometro">Odómetro (km)</label>
+          <input type="number" id="mantenimientoOdometro" min="0" step="1">
+        </div>
+        <div class="field" style="min-width:160px;">
+          <label for="mantenimientoHechoPor">Hecho por</label>
+          <input type="text" id="mantenimientoHechoPor" placeholder="Taller / mecánico...">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="mantenimientoDescripcion">Descripción</label>
+          <input type="text" id="mantenimientoDescripcion" placeholder="Detalle del trabajo...">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="mantenimientoProximoKm">Próximo servicio (km)</label>
+          <input type="number" id="mantenimientoProximoKm" min="0" step="1">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="mantenimientoProximaFecha">Próximo servicio (fecha)</label>
+          <input type="date" id="mantenimientoProximaFecha">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="mantenimientoNota">Nota (opcional)</label>
+          <input type="text" id="mantenimientoNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:200px;">
+          <label>Foto de factura (opcional)</label>
+          <input type="file" id="mantenimientoFacturaInput" accept="image/*" capture="environment" class="hidden">
+          <button type="button" class="btn secondary small" id="btnMantenimientoFacturaFoto" style="width:100%;">Tomar / subir foto</button>
+          <div id="mantenimientoFacturaPreview" style="margin-top:6px;"></div>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn small" id="btnAgregarMantenimiento" style="width:100%;">Agregar</button>
+        </div>
+      </div>
+      <div id="vehiculoMantenimientosLista" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="vehiculo-subseccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Multas</h3>
+      <div class="grid" id="vehiculoMultaForm" style="align-items:end;">
+        <div class="field" style="max-width:160px;">
+          <label for="multaFecha">Fecha</label>
+          <input type="date" id="multaFecha">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="multaMonto">Monto</label>
+          <input type="number" id="multaMonto" min="0" step="0.01">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="multaDescripcion">Descripción</label>
+          <input type="text" id="multaDescripcion" placeholder="Ej. Exceso de velocidad">
+        </div>
+        <div class="field" style="min-width:200px;flex:1;">
+          <label for="multaNota">Nota (opcional)</label>
+          <input type="text" id="multaNota" placeholder="Detalle...">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn small" id="btnAgregarMulta" style="width:100%;">Agregar</button>
+        </div>
+      </div>
+      <div id="vehiculoMultasLista" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY: VER IMAGEN (ticket / factura) ================= -->
+<div id="vehiculoImagenOverlay" class="hidden">
+  <img id="vehiculoImagenGrande" src="" alt="Imagen">
+</div>
+
 <!-- ================= OVERLAY DE IMPRESIÓN ================= -->
 <div id="printOverlay" class="hidden">
   <div id="printSheet">
@@ -2459,14 +2783,18 @@
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnEmpleados').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnVehiculos').classList.toggle('hidden',
+      !['dueño', 'asistente', 'tecnico'].includes(usuarioActual.rol));
     document.getElementById('tabBtnResumen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
-    // sus reportes de visita). El resto de pestanas quedan ocultas.
+    // sus reportes de visita) mas Vehiculos (para ver/operar SOLO su
+    // vehiculo asignado — la RLS ya lo filtra). El resto de pestanas
+    // quedan ocultas.
     if(usuarioActual.rol === 'tecnico'){
       document.querySelectorAll('.tab-btn').forEach(btn => {
-        if(btn.dataset.tab !== 'calendario') btn.classList.add('hidden');
+        if(btn.dataset.tab !== 'calendario' && btn.dataset.tab !== 'vehiculos') btn.classList.add('hidden');
       });
       activarTab('calendario');
     }
@@ -3210,6 +3538,7 @@
     calendario: document.getElementById('tab-calendario'),
     documentacion: document.getElementById('tab-documentacion'),
     empleados: document.getElementById('tab-empleados'),
+    vehiculos: document.getElementById('tab-vehiculos'),
     resumen: document.getElementById('tab-resumen'),
     accesos: document.getElementById('tab-accesos'),
     dispositivos: document.getElementById('tab-dispositivos'),
@@ -3234,6 +3563,10 @@
     if(nombre === 'empleados'){
       empleadosBuscador.value = '';
       cargarYRenderEmpleados();
+    }
+    if(nombre === 'vehiculos'){
+      vehiculosBuscador.value = '';
+      cargarTecnicosParaVehiculos().then(cargarYRenderVehiculos);
     }
     if(nombre === 'resumen') cargarYRenderResumenDia();
     if(nombre === 'dispositivos') cargarYRenderDispositivos();
@@ -7924,6 +8257,726 @@
       await cargarEmpleadoRegistros(empleadoDetalleActualId);
       renderEmpleadoDetalle();
     }
+  });
+
+
+  // ---------- Vehiculos / Flotilla ----------
+  // Oficina (dueno/asistente) administra toda la flotilla. Un tecnico
+  // solo ve/opera su(s) vehiculo(s) asignado(s) — la RLS de
+  // vehiculos_setup.sql ya filtra el select a eso, asi que aqui no hace
+  // falta filtrar de nuevo por tecnico: si un tecnico abre el detalle,
+  // por construccion es su propio vehiculo. Editar ficha/mantenimientos/
+  // multas es solo oficina; borrar cualquier cosa es solo dueno; cargar
+  // gasolina (insert) SI la puede hacer el tecnico para su vehiculo,
+  // reflejando la unica excepcion que tiene en la RLS.
+  let vehiculosCache = [];
+  let vehiculosTecnicosCache = [];
+  let vehiculoDetalleActualId = null;
+  let vehiculoFormEditandoId = null;
+  let vehiculoCargasCache = [];
+  let vehiculoMantenimientosCache = [];
+  let vehiculoMultasCache = [];
+  let cargaTicketFotoActual = null;
+  let mantenimientoFacturaFotoActual = null;
+
+  const vehiculosBuscador = document.getElementById('vehiculosBuscador');
+  const vehiculoFormOverlay = document.getElementById('vehiculoFormOverlay');
+  const vehiculoDetalleOverlay = document.getElementById('vehiculoDetalleOverlay');
+
+  const MANTENIMIENTO_TIPO_LABEL = {
+    afinacion: 'Afinación',
+    cambio_aceite: 'Cambio de aceite',
+    llantas: 'Llantas',
+    frenos: 'Frenos',
+    reparacion: 'Reparación',
+    otro: 'Otro',
+  };
+
+  function esOficinaActual(){
+    return !!usuarioActual && (usuarioActual.rol === 'dueño' || usuarioActual.rol === 'asistente');
+  }
+  function esDuenoParaVehiculos(){
+    return !!usuarioActual && usuarioActual.rol === 'dueño';
+  }
+
+  // Comprime una foto (ticket/factura) en el navegador antes de mandarla
+  // como base64: la redimensiona a un maximo de maxDim px (lado mas
+  // largo) y la reexporta como JPEG a la calidad indicada, para no meter
+  // fotos de celular de varios MB directo a Postgres.
+  function comprimirImagenABase64(file, maxDim, calidad){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if(w > maxDim || h > maxDim){
+            if(w >= h){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', calidad));
+        };
+        img.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        img.src = reader.result;
+      };
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---- Vencimientos / alertas ----
+  const DIAS_ALERTA_VENCIMIENTO = 30;
+  function estadoVencimiento(fechaIso){
+    if(!fechaIso) return 'ok';
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const venc = new Date(fechaIso + 'T00:00:00');
+    const limite = new Date(hoy.getTime() + DIAS_ALERTA_VENCIMIENTO * 24 * 60 * 60 * 1000);
+    if(venc < hoy) return 'vencido';
+    if(venc <= limite) return 'por_vencer';
+    return 'ok';
+  }
+  function estadoServicio(v){
+    const km = Number(v.km_actual || 0);
+    if(v.proximo_servicio_km != null && v.proximo_servicio_km !== ''){
+      const proximoKm = Number(v.proximo_servicio_km);
+      if(km >= proximoKm) return 'vencido';
+      if(km >= proximoKm - 500) return 'por_vencer';
+    }
+    if(v.proximo_servicio_fecha){
+      const est = estadoVencimiento(v.proximo_servicio_fecha);
+      if(est !== 'ok') return est;
+    }
+    return 'ok';
+  }
+  function peorEstado(...estados){
+    if(estados.includes('vencido')) return 'vencido';
+    if(estados.includes('por_vencer')) return 'por_vencer';
+    return 'ok';
+  }
+  function vehiculoEstadoGeneral(v){
+    return peorEstado(
+      estadoVencimiento(v.seguro_vence),
+      estadoVencimiento(v.verificacion_vence),
+      estadoVencimiento(v.tarjeta_circulacion_vence),
+      estadoServicio(v)
+    );
+  }
+  function claseBadgeEstado(estado){
+    return estado === 'vencido' ? 'vencida' : 'por-vencer';
+  }
+  function renderVehiculoBadges(v){
+    const piezas = [];
+    const seg = estadoVencimiento(v.seguro_vence);
+    if(seg !== 'ok') piezas.push(`<span class="badge ${claseBadgeEstado(seg)}">Seguro ${seg === 'vencido' ? 'vencido' : 'por vencer'}</span>`);
+    const ver = estadoVencimiento(v.verificacion_vence);
+    if(ver !== 'ok') piezas.push(`<span class="badge ${claseBadgeEstado(ver)}">Verificación ${ver === 'vencido' ? 'vencida' : 'por vencer'}</span>`);
+    const tar = estadoVencimiento(v.tarjeta_circulacion_vence);
+    if(tar !== 'ok') piezas.push(`<span class="badge ${claseBadgeEstado(tar)}">Tarjeta circulación ${tar === 'vencido' ? 'vencida' : 'por vencer'}</span>`);
+    const serv = estadoServicio(v);
+    if(serv !== 'ok') piezas.push(`<span class="badge ${claseBadgeEstado(serv)}">Servicio ${serv === 'vencido' ? 'vencido' : 'próximo'}</span>`);
+    return piezas.join('');
+  }
+  function renderVehiculosAlertaBanner(){
+    const banner = document.getElementById('vehiculosAlertaBanner');
+    const conAlerta = vehiculosCache.filter(v => vehiculoEstadoGeneral(v) !== 'ok');
+    if(!conAlerta.length){
+      banner.classList.add('hidden');
+      return;
+    }
+    const vencidos = conAlerta.filter(v => vehiculoEstadoGeneral(v) === 'vencido').length;
+    banner.classList.remove('hidden');
+    banner.textContent = `${conAlerta.length} vehículo${conAlerta.length > 1 ? 's' : ''} con documentos o servicio por vencer` +
+      (vencidos ? ` (${vencidos} ya vencido${vencidos > 1 ? 's' : ''}).` : '.');
+  }
+
+  // ---- Lista + buscador ----
+  async function cargarTecnicosParaVehiculos(){
+    const { data, error } = await supabaseClient
+      .from('perfiles_usuario')
+      .select('id, nombre')
+      .eq('rol', 'tecnico')
+      .eq('activo', true)
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los técnicos:', error);
+      return;
+    }
+    vehiculosTecnicosCache = data || [];
+    const opciones = vehiculosTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+    document.getElementById('vehiculoAsignado').innerHTML = '<option value="">Sin asignar</option>' + opciones;
+  }
+
+  async function cargarYRenderVehiculos(){
+    document.getElementById('btnAgregarVehiculo').classList.toggle('hidden', !esOficinaActual());
+    document.getElementById('vehiculosReporteMensualSeccion').classList.toggle('hidden', !esOficinaActual());
+
+    const { data, error } = await supabaseClient.from('vehiculos').select('*').order('alias');
+    if(error){
+      console.error('No se pudieron cargar los vehículos:', error);
+      document.getElementById('vehiculosLista').innerHTML =
+        `<div class="empty-msg">No se pudieron cargar los vehículos (${escapeHtml(error.message)}).</div>`;
+      return;
+    }
+    vehiculosCache = data || [];
+    renderVehiculosAlertaBanner();
+    renderVehiculosLista();
+    if(esOficinaActual()) renderVehiculosReporteMensual();
+  }
+
+  function renderVehiculosLista(){
+    const filtro = (vehiculosBuscador.value || '').trim().toLowerCase();
+    const todos = vehiculosCache;
+    const visibles = todos.filter(v => {
+      if(!filtro) return true;
+      return ((v.alias||'') + ' ' + (v.placas||'') + ' ' + (v.marca||'') + ' ' + (v.modelo||'')).toLowerCase().includes(filtro);
+    });
+
+    document.getElementById('btnLimpiarVehiculosBuscador').classList.toggle('hidden', !filtro);
+
+    const avisoEl = document.getElementById('vehiculosFiltroAviso');
+    if(filtro){
+      avisoEl.textContent = `Mostrando ${visibles.length} de ${todos.length} vehículos (filtrado por "${vehiculosBuscador.value.trim()}")`;
+      avisoEl.classList.remove('hidden');
+    } else {
+      avisoEl.classList.add('hidden');
+    }
+
+    const cont = document.getElementById('vehiculosLista');
+    if(visibles.length === 0){
+      cont.innerHTML = filtro
+        ? `<div class="empty-msg">No hay vehículos que coincidan con esta búsqueda.</div>`
+        : `<div class="empty-msg">No hay vehículos registrados todavía.</div>`;
+      return;
+    }
+    cont.innerHTML = visibles.map(v => `
+      <div class="vehiculo-card ${v.activo ? '' : 'inactivo'}" data-id="${v.id}">
+        <strong>${escapeHtml(v.alias)}</strong> ${v.activo ? '' : '<span class="badge vencida">Inactivo</span>'}
+        <div class="hint">${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' '))}${v.placas ? ' · ' + escapeHtml(v.placas) : ''}</div>
+        <div class="vehiculo-badges">${renderVehiculoBadges(v)}</div>
+      </div>
+    `).join('');
+  }
+
+  vehiculosBuscador.addEventListener('input', renderVehiculosLista);
+  document.getElementById('btnLimpiarVehiculosBuscador').addEventListener('click', () => {
+    vehiculosBuscador.value = '';
+    renderVehiculosLista();
+    vehiculosBuscador.focus();
+  });
+  document.getElementById('vehiculosLista').addEventListener('click', (e) => {
+    const card = e.target.closest('.vehiculo-card');
+    if(!card) return;
+    abrirVehiculoDetalle(card.dataset.id);
+  });
+
+  // ---- Desglose mensual (por vehiculo y de toda la flotilla) ----
+  function calcularDesgloseMensual(cargas, mantenimientos){
+    const meses = {};
+    const acumular = (fecha, campo, monto) => {
+      if(!fecha) return;
+      const clave = fecha.slice(0, 7);
+      if(!meses[clave]) meses[clave] = { gasolina: 0, mantenimiento: 0 };
+      meses[clave][campo] += Number(monto || 0);
+    };
+    cargas.forEach(c => acumular(c.fecha, 'gasolina', c.monto));
+    mantenimientos.forEach(m => acumular(m.fecha, 'mantenimiento', m.costo));
+    return Object.entries(meses)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([mes, datos]) => ({ mes, ...datos, total: datos.gasolina + datos.mantenimiento }));
+  }
+  function renderTablaDesgloseMensual(contId, desglose){
+    const cont = document.getElementById(contId);
+    if(!desglose.length){
+      cont.innerHTML = `<div class="empty-msg">Sin gastos registrados.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <table class="vehiculo-mensual-tabla">
+        <thead><tr><th>Mes</th><th>Gasolina</th><th>Mantenimiento</th><th>Total</th></tr></thead>
+        <tbody>
+          ${desglose.map(d => `<tr><td>${d.mes}</td><td>${formatMoney(d.gasolina)}</td><td>${formatMoney(d.mantenimiento)}</td><td>${formatMoney(d.total)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+  async function renderVehiculosReporteMensual(){
+    const [{ data: cargasData, error: errC }, { data: mantData, error: errM }] = await Promise.all([
+      supabaseClient.from('vehiculo_cargas').select('fecha, monto'),
+      supabaseClient.from('vehiculo_mantenimientos').select('fecha, costo'),
+    ]);
+    if(errC) console.error('No se pudo cargar el reporte de gasolina de flotilla:', errC);
+    if(errM) console.error('No se pudo cargar el reporte de mantenimiento de flotilla:', errM);
+    const desglose = calcularDesgloseMensual(cargasData || [], mantData || []);
+    renderTablaDesgloseMensual('vehiculosReporteMensual', desglose);
+  }
+
+  // ---- Agregar / Editar vehiculo (solo oficina) ----
+  function abrirVehiculoForm(vehiculo){
+    vehiculoFormEditandoId = vehiculo ? vehiculo.id : null;
+    document.getElementById('vehiculoFormTitulo').textContent = vehiculo ? 'Editar vehículo' : 'Agregar vehículo';
+    document.getElementById('vehiculoAlias').value = vehiculo ? (vehiculo.alias || '') : '';
+    document.getElementById('vehiculoMarca').value = vehiculo ? (vehiculo.marca || '') : '';
+    document.getElementById('vehiculoModelo').value = vehiculo ? (vehiculo.modelo || '') : '';
+    document.getElementById('vehiculoAnio').value = vehiculo ? (vehiculo.anio || '') : '';
+    document.getElementById('vehiculoPlacas').value = vehiculo ? (vehiculo.placas || '') : '';
+    document.getElementById('vehiculoColor').value = vehiculo ? (vehiculo.color || '') : '';
+    document.getElementById('vehiculoKmActual').value = vehiculo ? (vehiculo.km_actual ?? 0) : 0;
+    document.getElementById('vehiculoAsignado').value = vehiculo ? (vehiculo.asignado_usuario_id || '') : '';
+    document.getElementById('vehiculoAseguradora').value = vehiculo ? (vehiculo.aseguradora || '') : '';
+    document.getElementById('vehiculoPoliza').value = vehiculo ? (vehiculo.poliza || '') : '';
+    document.getElementById('vehiculoSeguroVence').value = vehiculo ? (vehiculo.seguro_vence || '') : '';
+    document.getElementById('vehiculoVerificacionVence').value = vehiculo ? (vehiculo.verificacion_vence || '') : '';
+    document.getElementById('vehiculoTarjetaVence').value = vehiculo ? (vehiculo.tarjeta_circulacion_vence || '') : '';
+    document.getElementById('vehiculoProximoServicioKm').value = vehiculo ? (vehiculo.proximo_servicio_km ?? '') : '';
+    document.getElementById('vehiculoProximoServicioFecha').value = vehiculo ? (vehiculo.proximo_servicio_fecha || '') : '';
+    document.getElementById('vehiculoNota').value = vehiculo ? (vehiculo.nota || '') : '';
+    document.getElementById('vehiculoActivo').checked = vehiculo ? !!vehiculo.activo : true;
+    vehiculoFormOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnAgregarVehiculo').addEventListener('click', () => abrirVehiculoForm(null));
+  document.getElementById('btnCerrarVehiculoForm').addEventListener('click', () => {
+    vehiculoFormOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('btnGuardarVehiculo').addEventListener('click', async () => {
+    const alias = document.getElementById('vehiculoAlias').value.trim();
+    if(!alias){ alert('El alias es obligatorio.'); return; }
+    const payload = {
+      alias,
+      marca: document.getElementById('vehiculoMarca').value.trim() || null,
+      modelo: document.getElementById('vehiculoModelo').value.trim() || null,
+      anio: document.getElementById('vehiculoAnio').value ? Number(document.getElementById('vehiculoAnio').value) : null,
+      placas: document.getElementById('vehiculoPlacas').value.trim() || null,
+      color: document.getElementById('vehiculoColor').value.trim() || null,
+      km_actual: Number(document.getElementById('vehiculoKmActual').value) || 0,
+      asignado_usuario_id: document.getElementById('vehiculoAsignado').value || null,
+      aseguradora: document.getElementById('vehiculoAseguradora').value.trim() || null,
+      poliza: document.getElementById('vehiculoPoliza').value.trim() || null,
+      seguro_vence: document.getElementById('vehiculoSeguroVence').value || null,
+      verificacion_vence: document.getElementById('vehiculoVerificacionVence').value || null,
+      tarjeta_circulacion_vence: document.getElementById('vehiculoTarjetaVence').value || null,
+      proximo_servicio_km: document.getElementById('vehiculoProximoServicioKm').value ? Number(document.getElementById('vehiculoProximoServicioKm').value) : null,
+      proximo_servicio_fecha: document.getElementById('vehiculoProximoServicioFecha').value || null,
+      nota: document.getElementById('vehiculoNota').value.trim() || null,
+      activo: document.getElementById('vehiculoActivo').checked,
+    };
+
+    const btn = document.getElementById('btnGuardarVehiculo');
+    btn.disabled = true;
+    try{
+      if(vehiculoFormEditandoId){
+        const { error } = await supabaseClient.from('vehiculos').update(payload).eq('id', vehiculoFormEditandoId);
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      } else {
+        payload.creado_por = (usuarioActual && usuarioActual.id) || null;
+        const { error } = await supabaseClient.from('vehiculos').insert(payload);
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      }
+      const editando = vehiculoFormEditandoId;
+      vehiculoFormOverlay.classList.add('hidden');
+      await cargarYRenderVehiculos();
+      if(editando && !vehiculoDetalleOverlay.classList.contains('hidden')) renderVehiculoDetalle();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnEditarVehiculo').addEventListener('click', () => {
+    const vehiculo = vehiculosCache.find(v => v.id === vehiculoDetalleActualId);
+    if(vehiculo) abrirVehiculoForm(vehiculo);
+  });
+
+  document.getElementById('btnEliminarVehiculo').addEventListener('click', async () => {
+    if(!confirm('¿Eliminar este vehículo? Se borrarán también sus cargas, mantenimientos y multas registradas.')) return;
+    const { error } = await supabaseClient.from('vehiculos').delete().eq('id', vehiculoDetalleActualId);
+    if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+    vehiculoDetalleOverlay.classList.add('hidden');
+    await cargarYRenderVehiculos();
+  });
+
+  document.getElementById('btnCerrarVehiculoDetalle').addEventListener('click', () => {
+    vehiculoDetalleOverlay.classList.add('hidden');
+  });
+
+  // ---- Detalle: metricas + ficha + cargas + mantenimientos + multas ----
+  async function cargarVehiculoRegistros(vehiculoId){
+    const [
+      { data: cargasData, error: errCargas },
+      { data: mantData, error: errMant },
+      { data: multasData, error: errMultas },
+    ] = await Promise.all([
+      supabaseClient.from('vehiculo_cargas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
+      supabaseClient.from('vehiculo_mantenimientos').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
+      supabaseClient.from('vehiculo_multas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
+    ]);
+    if(errCargas) console.error('No se pudieron cargar las cargas de gasolina:', errCargas);
+    if(errMant) console.error('No se pudieron cargar los mantenimientos:', errMant);
+    if(errMultas) console.error('No se pudieron cargar las multas:', errMultas);
+    vehiculoCargasCache = cargasData || [];
+    vehiculoMantenimientosCache = mantData || [];
+    vehiculoMultasCache = multasData || [];
+  }
+
+  async function abrirVehiculoDetalle(id){
+    vehiculoDetalleActualId = id;
+    cargaTicketFotoActual = null;
+    mantenimientoFacturaFotoActual = null;
+    renderCargaTicketPreview();
+    renderMantenimientoFacturaPreview();
+    await cargarVehiculoRegistros(id);
+    renderVehiculoDetalle();
+    vehiculoDetalleOverlay.classList.remove('hidden');
+  }
+
+  function calcularMetricasVehiculo(vehiculo, cargas, mantenimientos){
+    const cargasConOdometro = cargas.filter(c => c.odometro != null).slice().sort((a, b) => a.odometro - b.odometro);
+    let kmRecorridos = null;
+    if(cargasConOdometro.length >= 2){
+      const diff = cargasConOdometro[cargasConOdometro.length - 1].odometro - cargasConOdometro[0].odometro;
+      if(diff > 0) kmRecorridos = diff;
+    }
+    const totalLitros = cargas.reduce((s, c) => s + Number(c.litros || 0), 0);
+    const totalGasolina = cargas.reduce((s, c) => s + Number(c.monto || 0), 0);
+    const totalMantenimiento = mantenimientos.reduce((s, m) => s + Number(m.costo || 0), 0);
+    return {
+      kmActual: Number(vehiculo.km_actual || 0),
+      rendimiento: (kmRecorridos && totalLitros > 0) ? (kmRecorridos / totalLitros) : null,
+      gastoPorKm: (kmRecorridos && totalGasolina > 0) ? (totalGasolina / kmRecorridos) : null,
+      gastoTotal: totalGasolina + totalMantenimiento,
+    };
+  }
+
+  function renderVehiculoDetalle(){
+    const v = vehiculosCache.find(x => x.id === vehiculoDetalleActualId);
+    if(!v) return;
+    const oficina = esOficinaActual();
+    const dueno = esDuenoParaVehiculos();
+
+    document.getElementById('vehiculoDetalleAlias').textContent = v.alias;
+    document.getElementById('vehiculoDetallePlacas').textContent = v.placas || '';
+    document.getElementById('vehiculoDetalleBadges').innerHTML = renderVehiculoBadges(v);
+
+    document.getElementById('btnEditarVehiculo').classList.toggle('hidden', !oficina);
+    document.getElementById('btnEliminarVehiculo').classList.toggle('hidden', !dueno);
+
+    const metricas = calcularMetricasVehiculo(v, vehiculoCargasCache, vehiculoMantenimientosCache);
+    document.getElementById('vehiculoResumen').innerHTML = `
+      <div class="stat"><div class="valor">${metricas.kmActual.toLocaleString('es-MX')} km</div><div class="label">Km actual</div></div>
+      <div class="stat"><div class="valor">${metricas.rendimiento != null ? metricas.rendimiento.toFixed(1) : 'N/D'}</div><div class="label">Rendimiento (km/l)</div></div>
+      <div class="stat"><div class="valor">${metricas.gastoPorKm != null ? formatMoney(metricas.gastoPorKm) : 'N/D'}</div><div class="label">Gasto por km (gasolina)</div></div>
+      <div class="stat"><div class="valor">${formatMoney(metricas.gastoTotal)}</div><div class="label">Gasto total (gasolina + mtto.)</div></div>
+    `;
+
+    const tecnico = vehiculosTecnicosCache.find(t => t.id === v.asignado_usuario_id);
+    const proximoServicioPartes = [];
+    if(v.proximo_servicio_km) proximoServicioPartes.push(Number(v.proximo_servicio_km).toLocaleString('es-MX') + ' km');
+    if(v.proximo_servicio_fecha) proximoServicioPartes.push(formatDate(v.proximo_servicio_fecha));
+    document.getElementById('vehiculoFichaGrid').innerHTML = `
+      <div><span>Marca / Modelo / Año:</span> ${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' ') || '-')}</div>
+      <div><span>Color:</span> ${escapeHtml(v.color || '-')}</div>
+      <div><span>Placas:</span> ${escapeHtml(v.placas || '-')}</div>
+      <div><span>Asignado a:</span> ${escapeHtml(tecnico ? tecnico.nombre : 'Sin asignar')}</div>
+      <div><span>Aseguradora:</span> ${escapeHtml(v.aseguradora || '-')}</div>
+      <div><span>Póliza:</span> ${escapeHtml(v.poliza || '-')}</div>
+      <div><span>Seguro vence:</span> ${v.seguro_vence ? formatDate(v.seguro_vence) : '-'}</div>
+      <div><span>Verificación vence:</span> ${v.verificacion_vence ? formatDate(v.verificacion_vence) : '-'}</div>
+      <div><span>Tarjeta circulación vence:</span> ${v.tarjeta_circulacion_vence ? formatDate(v.tarjeta_circulacion_vence) : '-'}</div>
+      <div><span>Próximo servicio:</span> ${proximoServicioPartes.length ? escapeHtml(proximoServicioPartes.join(' / ')) : '-'}</div>
+      <div><span>Estado:</span> ${v.activo ? '<span class="badge vigente">Activo</span>' : '<span class="badge vencida">Inactivo</span>'}</div>
+      ${v.nota ? `<div style="grid-column:1/-1;"><span>Nota:</span> ${escapeHtml(v.nota)}</div>` : ''}
+    `;
+
+    renderTablaDesgloseMensual('vehiculoDesgloseMensual', calcularDesgloseMensual(vehiculoCargasCache, vehiculoMantenimientosCache));
+
+    // Alta de mantenimientos/multas: solo oficina. Cargas de gasolina: el
+    // tecnico tambien puede (si esta viendo el detalle, por RLS es su
+    // propio vehiculo asignado), asi que ese formulario no se oculta.
+    document.getElementById('vehiculoMantenimientoForm').classList.toggle('hidden', !oficina);
+    document.getElementById('vehiculoMultaForm').classList.toggle('hidden', !oficina);
+
+    renderVehiculoCargasLista(dueno);
+    renderVehiculoMantenimientosLista(dueno);
+    renderVehiculoMultasLista(dueno, oficina);
+  }
+
+  function renderVehiculoCargasLista(dueno){
+    const cont = document.getElementById('vehiculoCargasLista');
+    if(!vehiculoCargasCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin cargas registradas.</div>`;
+      return;
+    }
+    cont.innerHTML = vehiculoCargasCache.map(c => `
+      <div class="vehiculo-registro-card">
+        <div class="vehiculo-registro-info">
+          ${c.ticket_foto ? `<img class="vehiculo-ticket-thumb" src="${c.ticket_foto}" data-action="ver-imagen" data-src="${c.ticket_foto}" alt="Ticket">` : ''}
+          <div>
+            <strong>${formatDate(c.fecha)}</strong> — ${formatMoney(c.monto || 0)}${c.litros ? ' · ' + Number(c.litros).toFixed(1) + ' L' : ''}
+            <div class="hint">${[c.gasolinera, c.tipo_combustible, c.odometro ? Number(c.odometro).toLocaleString('es-MX') + ' km' : ''].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            ${c.nota ? `<div class="hint">${escapeHtml(c.nota)}</div>` : ''}
+          </div>
+        </div>
+        ${dueno ? `<button type="button" class="btn danger small" data-action="eliminar-carga" data-id="${c.id}">Eliminar</button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderVehiculoMantenimientosLista(dueno){
+    const cont = document.getElementById('vehiculoMantenimientosLista');
+    if(!vehiculoMantenimientosCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin mantenimientos registrados.</div>`;
+      return;
+    }
+    cont.innerHTML = vehiculoMantenimientosCache.map(m => {
+      const proximoPartes = [];
+      if(m.proximo_km) proximoPartes.push(Number(m.proximo_km).toLocaleString('es-MX') + ' km');
+      if(m.proxima_fecha) proximoPartes.push(formatDate(m.proxima_fecha));
+      return `
+      <div class="vehiculo-registro-card">
+        <div class="vehiculo-registro-info">
+          ${m.factura_foto ? `<img class="vehiculo-ticket-thumb" src="${m.factura_foto}" data-action="ver-imagen" data-src="${m.factura_foto}" alt="Factura">` : ''}
+          <div>
+            <strong>${escapeHtml(MANTENIMIENTO_TIPO_LABEL[m.tipo] || m.tipo || 'Mantenimiento')}</strong> — ${formatDate(m.fecha)} — ${formatMoney(m.costo || 0)}
+            <div class="hint">${[m.descripcion, m.hecho_por ? 'Hecho por: ' + m.hecho_por : '', m.odometro ? Number(m.odometro).toLocaleString('es-MX') + ' km' : ''].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            ${proximoPartes.length ? `<div class="hint">Próximo: ${escapeHtml(proximoPartes.join(' / '))}</div>` : ''}
+            ${m.nota ? `<div class="hint">${escapeHtml(m.nota)}</div>` : ''}
+          </div>
+        </div>
+        ${dueno ? `<button type="button" class="btn danger small" data-action="eliminar-mantenimiento" data-id="${m.id}">Eliminar</button>` : ''}
+      </div>
+    `;
+    }).join('');
+  }
+
+  function renderVehiculoMultasLista(dueno, oficina){
+    const cont = document.getElementById('vehiculoMultasLista');
+    if(!vehiculoMultasCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin multas registradas.</div>`;
+      return;
+    }
+    cont.innerHTML = vehiculoMultasCache.map(m => {
+      const acciones = [];
+      if(oficina && !m.pagada) acciones.push(`<button type="button" class="btn secondary small" data-action="marcar-pagada" data-id="${m.id}">Marcar pagada</button>`);
+      if(dueno) acciones.push(`<button type="button" class="btn danger small" data-action="eliminar-multa" data-id="${m.id}">Eliminar</button>`);
+      return `
+        <div class="vehiculo-registro-card">
+          <div>
+            <strong>${formatMoney(m.monto || 0)}</strong>
+            ${m.pagada ? '<span class="badge vigente">Pagada</span>' : '<span class="badge vencida">Pendiente</span>'}
+            <div class="hint">${[m.fecha ? formatDate(m.fecha) : '', m.descripcion].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            ${m.nota ? `<div class="hint">${escapeHtml(m.nota)}</div>` : ''}
+          </div>
+          ${acciones.length ? `<div class="actions-row" style="margin-top:0;">${acciones.join('')}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ---- Foto del ticket (carga de gasolina) ----
+  function renderCargaTicketPreview(){
+    document.getElementById('cargaTicketPreview').innerHTML = cargaTicketFotoActual
+      ? `<img class="vehiculo-ticket-thumb" src="${cargaTicketFotoActual}" alt="Ticket">`
+      : '';
+  }
+  document.getElementById('btnCargaTicketFoto').addEventListener('click', () => {
+    document.getElementById('cargaTicketInput').click();
+  });
+  document.getElementById('cargaTicketInput').addEventListener('change', async () => {
+    const file = document.getElementById('cargaTicketInput').files[0];
+    if(!file) return;
+    const btn = document.getElementById('btnCargaTicketFoto');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+    try{
+      cargaTicketFotoActual = await comprimirImagenABase64(file, 1000, 0.7);
+      renderCargaTicketPreview();
+    } catch(e){
+      alert('No se pudo procesar la foto: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+      document.getElementById('cargaTicketInput').value = '';
+    }
+  });
+
+  document.getElementById('btnAgregarCarga').addEventListener('click', async () => {
+    const fecha = document.getElementById('cargaFecha').value;
+    if(!fecha){ alert('Elige una fecha.'); return; }
+    const litros = document.getElementById('cargaLitros').value ? Number(document.getElementById('cargaLitros').value) : null;
+    const monto = document.getElementById('cargaMonto').value ? Number(document.getElementById('cargaMonto').value) : null;
+    const odometro = document.getElementById('cargaOdometro').value ? Number(document.getElementById('cargaOdometro').value) : null;
+    const precioLitro = (litros && monto && litros > 0) ? Number((monto / litros).toFixed(3)) : null;
+
+    const btn = document.getElementById('btnAgregarCarga');
+    btn.disabled = true;
+    try{
+      const { error } = await supabaseClient.from('vehiculo_cargas').insert({
+        vehiculo_id: vehiculoDetalleActualId,
+        fecha, litros, monto, precio_litro: precioLitro, odometro,
+        gasolinera: document.getElementById('cargaGasolinera').value.trim() || null,
+        tipo_combustible: document.getElementById('cargaTipoCombustible').value || null,
+        ticket_foto: cargaTicketFotoActual,
+        nota: document.getElementById('cargaNota').value.trim() || null,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      });
+      if(error){ alert('No se pudo registrar la carga: ' + error.message); return; }
+      document.getElementById('cargaFecha').value = '';
+      document.getElementById('cargaLitros').value = '';
+      document.getElementById('cargaMonto').value = '';
+      document.getElementById('cargaOdometro').value = '';
+      document.getElementById('cargaGasolinera').value = '';
+      document.getElementById('cargaTipoCombustible').value = '';
+      document.getElementById('cargaNota').value = '';
+      cargaTicketFotoActual = null;
+      renderCargaTicketPreview();
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---- Foto de factura (mantenimiento) ----
+  function renderMantenimientoFacturaPreview(){
+    document.getElementById('mantenimientoFacturaPreview').innerHTML = mantenimientoFacturaFotoActual
+      ? `<img class="vehiculo-ticket-thumb" src="${mantenimientoFacturaFotoActual}" alt="Factura">`
+      : '';
+  }
+  document.getElementById('btnMantenimientoFacturaFoto').addEventListener('click', () => {
+    document.getElementById('mantenimientoFacturaInput').click();
+  });
+  document.getElementById('mantenimientoFacturaInput').addEventListener('change', async () => {
+    const file = document.getElementById('mantenimientoFacturaInput').files[0];
+    if(!file) return;
+    const btn = document.getElementById('btnMantenimientoFacturaFoto');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+    try{
+      mantenimientoFacturaFotoActual = await comprimirImagenABase64(file, 1000, 0.7);
+      renderMantenimientoFacturaPreview();
+    } catch(e){
+      alert('No se pudo procesar la foto: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+      document.getElementById('mantenimientoFacturaInput').value = '';
+    }
+  });
+
+  document.getElementById('btnAgregarMantenimiento').addEventListener('click', async () => {
+    const fecha = document.getElementById('mantenimientoFecha').value;
+    if(!fecha){ alert('Elige una fecha.'); return; }
+    const btn = document.getElementById('btnAgregarMantenimiento');
+    btn.disabled = true;
+    try{
+      const { error } = await supabaseClient.from('vehiculo_mantenimientos').insert({
+        vehiculo_id: vehiculoDetalleActualId,
+        fecha,
+        tipo: document.getElementById('mantenimientoTipo').value || null,
+        descripcion: document.getElementById('mantenimientoDescripcion').value.trim() || null,
+        costo: document.getElementById('mantenimientoCosto').value ? Number(document.getElementById('mantenimientoCosto').value) : null,
+        odometro: document.getElementById('mantenimientoOdometro').value ? Number(document.getElementById('mantenimientoOdometro').value) : null,
+        hecho_por: document.getElementById('mantenimientoHechoPor').value.trim() || null,
+        proximo_km: document.getElementById('mantenimientoProximoKm').value ? Number(document.getElementById('mantenimientoProximoKm').value) : null,
+        proxima_fecha: document.getElementById('mantenimientoProximaFecha').value || null,
+        factura_foto: mantenimientoFacturaFotoActual,
+        nota: document.getElementById('mantenimientoNota').value.trim() || null,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      });
+      if(error){ alert('No se pudo registrar el mantenimiento: ' + error.message); return; }
+      document.getElementById('mantenimientoFecha').value = '';
+      document.getElementById('mantenimientoCosto').value = '';
+      document.getElementById('mantenimientoOdometro').value = '';
+      document.getElementById('mantenimientoHechoPor').value = '';
+      document.getElementById('mantenimientoDescripcion').value = '';
+      document.getElementById('mantenimientoProximoKm').value = '';
+      document.getElementById('mantenimientoProximaFecha').value = '';
+      document.getElementById('mantenimientoNota').value = '';
+      mantenimientoFacturaFotoActual = null;
+      renderMantenimientoFacturaPreview();
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnAgregarMulta').addEventListener('click', async () => {
+    const btn = document.getElementById('btnAgregarMulta');
+    btn.disabled = true;
+    try{
+      const { error } = await supabaseClient.from('vehiculo_multas').insert({
+        vehiculo_id: vehiculoDetalleActualId,
+        fecha: document.getElementById('multaFecha').value || null,
+        monto: document.getElementById('multaMonto').value ? Number(document.getElementById('multaMonto').value) : null,
+        descripcion: document.getElementById('multaDescripcion').value.trim() || null,
+        nota: document.getElementById('multaNota').value.trim() || null,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      });
+      if(error){ alert('No se pudo registrar la multa: ' + error.message); return; }
+      document.getElementById('multaFecha').value = '';
+      document.getElementById('multaMonto').value = '';
+      document.getElementById('multaDescripcion').value = '';
+      document.getElementById('multaNota').value = '';
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---- Acciones delegadas dentro del detalle (eliminar / marcar pagada / ver imagen) ----
+  document.getElementById('vehiculoDetallePanel').addEventListener('click', async (e) => {
+    const imgBtn = e.target.closest('[data-action="ver-imagen"]');
+    if(imgBtn){
+      document.getElementById('vehiculoImagenGrande').src = imgBtn.dataset.src;
+      document.getElementById('vehiculoImagenOverlay').classList.remove('hidden');
+      return;
+    }
+    const elimCarga = e.target.closest('[data-action="eliminar-carga"]');
+    if(elimCarga){
+      if(!confirm('¿Eliminar esta carga de gasolina?')) return;
+      const { error } = await supabaseClient.from('vehiculo_cargas').delete().eq('id', elimCarga.dataset.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+      return;
+    }
+    const elimMant = e.target.closest('[data-action="eliminar-mantenimiento"]');
+    if(elimMant){
+      if(!confirm('¿Eliminar este mantenimiento?')) return;
+      const { error } = await supabaseClient.from('vehiculo_mantenimientos').delete().eq('id', elimMant.dataset.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+      return;
+    }
+    const marcarPagada = e.target.closest('[data-action="marcar-pagada"]');
+    if(marcarPagada){
+      const { error } = await supabaseClient.from('vehiculo_multas').update({ pagada: true }).eq('id', marcarPagada.dataset.id);
+      if(error){ alert('No se pudo marcar como pagada: ' + error.message); return; }
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+      return;
+    }
+    const elimMulta = e.target.closest('[data-action="eliminar-multa"]');
+    if(elimMulta){
+      if(!confirm('¿Eliminar esta multa?')) return;
+      const { error } = await supabaseClient.from('vehiculo_multas').delete().eq('id', elimMulta.dataset.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      await cargarVehiculoRegistros(vehiculoDetalleActualId);
+      renderVehiculoDetalle();
+    }
+  });
+
+  document.getElementById('vehiculoImagenOverlay').addEventListener('click', () => {
+    document.getElementById('vehiculoImagenOverlay').classList.add('hidden');
   });
 
 
