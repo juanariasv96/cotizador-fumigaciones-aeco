@@ -1947,11 +1947,11 @@
     </div>
   </section>
 
-  <!-- ================= TAB: RESUMEN DEL DÍA (oficina: dueño y asistente) ================= -->
+  <!-- ================= TAB: RESUMEN DEL DÍA (solo dueño) ================= -->
   <section id="tab-resumen" class="hidden">
     <div class="panel">
       <h2>Resumen del día</h2>
-      <p style="font-size:12px;color:#777;margin-top:0;">Actividad de cada técnico en la fecha elegida: primer inicio de sesión, última actividad registrada, visitas atendidas, reportes y certificados generados.</p>
+      <p style="font-size:12px;color:#777;margin-top:0;">Actividad de cada técnico en la fecha elegida: primer inicio de sesión, última actividad registrada, visitas atendidas, reportes y certificados generados. Visible solo para el rol "dueño".</p>
 
       <div class="field" style="max-width:200px;">
         <label for="resumenFecha">Fecha</label>
@@ -2786,7 +2786,7 @@
     document.getElementById('tabBtnVehiculos').classList.toggle('hidden',
       !['dueño', 'asistente', 'tecnico'].includes(usuarioActual.rol));
     document.getElementById('tabBtnResumen').classList.toggle('hidden',
-      !['dueño', 'asistente'].includes(usuarioActual.rol));
+      usuarioActual.rol !== 'dueño');
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
     // sus reportes de visita) mas Vehiculos (para ver/operar SOLO su
@@ -8980,7 +8980,7 @@
   });
 
 
-  // ---------- Resumen del día (oficina: dueño y asistente) ----------
+  // ---------- Resumen del día (solo dueño) ----------
   const resumenFechaInput = document.getElementById('resumenFecha');
   resumenFechaInput.addEventListener('change', () => {
     cargarYRenderResumenDia();
