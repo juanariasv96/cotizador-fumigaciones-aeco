@@ -795,6 +795,10 @@
   .seguimiento-card.atrasada{border-left:4px solid var(--rojo);}
   .seguimiento-llamada.atrasada{color:var(--rojo);font-weight:700;}
   .seguimiento-vendedores-tabla{margin-top:10px;}
+  .seguimiento-contacto{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:13px;color:#444;}
+  .seguimiento-contacto a{color:var(--verde-oscuro);font-weight:600;text-decoration:none;}
+  .seguimiento-contacto a:hover{text-decoration:underline;}
+  .seguimiento-contacto .sin-dato{color:#999;font-style:italic;}
 
   /* ---------- Empleados / Personal ---------- */
   .empleado-card{
@@ -9712,6 +9716,11 @@
               <span class="badge ${claseEtapa(c.etapa_seguimiento)}">${escapeHtml(c.etapa_seguimiento || 'Enviada')}</span>
             </div>
             <div>${formatMoney(montoTotalConIva(c))}</div>
+          </div>
+          <div class="seguimiento-contacto">
+            <span>👤 ${c.cliente.contacto ? escapeHtml(c.cliente.contacto) : '<span class="sin-dato">sin contacto asignado</span>'}</span>
+            <span>📞 ${c.cliente.telefono ? `<a href="tel:${escapeHtml(c.cliente.telefono)}">${escapeHtml(c.cliente.telefono)}</a>` : '<span class="sin-dato">sin teléfono</span>'}</span>
+            <span>✉️ ${c.cliente.email ? `<a href="mailto:${escapeHtml(c.cliente.email)}">${escapeHtml(c.cliente.email)}</a>` : '<span class="sin-dato">sin correo</span>'}</span>
           </div>
           <div class="seguimiento-llamada ${atrasada ? 'atrasada' : ''}" style="margin-top:4px;font-size:13px;">
             Próxima llamada: ${c.proxima_llamada ? formatDate(c.proxima_llamada) : '-'} ${atrasada ? '(atrasada)' : ''}
