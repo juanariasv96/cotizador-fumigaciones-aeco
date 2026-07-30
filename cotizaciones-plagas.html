@@ -1754,6 +1754,73 @@
           <div id="semaforoClienteInfo"></div>
         </div>
 
+        <!-- Datos fiscales del cliente: solo captura por ahora, base para
+             la futura emision de CFDI 4.0 via PAC. Dato sensible: oculto
+             por completo para tecnico, tanto en HTML (hidden por defecto)
+             como en JS (renderFacturacionPanel vuelve a ocultarlo si el
+             rol no es oficina, por si el DOM ya estaba visible). -->
+        <div class="panel hidden" id="facturacionClientePanel" style="margin:16px 0;">
+          <h3 style="margin-top:0;">Datos de facturación</h3>
+          <p style="font-size:12px;color:#777;margin-top:0;">Datos fiscales para la futura emisión de CFDI 4.0. Visibles y editables solo para oficina.</p>
+          <div id="facturacionClienteVacioAviso" class="hint hidden" style="margin-bottom:10px;">Sin datos de facturación capturados todavía.</div>
+          <div class="grid">
+            <div class="field">
+              <label for="facturacionTipoPersona">Tipo de persona</label>
+              <select id="facturacionTipoPersona">
+                <option value="">Selecciona...</option>
+                <option value="fisica">Física</option>
+                <option value="moral">Moral</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="facturacionRfc">RFC</label>
+              <input type="text" id="facturacionRfc" maxlength="13" placeholder="Ej. XAXX010101000" style="text-transform:uppercase;">
+            </div>
+            <div class="field">
+              <label for="facturacionRazonSocial">Razón social</label>
+              <input type="text" id="facturacionRazonSocial" placeholder="Nombre fiscal exacto (Constancia de Situación Fiscal)">
+            </div>
+            <div class="field">
+              <label for="facturacionRegimenFiscal">Régimen fiscal</label>
+              <select id="facturacionRegimenFiscal">
+                <option value="">Selecciona...</option>
+                <option value="601">601 - General de Ley Personas Morales</option>
+                <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                <option value="605">605 - Sueldos y Salarios</option>
+                <option value="606">606 - Arrendamiento</option>
+                <option value="612">612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+                <option value="621">621 - Incorporación Fiscal</option>
+                <option value="626">626 - Régimen Simplificado de Confianza (RESICO)</option>
+                <option value="616">616 - Sin obligaciones fiscales</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="facturacionUsoCfdi">Uso de CFDI</label>
+              <select id="facturacionUsoCfdi">
+                <option value="">Selecciona...</option>
+                <option value="G01">G01 - Adquisición de mercancías</option>
+                <option value="G03">G03 - Gastos en general</option>
+                <option value="I01">I01 - Construcciones</option>
+                <option value="I08">I08 - Otra maquinaria y equipo</option>
+                <option value="P01">P01 - Por definir</option>
+                <option value="S01">S01 - Sin efectos fiscales</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="facturacionCpFiscal">CP fiscal</label>
+              <input type="text" id="facturacionCpFiscal" maxlength="5" inputmode="numeric" placeholder="Ej. 64000">
+            </div>
+            <div class="field">
+              <label for="facturacionEmail">Correo de facturación</label>
+              <input type="email" id="facturacionEmail" placeholder="facturas@cliente.com">
+            </div>
+          </div>
+          <div class="actions-row" style="margin-top:12px;">
+            <button type="button" class="btn" id="btnGuardarFacturacion">Guardar datos de facturación</button>
+          </div>
+          <div id="facturacionClienteInfo" class="hint" style="margin-top:8px;"></div>
+        </div>
+
         <div class="panel" id="mapaSitioPanel" style="margin:16px 0;">
           <h3 style="margin-top:0;">Mapa del sitio</h3>
           <p style="font-size:12px;color:#777;margin-top:0;">Sube una foto satelital (Google Maps/Earth) o un plano del lugar, y haz click sobre la imagen para clavar un pin y ubicar cada estación físicamente.</p>
@@ -5740,6 +5807,109 @@
     estacionesClienteSelect.dispatchEvent(new Event('change'));
   });
 
+  // ---------- Datos de facturacion del cliente (oficina: dueño y asistente) ----------
+  // Solo captura de datos por ahora (RFC, razon social, regimen fiscal,
+  // uso de CFDI, CP fiscal, correo de facturacion, tipo de persona) - es
+  // la base para cuando se conecte la emision de CFDI 4.0 via PAC, que
+  // todavia no existe. Dato fiscal sensible: nunca se muestra ni se deja
+  // editar a tecnico, aunque la RLS de clientes ya sea de equipo
+  // compartido (el filtro es solo de UI, a proposito).
+  function esOficinaFacturacion(){
+    return !!usuarioActual && (usuarioActual.rol === 'dueño' || usuarioActual.rol === 'asistente');
+  }
+
+  // RFC persona fisica: 4 letras + 6 digitos (fecha) + 3 alfanumericos (13).
+  // RFC persona moral: 3 letras + 6 digitos + 3 alfanumericos (12).
+  // Es una validacion de FORMATO nada mas (no verifica homoclave real ni
+  // consulta al SAT) - solo para atajar errores de captura obvios.
+  function validarFormatoRfc(rfc){
+    return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc);
+  }
+
+  function validarEmailBasico(email){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  const facturacionClientePanel = document.getElementById('facturacionClientePanel');
+
+  function renderFacturacionPanel(cliente){
+    if(!facturacionClientePanel) return;
+    const esOficina = esOficinaFacturacion();
+    facturacionClientePanel.classList.toggle('hidden', !esOficina);
+    if(!esOficina) return;
+
+    document.getElementById('facturacionTipoPersona').value = cliente.tipo_persona || '';
+    document.getElementById('facturacionRfc').value = cliente.rfc || '';
+    document.getElementById('facturacionRazonSocial').value = cliente.razon_social || '';
+    document.getElementById('facturacionRegimenFiscal').value = cliente.regimen_fiscal || '';
+    document.getElementById('facturacionUsoCfdi').value = cliente.uso_cfdi || '';
+    document.getElementById('facturacionCpFiscal').value = cliente.cp_fiscal || '';
+    document.getElementById('facturacionEmail').value = cliente.email_facturacion || '';
+
+    const sinDatos = !cliente.rfc && !cliente.razon_social && !cliente.regimen_fiscal
+      && !cliente.uso_cfdi && !cliente.cp_fiscal && !cliente.email_facturacion && !cliente.tipo_persona;
+    document.getElementById('facturacionClienteVacioAviso').classList.toggle('hidden', !sinDatos);
+    document.getElementById('facturacionClienteInfo').textContent = '';
+  }
+
+  document.getElementById('btnGuardarFacturacion').addEventListener('click', async () => {
+    const cliente = clientesCache.find(c => c.id === estacionesClienteActualId);
+    if(!cliente){ alert('Selecciona un cliente primero.'); return; }
+
+    const rfc = document.getElementById('facturacionRfc').value.trim().toUpperCase();
+    const razonSocial = document.getElementById('facturacionRazonSocial').value.trim();
+    const regimenFiscal = document.getElementById('facturacionRegimenFiscal').value;
+    const usoCfdi = document.getElementById('facturacionUsoCfdi').value;
+    const cpFiscal = document.getElementById('facturacionCpFiscal').value.trim();
+    const emailFacturacion = document.getElementById('facturacionEmail').value.trim();
+    const tipoPersona = document.getElementById('facturacionTipoPersona').value;
+
+    if(rfc && !validarFormatoRfc(rfc)){
+      alert('El RFC no tiene un formato válido (13 caracteres persona física, 12 persona moral). Corrígelo o déjalo en blanco.');
+      return;
+    }
+    if(cpFiscal && !/^\d{5}$/.test(cpFiscal)){
+      alert('El código postal fiscal debe tener 5 dígitos.');
+      return;
+    }
+    if(emailFacturacion && !validarEmailBasico(emailFacturacion)){
+      alert('El correo de facturación no parece válido.');
+      return;
+    }
+
+    const btn = document.getElementById('btnGuardarFacturacion');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('clientes').update({
+      rfc: rfc || null,
+      razon_social: razonSocial || null,
+      regimen_fiscal: regimenFiscal || null,
+      uso_cfdi: usoCfdi || null,
+      cp_fiscal: cpFiscal || null,
+      email_facturacion: emailFacturacion || null,
+      tipo_persona: tipoPersona || null,
+    }).eq('id', cliente.id);
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudieron guardar los datos de facturación: ' + error.message);
+      return;
+    }
+
+    // Se muta el mismo objeto que ya vive en clientesCache para que quede
+    // sincronizado sin recargar (mismo patron que el semaforo).
+    cliente.rfc = rfc || null;
+    cliente.razon_social = razonSocial || null;
+    cliente.regimen_fiscal = regimenFiscal || null;
+    cliente.uso_cfdi = usoCfdi || null;
+    cliente.cp_fiscal = cpFiscal || null;
+    cliente.email_facturacion = emailFacturacion || null;
+    cliente.tipo_persona = tipoPersona || null;
+
+    renderFacturacionPanel(cliente);
+    document.getElementById('facturacionClienteInfo').textContent =
+      `Guardado el ${formatDate(new Date().toISOString().slice(0, 10))}.`;
+  });
+
   let clientesCache = [];
   let estacionesClienteActualId = '';
   let estacionesCache = [];
@@ -5756,7 +5926,7 @@
   async function cargarClientesParaEstaciones(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono, direccion, foto_sitio_url, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en')
+      .select('id, nombre, telefono, direccion, foto_sitio_url, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en, rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, email_facturacion, tipo_persona')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
@@ -5820,7 +5990,10 @@
     estacionesContenido.classList.remove('hidden');
     estacionesListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
     const clienteSeleccionado = clientesCache.find(c => c.id === estacionesClienteActualId);
-    if(clienteSeleccionado) renderSemaforoPanel('semaforoCliente', clienteSeleccionado);
+    if(clienteSeleccionado){
+      renderSemaforoPanel('semaforoCliente', clienteSeleccionado);
+      renderFacturacionPanel(clienteSeleccionado);
+    }
     ocultarMapaSitioInfoPanel();
     renderMapaSitio();
     await cargarEstacionesDeCliente(estacionesClienteActualId);
