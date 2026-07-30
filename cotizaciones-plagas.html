@@ -733,6 +733,60 @@
     .semaforo-pill{flex:1 1 45%;font-size:12.5px;padding:10px 8px;}
   }
 
+  /* ---------- Vista panoramica del semaforo (tab Semaforo, oficina) ---------- */
+  .semaforo-sinestado{background:#eee;color:#5a5a5a;}
+  .semaforo-filtros{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px;}
+  .semaforo-filtro-chip{
+    display:flex;align-items:center;gap:6px;
+    padding:8px 14px;
+    border-radius:999px;
+    border:2px solid transparent;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    opacity:.55;
+    transition:opacity .15s;
+  }
+  /* El color/fondo de cada chip lo da su clase de paleta (.semaforo-rojo,
+     .semaforo-sinestado, etc.) o el id de "Todos" - a proposito NO se
+     define aqui, porque con la misma especificidad (una sola clase) la
+     regla declarada despues en el CSS ganaria y taparia esos colores. */
+  .semaforo-filtro-chip.activo{opacity:1;border-color:currentColor;}
+  .semaforo-filtro-chip .conteo{
+    background:rgba(0,0,0,.08);
+    border-radius:999px;
+    padding:1px 7px;
+    font-size:11.5px;
+  }
+  .semaforo-filtro-chip#semaforoFiltro_todos{background:var(--verde-suave);color:var(--verde-oscuro);}
+  .semaforo-resumen-row{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:12px 14px;
+    border:1px solid var(--gris-borde);
+    border-radius:8px;
+    margin-bottom:8px;
+    background:var(--blanco);
+    cursor:pointer;
+    transition:background .1s;
+  }
+  .semaforo-resumen-row:hover{background:var(--gris-fondo);}
+  .semaforo-badge{
+    flex:0 0 auto;
+    padding:5px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .semaforo-resumen-info{flex:1 1 auto;min-width:0;}
+  .semaforo-resumen-info strong{font-size:14.5px;color:var(--verde-oscuro);}
+  .semaforo-resumen-motivo{font-size:12.5px;color:#666;margin-top:3px;}
+  @media (max-width:480px){
+    .semaforo-resumen-row{flex-direction:column;align-items:flex-start;gap:6px;}
+  }
+
   /* ---------- Calendario de visitas ---------- */
   .badge.programada{background:#e7f0fd;color:#1d4ed8;}
   .badge.realizada{background:#d8f3dc;color:#1b4332;}
@@ -1186,6 +1240,7 @@
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
+  <button class="tab-btn hidden" data-tab="semaforo" id="tabBtnSemaforo">Semáforo</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
   <button class="tab-btn hidden" data-tab="empleados" id="tabBtnEmpleados">Empleados</button>
   <button class="tab-btn hidden" data-tab="vehiculos" id="tabBtnVehiculos">Vehículos</button>
@@ -1930,6 +1985,25 @@
         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
       </div>
       <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: SEMÁFORO DE CLIENTES (oficina: dueño y asistente) ================= -->
+  <section id="tab-semaforo" class="hidden">
+    <div class="panel">
+      <h2>Semáforo de estado — todos los clientes</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Vista panorámica de todos los clientes por color de semáforo, ordenados por prioridad (rojo primero). Toca un cliente para ir a sus estaciones.</p>
+
+      <div class="semaforo-filtros" id="semaforoFiltros">
+        <button type="button" class="semaforo-filtro-chip activo" data-filtro="todos" id="semaforoFiltro_todos">Todos <span class="conteo">0</span></button>
+        <button type="button" class="semaforo-filtro-chip semaforo-rojo" data-filtro="rojo" id="semaforoFiltro_rojo">🔴 Rojo <span class="conteo">0</span></button>
+        <button type="button" class="semaforo-filtro-chip semaforo-naranja" data-filtro="naranja" id="semaforoFiltro_naranja">🟠 Naranja <span class="conteo">0</span></button>
+        <button type="button" class="semaforo-filtro-chip semaforo-amarillo" data-filtro="amarillo" id="semaforoFiltro_amarillo">🟡 Amarillo <span class="conteo">0</span></button>
+        <button type="button" class="semaforo-filtro-chip semaforo-verde" data-filtro="verde" id="semaforoFiltro_verde">🟢 Verde <span class="conteo">0</span></button>
+        <button type="button" class="semaforo-filtro-chip semaforo-sinestado" data-filtro="sinestado" id="semaforoFiltro_sinestado">⚪ Sin estado <span class="conteo">0</span></button>
+      </div>
+
+      <div id="semaforoResumenLista"></div>
     </div>
   </section>
 
@@ -2879,6 +2953,8 @@
     document.getElementById('tabBtnDispositivos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnSemaforo').classList.toggle('hidden',
+      !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnDocumentacion').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnEmpleados').classList.toggle('hidden',
@@ -3636,6 +3712,7 @@
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
+    semaforo: document.getElementById('tab-semaforo'),
     documentacion: document.getElementById('tab-documentacion'),
     empleados: document.getElementById('tab-empleados'),
     vehiculos: document.getElementById('tab-vehiculos'),
@@ -3659,6 +3736,7 @@
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
+    if(nombre === 'semaforo') cargarSemaforoResumen();
     if(nombre === 'documentacion') cargarDocumentacion().then(renderDocumentacionLista);
     if(nombre === 'empleados'){
       empleadosBuscador.value = '';
@@ -5561,6 +5639,106 @@
       await renderSemaforoPanel(prefix, cliente);
     });
   }
+
+  // ---------- Vista panoramica del semaforo (oficina: dueño y asistente) ----------
+  let semaforoResumenCache = [];
+  let semaforoFiltroActivo = 'todos';
+
+  function semaforoInfoDe(color){
+    return SEMAFORO_INFO[color] || { emoji: '⚪', label: 'Sin estado' };
+  }
+
+  async function cargarSemaforoResumen(){
+    const cont = document.getElementById('semaforoResumenLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const { data, error } = await supabaseClient
+      .from('clientes')
+      .select('id, nombre, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en')
+      .order('nombre');
+    if(error){
+      console.error('No se pudo cargar el semáforo de clientes:', error);
+      cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    semaforoResumenCache = data || [];
+    renderSemaforoResumen();
+  }
+
+  function renderSemaforoResumen(){
+    const cont = document.getElementById('semaforoResumenLista');
+    const conteos = { rojo: 0, naranja: 0, amarillo: 0, verde: 0, sinestado: 0 };
+    semaforoResumenCache.forEach(c => {
+      conteos[c.semaforo && SEMAFORO_INFO[c.semaforo] ? c.semaforo : 'sinestado']++;
+    });
+    document.getElementById('semaforoFiltro_todos').querySelector('.conteo').textContent = semaforoResumenCache.length;
+    ['rojo', 'naranja', 'amarillo', 'verde', 'sinestado'].forEach(k => {
+      const chip = document.getElementById('semaforoFiltro_' + k);
+      if(chip) chip.querySelector('.conteo').textContent = conteos[k];
+    });
+
+    let lista = semaforoResumenCache.slice();
+    if(semaforoFiltroActivo !== 'todos'){
+      lista = lista.filter(c => (c.semaforo && SEMAFORO_INFO[c.semaforo] ? c.semaforo : 'sinestado') === semaforoFiltroActivo);
+    }
+    // Prioridad: rojo, naranja, amarillo, verde y al final los sin estado.
+    const ORDEN = { rojo: 0, naranja: 1, amarillo: 2, verde: 3 };
+    lista.sort((a, b) => {
+      const oa = (a.semaforo && ORDEN[a.semaforo] !== undefined) ? ORDEN[a.semaforo] : 4;
+      const ob = (b.semaforo && ORDEN[b.semaforo] !== undefined) ? ORDEN[b.semaforo] : 4;
+      if(oa !== ob) return oa - ob;
+      return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+    });
+
+    if(lista.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay clientes en este filtro.</div>`;
+      return;
+    }
+
+    cont.innerHTML = lista.map(c => {
+      const info = semaforoInfoDe(c.semaforo);
+      const clase = c.semaforo && SEMAFORO_INFO[c.semaforo] ? 'semaforo-' + c.semaforo : 'semaforo-sinestado';
+      return `
+        <div class="semaforo-resumen-row" data-cliente-id="${c.id}">
+          <span class="semaforo-badge ${clase}">${info.emoji} ${info.label}</span>
+          <div class="semaforo-resumen-info">
+            <strong>${escapeHtml(c.nombre)}</strong>
+            <div class="semaforo-resumen-motivo" id="semaforoResumenMotivo_${c.id}">${c.semaforo ? 'Cargando...' : 'Todavía no se le ha puesto un estado.'}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Nombre de quien lo puso + fecha se resuelven aparte (puede pedir a
+    // perfiles_usuario) para no bloquear el primer pintado de la lista.
+    lista.filter(c => c.semaforo).forEach(async c => {
+      const el = document.getElementById('semaforoResumenMotivo_' + c.id);
+      if(!el) return;
+      const nombre = await obtenerNombreUsuario(c.semaforo_actualizado_por);
+      const fecha = formatDate((c.semaforo_actualizado_en || '').slice(0, 10));
+      const motivo = c.semaforo_nota || '(sin motivo registrado)';
+      el.textContent = `${motivo} — por ${nombre || 'alguien del equipo'} el ${fecha}`;
+    });
+  }
+
+  document.getElementById('semaforoFiltros').addEventListener('click', (e) => {
+    const btn = e.target.closest('.semaforo-filtro-chip');
+    if(!btn) return;
+    semaforoFiltroActivo = btn.dataset.filtro;
+    document.querySelectorAll('#semaforoFiltros .semaforo-filtro-chip').forEach(b => b.classList.toggle('activo', b === btn));
+    renderSemaforoResumen();
+  });
+
+  // Tocar un cliente en la vista panoramica lleva directo a su panel de
+  // Estaciones (misma pantalla donde oficina ya ve/edita su semaforo).
+  document.getElementById('semaforoResumenLista').addEventListener('click', async (e) => {
+    const row = e.target.closest('.semaforo-resumen-row');
+    if(!row) return;
+    const clienteId = row.dataset.clienteId;
+    activarTab('estaciones');
+    await cargarClientesParaEstaciones();
+    estacionesClienteSelect.value = clienteId;
+    estacionesClienteSelect.dispatchEvent(new Event('change'));
+  });
 
   let clientesCache = [];
   let estacionesClienteActualId = '';
