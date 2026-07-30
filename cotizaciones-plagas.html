@@ -695,6 +695,35 @@
   #serviciosLista tr.inactiva{opacity:.55;}
   #avisosLista tr.inactiva{opacity:.55;}
 
+  /* ---------- Semaforo de estado del cliente ---------- */
+  .semaforo-pills{display:flex;flex-wrap:wrap;gap:8px;}
+  .semaforo-pill{
+    flex:1 1 130px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:10px 12px;
+    border-radius:999px;
+    border:2px solid transparent;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    opacity:.5;
+    transition:opacity .15s, transform .1s;
+  }
+  .semaforo-pill:active{transform:scale(.97);}
+  .semaforo-pill.activo{opacity:1;border-color:currentColor;}
+  .semaforo-pill[disabled]{cursor:wait;}
+  .semaforo-rojo{background:#fdecea;color:#b3261e;}
+  .semaforo-naranja{background:#fff1e0;color:#b5540a;}
+  .semaforo-amarillo{background:#fff8db;color:#8a6d00;}
+  .semaforo-verde{background:var(--verde-suave);color:var(--verde-oscuro);}
+  #semaforoClienteInfo,#reporteSemaforoInfo{font-size:12px;color:#666;margin-top:8px;}
+  @media (max-width:480px){
+    .semaforo-pill{flex:1 1 45%;font-size:12.5px;padding:10px 8px;}
+  }
+
   /* ---------- Calendario de visitas ---------- */
   .badge.programada{background:#e7f0fd;color:#1d4ed8;}
   .badge.realizada{background:#d8f3dc;color:#1b4332;}
@@ -1642,6 +1671,21 @@
       <div id="estacionesClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus estaciones.</div>
 
       <div id="estacionesContenido" class="hidden">
+        <div class="panel" id="semaforoClientePanel" style="margin:16px 0;">
+          <h3 style="margin-top:0;">Semáforo de estado</h3>
+          <div class="semaforo-pills" id="semaforoClientePills">
+            <button type="button" class="semaforo-pill semaforo-rojo" data-semaforo="rojo">🔴 Urgente</button>
+            <button type="button" class="semaforo-pill semaforo-naranja" data-semaforo="naranja">🟠 Urgente (menos)</button>
+            <button type="button" class="semaforo-pill semaforo-amarillo" data-semaforo="amarillo">🟡 Falta atención</button>
+            <button type="button" class="semaforo-pill semaforo-verde" data-semaforo="verde">🟢 Controlado</button>
+          </div>
+          <div class="field" style="margin-top:10px;max-width:420px;">
+            <label for="semaforoClienteNota">Nota (opcional)</label>
+            <input type="text" id="semaforoClienteNota" placeholder="Ej. Se detectó actividad en zona de cocina">
+          </div>
+          <div id="semaforoClienteInfo"></div>
+        </div>
+
         <div class="panel" id="mapaSitioPanel" style="margin:16px 0;">
           <h3 style="margin-top:0;">Mapa del sitio</h3>
           <p style="font-size:12px;color:#777;margin-top:0;">Sube una foto satelital (Google Maps/Earth) o un plano del lugar, y haz click sobre la imagen para clavar un pin y ubicar cada estación físicamente.</p>
@@ -2084,6 +2128,21 @@
   <div id="reportePanel">
     <h3 style="margin-top:0;" id="reportePanelTitulo">Reporte de visita</h3>
     <p style="font-size:12px;color:#777;margin-top:0;" id="reportePanelSubtitulo"></p>
+
+    <div class="panel" id="reporteSemaforoPanel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Semáforo de estado</h4>
+      <div class="semaforo-pills" id="reporteSemaforoPills">
+        <button type="button" class="semaforo-pill semaforo-rojo" data-semaforo="rojo">🔴 Urgente</button>
+        <button type="button" class="semaforo-pill semaforo-naranja" data-semaforo="naranja">🟠 Urgente (menos)</button>
+        <button type="button" class="semaforo-pill semaforo-amarillo" data-semaforo="amarillo">🟡 Falta atención</button>
+        <button type="button" class="semaforo-pill semaforo-verde" data-semaforo="verde">🟢 Controlado</button>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label for="reporteSemaforoNota">Nota (opcional)</label>
+        <input type="text" id="reporteSemaforoNota" placeholder="Ej. Se detectó actividad en zona de cocina">
+      </div>
+      <div id="reporteSemaforoInfo"></div>
+    </div>
 
     <div class="panel" style="margin:14px 0;">
       <h4 style="margin-top:0;">Mantenimiento según plan</h4>
@@ -5400,6 +5459,79 @@
     if(seleccionActual) selectEl.value = seleccionActual;
   }
 
+  // ---------- Semaforo de estado del cliente (rojo/naranja/amarillo/verde) ----------
+  // Lo puede tocar tanto oficina (panel de Estaciones) como tecnico (Reporte
+  // de visita) - ambos paneles comparten esta misma logica de guardado y
+  // solo difieren en el prefijo de sus ids en el DOM.
+  const perfilNombreCache = {};
+  async function obtenerNombreUsuario(id){
+    if(!id) return null;
+    if(usuarioActual && id === usuarioActual.id) return usuarioActual.nombre;
+    if(perfilNombreCache[id] !== undefined) return perfilNombreCache[id];
+    const { data, error } = await supabaseClient.from('perfiles_usuario').select('nombre').eq('id', id).maybeSingle();
+    // Si RLS no deja ver el nombre de otro usuario (ej. tecnico viendo un
+    // cambio hecho por oficina), data llega vacio: se cachea null y el
+    // llamador cae a un texto generico en vez de romper.
+    const nombre = (!error && data) ? data.nombre : null;
+    perfilNombreCache[id] = nombre;
+    return nombre;
+  }
+
+  async function renderSemaforoPanel(prefix, cliente){
+    const pillsEl = document.getElementById(prefix + 'Pills');
+    const notaEl = document.getElementById(prefix + 'Nota');
+    const infoEl = document.getElementById(prefix + 'Info');
+    if(!pillsEl) return;
+    pillsEl.querySelectorAll('.semaforo-pill').forEach(btn => {
+      btn.classList.toggle('activo', btn.dataset.semaforo === cliente.semaforo);
+    });
+    if(notaEl) notaEl.value = cliente.semaforo_nota || '';
+    if(infoEl){
+      if(cliente.semaforo && cliente.semaforo_actualizado_en){
+        infoEl.textContent = 'Cargando...';
+        const nombre = await obtenerNombreUsuario(cliente.semaforo_actualizado_por);
+        infoEl.textContent = `Actualizado por ${nombre || 'alguien del equipo'} el ${formatDate((cliente.semaforo_actualizado_en || '').slice(0, 10))}`;
+      } else {
+        infoEl.textContent = 'Sin estado asignado todavía.';
+      }
+    }
+  }
+
+  function wireSemaforoPanel(prefix, getCliente){
+    const pillsEl = document.getElementById(prefix + 'Pills');
+    const notaEl = document.getElementById(prefix + 'Nota');
+    if(!pillsEl) return;
+    pillsEl.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.semaforo-pill');
+      if(!btn) return;
+      const cliente = getCliente();
+      if(!cliente || !cliente.id){ alert('Selecciona un cliente primero.'); return; }
+      const color = btn.dataset.semaforo;
+      const nota = (notaEl && notaEl.value.trim()) || null;
+      const botones = pillsEl.querySelectorAll('.semaforo-pill');
+      botones.forEach(b => b.disabled = true);
+      const ahora = new Date().toISOString();
+      const { error } = await supabaseClient.from('clientes').update({
+        semaforo: color,
+        semaforo_nota: nota,
+        semaforo_actualizado_por: usuarioActual.id,
+        semaforo_actualizado_en: ahora,
+      }).eq('id', cliente.id);
+      botones.forEach(b => b.disabled = false);
+      if(error){
+        alert('No se pudo guardar el semáforo: ' + error.message);
+        return;
+      }
+      // Se muta el mismo objeto que ya vive en la cache (clientesCache o
+      // visita.clientes) para que quede sincronizado sin recargar.
+      cliente.semaforo = color;
+      cliente.semaforo_nota = nota;
+      cliente.semaforo_actualizado_por = usuarioActual.id;
+      cliente.semaforo_actualizado_en = ahora;
+      await renderSemaforoPanel(prefix, cliente);
+    });
+  }
+
   let clientesCache = [];
   let estacionesClienteActualId = '';
   let estacionesCache = [];
@@ -5416,7 +5548,7 @@
   async function cargarClientesParaEstaciones(){
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono, direccion, foto_sitio_url')
+      .select('id, nombre, telefono, direccion, foto_sitio_url, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en')
       .order('nombre');
     if(error){
       console.error('No se pudieron cargar los clientes:', error);
@@ -5479,11 +5611,15 @@
     estacionesClienteVacio.classList.add('hidden');
     estacionesContenido.classList.remove('hidden');
     estacionesListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const clienteSeleccionado = clientesCache.find(c => c.id === estacionesClienteActualId);
+    if(clienteSeleccionado) renderSemaforoPanel('semaforoCliente', clienteSeleccionado);
     ocultarMapaSitioInfoPanel();
     renderMapaSitio();
     await cargarEstacionesDeCliente(estacionesClienteActualId);
     renderEstacionesLista();
   });
+
+  wireSemaforoPanel('semaforoCliente', () => clientesCache.find(c => c.id === estacionesClienteActualId));
 
   document.getElementById('btnAgregarEstacion').addEventListener('click', async ()=>{
     if(!estacionesClienteActualId){
@@ -6464,7 +6600,7 @@
     const fin = `${calAnioActual}-12-31`;
     const { data, error } = await supabaseClient
       .from('visitas_programadas')
-      .select('*, clientes(nombre, direccion, telefono, zona), servicios_cliente(tipo_servicio)')
+      .select('*, clientes(nombre, direccion, telefono, zona, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en), servicios_cliente(tipo_servicio)')
       .gte('fecha_programada', inicio)
       .lte('fecha_programada', fin)
       .order('fecha_programada');
@@ -6821,6 +6957,7 @@
 
   let reporteVisitaActualId = null;
   let reporteClienteActualId = null;
+  let reporteClienteObj = null;
   let reporteEstacionesCache = [];
   let reporteAvisosCache = [];
   let reporteFirmaClienteExistente = null;
@@ -7033,6 +7170,14 @@
     const tipoServicio = (visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
     const tipoVisita = visita.tipo || 'Mantenimiento';
 
+    // Se muta el mismo objeto embebido de la visita (no una copia) para que,
+    // si el tecnico guarda un cambio de semaforo, quede reflejado tambien
+    // si vuelve a abrir este mismo reporte sin recargar el calendario.
+    visita.clientes = visita.clientes || {};
+    visita.clientes.id = reporteClienteActualId;
+    reporteClienteObj = visita.clientes;
+    renderSemaforoPanel('reporteSemaforo', reporteClienteObj);
+
     document.getElementById('reportePanelTitulo').textContent = `Reporte de visita — ${clienteNombre}`;
     document.getElementById('reportePanelSubtitulo').textContent =
       `${tipoServicio ? tipoServicio + ' · ' : ''}${tipoVisita} · ${formatDate(visita.fecha_programada)}${visita.hora ? ' ' + visita.hora.slice(0, 5) : ''}`;
@@ -7104,6 +7249,8 @@
   document.getElementById('btnCerrarReporteVisita').addEventListener('click', ()=>{
     reporteOverlay.classList.add('hidden');
   });
+
+  wireSemaforoPanel('reporteSemaforo', () => reporteClienteObj);
 
   function firmaHtml(imagen, nombre, etiqueta){
     if(imagen){
