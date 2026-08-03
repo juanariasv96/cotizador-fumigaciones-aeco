@@ -787,6 +787,49 @@
     .semaforo-resumen-row{flex-direction:column;align-items:flex-start;gap:6px;}
   }
 
+  /* ---------- Almacen de insumos ---------- */
+  .insumo-row{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:10px 14px;
+    border:1px solid var(--gris-borde);
+    border-radius:8px;
+    margin-bottom:8px;
+    background:var(--blanco);
+  }
+  .insumo-row.inactivo{opacity:.55;background:var(--gris-fondo);}
+  .insumo-row .insumo-info{flex:1 1 auto;min-width:160px;}
+  .insumo-row .insumo-nombre{font-weight:700;color:var(--verde-oscuro);}
+  .insumo-row .insumo-meta{font-size:12px;color:#666;margin-top:2px;}
+  .insumo-row .insumo-acciones{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;}
+  .stock-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:10px 14px;
+    border:1px solid var(--gris-borde);
+    border-radius:8px;
+    margin-bottom:8px;
+    background:var(--blanco);
+  }
+  .stock-row.bajo-minimo{background:#fdecea;border-color:#f3b4ac;}
+  .stock-row .stock-nombre{font-weight:700;color:var(--verde-oscuro);flex:1 1 180px;}
+  .stock-row.bajo-minimo .stock-nombre{color:#b3261e;}
+  .stock-row .stock-datos{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:#444;}
+  .stock-row .stock-datos strong{display:block;font-size:15px;}
+  .resurtir-badge{
+    background:#b3261e;color:#fff;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;white-space:nowrap;
+  }
+  #reporteConsumosGuardadosLista .consumo-fila,
+  #reporteConsumosPendientesLista .consumo-fila{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border:1px solid var(--gris-borde);border-radius:8px;
+    margin-bottom:6px;font-size:13px;background:var(--blanco);
+  }
+  #reporteConsumosGuardadosLista .consumo-fila{background:var(--gris-fondo);color:#555;}
+  @media (max-width:480px){
+    .stock-row{flex-direction:column;align-items:flex-start;}
+    .stock-row .stock-datos{gap:12px;}
+  }
+
   /* ---------- Calendario de visitas ---------- */
   .badge.programada{background:#e7f0fd;color:#1d4ed8;}
   .badge.realizada{background:#d8f3dc;color:#1b4332;}
@@ -1241,6 +1284,7 @@
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="semaforo" id="tabBtnSemaforo">Semáforo</button>
+  <button class="tab-btn hidden" data-tab="almacen" id="tabBtnAlmacen">Almacén</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
   <button class="tab-btn hidden" data-tab="empleados" id="tabBtnEmpleados">Empleados</button>
   <button class="tab-btn hidden" data-tab="vehiculos" id="tabBtnVehiculos">Vehículos</button>
@@ -2074,6 +2118,102 @@
     </div>
   </section>
 
+  <!-- ================= TAB: ALMACÉN DE INSUMOS (oficina: dueño y asistente) =================
+       Fase A: catalogo, compras (entradas) y stock en vivo. Los consumos
+       (salidas) se registran desde el Reporte de visita del tecnico, no
+       aqui - este panel es solo lectura de eso y alta de compras. -->
+  <section id="tab-almacen" class="hidden">
+    <div class="panel">
+      <h2>Almacén de insumos</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Catálogo, compras (entradas) y niveles de stock en vivo. Los consumos (salidas) los registra el técnico desde su Reporte de visita.</p>
+
+      <h3>Catálogo</h3>
+      <div class="grid" style="align-items:end;">
+        <div class="field">
+          <label for="insumoNombre">Nombre</label>
+          <input type="text" id="insumoNombre" placeholder="Ej. Biothrine 250 EC">
+        </div>
+        <div class="field" style="max-width:180px;">
+          <label for="insumoCategoria">Categoría</label>
+          <select id="insumoCategoria">
+            <option value="quimico">Químico</option>
+            <option value="insumo">Insumo</option>
+            <option value="lampara">Lámpara</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="insumoUnidadBase">Unidad base</label>
+          <select id="insumoUnidadBase">
+            <option value="ml">ml</option>
+            <option value="g">g</option>
+            <option value="pieza">pieza</option>
+            <option value="l">l</option>
+            <option value="kg">kg</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label for="insumoStockMinimo">Stock mínimo</label>
+          <input type="number" id="insumoStockMinimo" min="0" step="any" value="0">
+        </div>
+        <div class="field" style="max-width:220px;">
+          <button type="button" class="btn" id="btnGuardarInsumo" style="width:100%;">+ Agregar insumo</button>
+        </div>
+      </div>
+      <div class="hint hidden" id="insumoEditandoAviso" style="margin-top:6px;">
+        Editando <strong id="insumoEditandoNombre"></strong> —
+        <button type="button" class="btn secondary small" id="btnCancelarEdicionInsumo">Cancelar edición</button>
+      </div>
+
+      <div id="insumosLista" style="margin-top:14px;"></div>
+
+      <h3 style="margin-top:28px;">Registrar compra (entrada)</h3>
+      <p style="font-size:12px;color:#777;margin-top:0;">El envase se captura por compra, porque puede variar de tamaño. La cantidad y el costo por unidad se calculan solos.</p>
+      <div class="grid" style="align-items:end;">
+        <div class="field">
+          <label for="compraInsumo">Insumo</label>
+          <select id="compraInsumo">
+            <option value="">Selecciona...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="compraProveedor">Proveedor</label>
+          <input type="text" id="compraProveedor" placeholder="Ej. Agroquímicos del Norte">
+        </div>
+        <div class="field" style="max-width:170px;">
+          <label for="compraFecha">Fecha</label>
+          <input type="date" id="compraFecha">
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="compraNumEnvases">Núm. de envases</label>
+          <input type="number" id="compraNumEnvases" min="0" step="any" placeholder="Ej. 4">
+        </div>
+        <div class="field" style="max-width:210px;">
+          <label for="compraContenidoEnvase" id="compraContenidoEnvaseLabel">Contenido por envase</label>
+          <input type="number" id="compraContenidoEnvase" min="0" step="any" placeholder="Ej. 1000">
+        </div>
+        <div class="field" style="max-width:170px;">
+          <label for="compraTipoPrecio">El precio que voy a dar es...</label>
+          <select id="compraTipoPrecio">
+            <option value="total">Total de la compra</option>
+            <option value="envase">Por envase</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label for="compraPrecio">Precio ($)</label>
+          <input type="number" id="compraPrecio" min="0" step="any" placeholder="Ej. 3600">
+        </div>
+        <div class="field" style="max-width:220px;">
+          <button type="button" class="btn" id="btnRegistrarCompra" style="width:100%;">Registrar compra</button>
+        </div>
+      </div>
+      <div class="hint" id="compraPreview"></div>
+
+      <h3 style="margin-top:28px;">Niveles en vivo</h3>
+      <div id="stockLista"></div>
+    </div>
+  </section>
+
   <!-- ================= TAB: DOCUMENTACIÓN (oficina: dueño y asistente) ================= -->
   <section id="tab-documentacion" class="hidden">
     <div class="panel">
@@ -2317,6 +2457,31 @@
     <div class="panel" style="margin:14px 0;">
       <h4 style="margin-top:0;">Estaciones</h4>
       <div id="reporteEstacionesLista"></div>
+    </div>
+
+    <!-- Consumos: insumos usados en esta visita. Cada renglon "por guardar"
+         se vuelve un movimiento 'salida' al presionar "Guardar reporte" -
+         los ya guardados quedan fijos (el almacen es un libro mayor sin
+         edicion) y solo se pueden agregar mas, nunca quitar uno ya guardado. -->
+    <div class="panel" id="reporteConsumosPanel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Consumos</h4>
+      <div id="reporteConsumosGuardadosLista"></div>
+      <div class="grid" style="align-items:end;margin-top:8px;">
+        <div class="field">
+          <label for="consumoInsumoSelect">Insumo</label>
+          <select id="consumoInsumoSelect">
+            <option value="">Selecciona...</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="consumoCantidad" id="consumoCantidadLabel">Cantidad</label>
+          <input type="number" id="consumoCantidad" min="0" step="any" placeholder="Ej. 50">
+        </div>
+        <div class="field" style="max-width:150px;">
+          <button type="button" class="btn secondary small" id="btnAgregarConsumo" style="width:100%;">+ Agregar</button>
+        </div>
+      </div>
+      <div id="reporteConsumosPendientesLista" style="margin-top:10px;"></div>
     </div>
 
     <div class="field">
@@ -3021,6 +3186,8 @@
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnSemaforo').classList.toggle('hidden',
+      !['dueño', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnDocumentacion').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
@@ -3780,6 +3947,7 @@
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     semaforo: document.getElementById('tab-semaforo'),
+    almacen: document.getElementById('tab-almacen'),
     documentacion: document.getElementById('tab-documentacion'),
     empleados: document.getElementById('tab-empleados'),
     vehiculos: document.getElementById('tab-vehiculos'),
@@ -3804,6 +3972,7 @@
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'semaforo') cargarSemaforoResumen();
+    if(nombre === 'almacen') cargarAlmacen();
     if(nombre === 'documentacion') cargarDocumentacion().then(renderDocumentacionLista);
     if(nombre === 'empleados'){
       empleadosBuscador.value = '';
@@ -6904,6 +7073,283 @@
   });
 
 
+  // =====================================================================
+  // ALMACÉN DE INSUMOS — Fase A (oficina: dueño y asistente)
+  // Catálogo, compras (entradas) y stock en vivo (vista public.stock_insumos).
+  // Los consumos (salidas) NO se registran aquí: los agrega el técnico
+  // desde su Reporte de visita (ver mas abajo, seccion "Consumos del
+  // reporte de visita"). insumo_movimientos es un libro mayor append-only
+  // (sin update/delete en la RLS), asi que aqui tampoco se edita ni se
+  // borra un movimiento ya guardado - solo se agregan compras nuevas.
+  // =====================================================================
+  const UNIDAD_BASE_LABEL = { ml: 'ml', g: 'g', pieza: 'pieza(s)', l: 'l', kg: 'kg' };
+  const CATEGORIA_INSUMO_LABEL = { quimico: 'Químico', insumo: 'Insumo', lampara: 'Lámpara', otro: 'Otro' };
+
+  let insumosCache = [];       // catalogo completo (activos e inactivos), para la pestaña Almacen
+  let stockInsumosCache = [];  // filas de la vista stock_insumos
+  let insumoEditandoId = null; // si no es null, el formulario de catalogo esta en modo "editar"
+
+  function formatCantidadBase(cantidad, unidadBase){
+    const n = Number(cantidad) || 0;
+    // Sin decimales colgados: 50 en vez de 50.00, pero conserva decimales reales (ej. 2.5 kg).
+    const texto = Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    return `${texto} ${UNIDAD_BASE_LABEL[unidadBase] || unidadBase}`;
+  }
+
+  async function cargarAlmacen(){
+    const hoyInput = document.getElementById('compraFecha');
+    if(hoyInput && !hoyInput.value) hoyInput.value = new Date().toISOString().slice(0, 10);
+    await Promise.all([cargarInsumos(), cargarStockInsumos()]);
+  }
+
+  // ---------- Catálogo ----------
+  async function cargarInsumos(){
+    const cont = document.getElementById('insumosLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const { data, error } = await supabaseClient
+      .from('insumos')
+      .select('*')
+      .order('nombre');
+    if(error){
+      console.error('No se pudieron cargar los insumos:', error);
+      cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    insumosCache = data || [];
+    renderInsumosLista();
+    renderSelectComprasInsumo();
+  }
+
+  function renderInsumosLista(){
+    const cont = document.getElementById('insumosLista');
+    if(insumosCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">Todavía no hay insumos en el catálogo.</div>`;
+      return;
+    }
+    cont.innerHTML = insumosCache.map(i => `
+      <div class="insumo-row ${i.activo ? '' : 'inactivo'}" data-id="${i.id}">
+        <div class="insumo-info">
+          <div class="insumo-nombre">${escapeHtml(i.nombre)}${i.activo ? '' : ' (inactivo)'}</div>
+          <div class="insumo-meta">${CATEGORIA_INSUMO_LABEL[i.categoria] || i.categoria || 'Sin categoría'} · unidad base: ${escapeHtml(i.unidad_base)} · mínimo: ${formatCantidadBase(i.stock_minimo, i.unidad_base)}</div>
+        </div>
+        <div class="insumo-acciones">
+          <button type="button" class="btn secondary small" data-editar-insumo="${i.id}">Editar</button>
+          <button type="button" class="btn secondary small" data-toggle-insumo="${i.id}" data-activo="${i.activo}">${i.activo ? 'Desactivar' : 'Activar'}</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function limpiarFormularioInsumo(){
+    insumoEditandoId = null;
+    document.getElementById('insumoNombre').value = '';
+    document.getElementById('insumoCategoria').value = 'quimico';
+    document.getElementById('insumoUnidadBase').value = 'ml';
+    document.getElementById('insumoStockMinimo').value = '0';
+    document.getElementById('btnGuardarInsumo').textContent = '+ Agregar insumo';
+    document.getElementById('insumoEditandoAviso').classList.add('hidden');
+  }
+
+  document.getElementById('btnGuardarInsumo').addEventListener('click', async () => {
+    const nombre = document.getElementById('insumoNombre').value.trim();
+    if(!nombre){ alert('Escribe el nombre del insumo.'); return; }
+    const categoria = document.getElementById('insumoCategoria').value;
+    const unidadBase = document.getElementById('insumoUnidadBase').value;
+    const stockMinimo = parseFloat(document.getElementById('insumoStockMinimo').value) || 0;
+
+    const btn = document.getElementById('btnGuardarInsumo');
+    btn.disabled = true;
+    let error;
+    if(insumoEditandoId){
+      ({ error } = await supabaseClient.from('insumos').update({
+        nombre, categoria, unidad_base: unidadBase, stock_minimo: stockMinimo,
+      }).eq('id', insumoEditandoId));
+    } else {
+      ({ error } = await supabaseClient.from('insumos').insert({
+        nombre, categoria, unidad_base: unidadBase, stock_minimo: stockMinimo,
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      }));
+    }
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudo guardar el insumo: ' + error.message);
+      return;
+    }
+    limpiarFormularioInsumo();
+    await cargarInsumos();
+    await cargarStockInsumos();
+  });
+
+  document.getElementById('btnCancelarEdicionInsumo').addEventListener('click', limpiarFormularioInsumo);
+
+  document.getElementById('insumosLista').addEventListener('click', async (e) => {
+    const btnEditar = e.target.closest('[data-editar-insumo]');
+    if(btnEditar){
+      const insumo = insumosCache.find(i => i.id === btnEditar.dataset.editarInsumo);
+      if(!insumo) return;
+      insumoEditandoId = insumo.id;
+      document.getElementById('insumoNombre').value = insumo.nombre;
+      document.getElementById('insumoCategoria').value = insumo.categoria || 'quimico';
+      document.getElementById('insumoUnidadBase').value = insumo.unidad_base;
+      document.getElementById('insumoStockMinimo').value = insumo.stock_minimo;
+      document.getElementById('btnGuardarInsumo').textContent = 'Guardar cambios';
+      document.getElementById('insumoEditandoNombre').textContent = insumo.nombre;
+      document.getElementById('insumoEditandoAviso').classList.remove('hidden');
+      document.getElementById('insumoNombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const btnToggle = e.target.closest('[data-toggle-insumo]');
+    if(btnToggle){
+      const activo = btnToggle.dataset.activo === 'true';
+      btnToggle.disabled = true;
+      const { error } = await supabaseClient.from('insumos').update({ activo: !activo }).eq('id', btnToggle.dataset.toggleInsumo);
+      btnToggle.disabled = false;
+      if(error){ alert('No se pudo cambiar el estatus: ' + error.message); return; }
+      await cargarInsumos();
+    }
+  });
+
+  // ---------- Registrar compra (entrada) ----------
+  function renderSelectComprasInsumo(){
+    const select = document.getElementById('compraInsumo');
+    const seleccionActual = select.value;
+    const activos = insumosCache.filter(i => i.activo);
+    select.innerHTML = `<option value="">Selecciona...</option>` +
+      activos.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)} (${escapeHtml(i.unidad_base)})</option>`).join('');
+    if(seleccionActual) select.value = seleccionActual;
+    actualizarEtiquetaContenidoEnvase();
+  }
+
+  function actualizarEtiquetaContenidoEnvase(){
+    const insumo = insumosCache.find(i => i.id === document.getElementById('compraInsumo').value);
+    const unidad = insumo ? (UNIDAD_BASE_LABEL[insumo.unidad_base] || insumo.unidad_base) : 'unidad base';
+    document.getElementById('compraContenidoEnvaseLabel').textContent = `Contenido por envase (${unidad})`;
+  }
+  document.getElementById('compraInsumo').addEventListener('change', () => {
+    actualizarEtiquetaContenidoEnvase();
+    actualizarPreviewCompra();
+  });
+
+  // Vista previa en vivo de cantidad_base y costo_unitario ANTES de guardar,
+  // calculados exactamente igual que el CHECK de la base (cantidad_base =
+  // num_envases * contenido_envase) para que nunca truene por descuadre.
+  function calcularCompra(){
+    const insumo = insumosCache.find(i => i.id === document.getElementById('compraInsumo').value);
+    const numEnvases = parseFloat(document.getElementById('compraNumEnvases').value);
+    const contenidoEnvase = parseFloat(document.getElementById('compraContenidoEnvase').value);
+    const tipoPrecio = document.getElementById('compraTipoPrecio').value;
+    const precioCapturado = parseFloat(document.getElementById('compraPrecio').value);
+
+    if(!insumo || !numEnvases || numEnvases <= 0 || !contenidoEnvase || contenidoEnvase <= 0 || !precioCapturado || precioCapturado <= 0){
+      return null;
+    }
+    const cantidadBase = numEnvases * contenidoEnvase;
+    const precioTotal = tipoPrecio === 'envase' ? precioCapturado * numEnvases : precioCapturado;
+    const costoUnitario = precioTotal / cantidadBase;
+    return { insumo, numEnvases, contenidoEnvase, precioTotal, cantidadBase, costoUnitario };
+  }
+
+  function actualizarPreviewCompra(){
+    const preview = document.getElementById('compraPreview');
+    const calculo = calcularCompra();
+    if(!calculo){
+      preview.textContent = '';
+      return;
+    }
+    const unidad = UNIDAD_BASE_LABEL[calculo.insumo.unidad_base] || calculo.insumo.unidad_base;
+    preview.textContent =
+      `= ${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} · ` +
+      `costo total ${formatMoney(calculo.precioTotal)} · ` +
+      `costo unitario ${formatMoney(calculo.costoUnitario)} por ${unidad}`;
+  }
+  ['compraNumEnvases', 'compraContenidoEnvase', 'compraTipoPrecio', 'compraPrecio'].forEach(id => {
+    document.getElementById(id).addEventListener('input', actualizarPreviewCompra);
+    document.getElementById(id).addEventListener('change', actualizarPreviewCompra);
+  });
+
+  document.getElementById('btnRegistrarCompra').addEventListener('click', async () => {
+    const calculo = calcularCompra();
+    if(!calculo){
+      alert('Revisa el insumo, número de envases, contenido por envase y precio: todos son obligatorios y mayores a 0.');
+      return;
+    }
+    const proveedor = document.getElementById('compraProveedor').value.trim();
+    const fecha = document.getElementById('compraFecha').value || new Date().toISOString().slice(0, 10);
+
+    const btn = document.getElementById('btnRegistrarCompra');
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('insumo_movimientos').insert({
+      insumo_id: calculo.insumo.id,
+      tipo: 'entrada',
+      cantidad_base: calculo.cantidadBase,
+      costo_unitario: calculo.costoUnitario,
+      fecha,
+      proveedor: proveedor || null,
+      num_envases: calculo.numEnvases,
+      contenido_envase: calculo.contenidoEnvase,
+      precio_total: calculo.precioTotal,
+      usuario_id: (usuarioActual && usuarioActual.id) || null,
+    });
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudo registrar la compra: ' + error.message);
+      return;
+    }
+
+    mostrarToast(`Compra registrada: +${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} de ${calculo.insumo.nombre}.`);
+    document.getElementById('compraNumEnvases').value = '';
+    document.getElementById('compraContenidoEnvase').value = '';
+    document.getElementById('compraPrecio').value = '';
+    document.getElementById('compraProveedor').value = '';
+    document.getElementById('compraPreview').textContent = '';
+    await cargarStockInsumos();
+  });
+
+  // ---------- Niveles en vivo ----------
+  async function cargarStockInsumos(){
+    const cont = document.getElementById('stockLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const { data, error } = await supabaseClient
+      .from('stock_insumos')
+      .select('*')
+      .order('nombre');
+    if(error){
+      console.error('No se pudo cargar el stock de insumos:', error);
+      cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    stockInsumosCache = data || [];
+    renderStockInsumos();
+  }
+
+  function renderStockInsumos(){
+    const cont = document.getElementById('stockLista');
+    const visibles = stockInsumosCache.filter(s => s.activo);
+    if(visibles.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay insumos activos con movimientos todavía.</div>`;
+      return;
+    }
+    // Los que necesitan resurtido primero, para que salten a la vista.
+    const ordenados = visibles.slice().sort((a, b) => {
+      if(a.bajo_minimo !== b.bajo_minimo) return a.bajo_minimo ? -1 : 1;
+      return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+    });
+    cont.innerHTML = ordenados.map(s => `
+      <div class="stock-row ${s.bajo_minimo ? 'bajo-minimo' : ''}">
+        <div class="stock-nombre">${escapeHtml(s.nombre)} ${s.bajo_minimo ? '<span class="resurtir-badge">¡Resurtir!</span>' : ''}</div>
+        <div class="stock-datos">
+          <div>Stock actual<br><strong>${formatCantidadBase(s.stock_actual, s.unidad_base)}</strong></div>
+          <div>Mínimo<br><strong>${formatCantidadBase(s.stock_minimo, s.unidad_base)}</strong></div>
+          <div>Costo promedio<br><strong>${s.costo_promedio != null ? formatMoney(s.costo_promedio) + '/' + (UNIDAD_BASE_LABEL[s.unidad_base] || s.unidad_base) : '—'}</strong></div>
+          <div>Valor en almacén<br><strong>${s.valor_almacen != null ? formatMoney(s.valor_almacen) : '—'}</strong></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+
   // ---------- Calendario de visitas ----------
   const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -7343,10 +7789,119 @@
   let reporteAvisosCache = [];
   let reporteFirmaClienteExistente = null;
   let reporteFirmaTecnicoExistente = null;
+  let reporteInsumosCache = [];          // insumos activos, para el selector de Consumos
+  let reporteConsumosGuardadosCache = []; // salidas ya guardadas de ESTA visita (no editables)
+  let reporteConsumosPendientes = [];     // renglones nuevos, se guardan al presionar "Guardar reporte"
 
   const reporteOverlay = document.getElementById('reporteOverlay');
   const reportePrintOverlay = document.getElementById('reportePrintOverlay');
   const reporteDocContent = document.getElementById('reporteDocContent');
+
+  // ---------- Consumos del Reporte de visita (tecnico registra salidas) ----------
+  async function cargarInsumosActivosParaConsumos(){
+    const { data, error } = await supabaseClient
+      .from('insumos')
+      .select('id, nombre, unidad_base')
+      .eq('activo', true)
+      .order('nombre');
+    if(error){ console.error('No se pudieron cargar los insumos:', error); return; }
+    reporteInsumosCache = data || [];
+  }
+
+  function renderSelectConsumoInsumo(){
+    const select = document.getElementById('consumoInsumoSelect');
+    select.innerHTML = `<option value="">Selecciona...</option>` +
+      reporteInsumosCache.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)}</option>`).join('');
+    actualizarEtiquetaCantidadConsumo();
+  }
+
+  function actualizarEtiquetaCantidadConsumo(){
+    const insumo = reporteInsumosCache.find(i => i.id === document.getElementById('consumoInsumoSelect').value);
+    const unidad = insumo ? (UNIDAD_BASE_LABEL[insumo.unidad_base] || insumo.unidad_base) : 'unidad';
+    document.getElementById('consumoCantidadLabel').textContent = `Cantidad (${unidad})`;
+  }
+  document.getElementById('consumoInsumoSelect').addEventListener('change', actualizarEtiquetaCantidadConsumo);
+
+  function renderReporteConsumos(){
+    const guardadosEl = document.getElementById('reporteConsumosGuardadosLista');
+    if(reporteConsumosGuardadosCache.length === 0){
+      guardadosEl.innerHTML = '';
+    } else {
+      guardadosEl.innerHTML = `<div class="hint" style="margin-bottom:4px;">Ya guardados en este reporte:</div>` +
+        reporteConsumosGuardadosCache.map(c => {
+          const nombreInsumo = (c.insumos && c.insumos.nombre) || '(insumo eliminado)';
+          const unidad = (c.insumos && c.insumos.unidad_base) || '';
+          return `<div class="consumo-fila"><span>${escapeHtml(nombreInsumo)}</span><span>${formatCantidadBase(c.cantidad_base, unidad)}</span></div>`;
+        }).join('');
+    }
+
+    const pendientesEl = document.getElementById('reporteConsumosPendientesLista');
+    if(reporteConsumosPendientes.length === 0){
+      pendientesEl.innerHTML = '';
+      return;
+    }
+    pendientesEl.innerHTML = `<div class="hint" style="margin-bottom:4px;">Por guardar:</div>` +
+      reporteConsumosPendientes.map((c, idx) => `
+        <div class="consumo-fila">
+          <span>${escapeHtml(c.nombre)} — ${formatCantidadBase(c.cantidad, c.unidadBase)}</span>
+          <button type="button" class="btn danger small" data-quitar-consumo="${idx}">Quitar</button>
+        </div>
+      `).join('');
+  }
+
+  document.getElementById('btnAgregarConsumo').addEventListener('click', () => {
+    const insumoId = document.getElementById('consumoInsumoSelect').value;
+    const insumo = reporteInsumosCache.find(i => i.id === insumoId);
+    const cantidad = parseFloat(document.getElementById('consumoCantidad').value);
+    if(!insumo){ alert('Selecciona un insumo.'); return; }
+    if(!cantidad || cantidad <= 0){ alert('Escribe una cantidad mayor a 0.'); return; }
+
+    reporteConsumosPendientes.push({ insumoId: insumo.id, nombre: insumo.nombre, unidadBase: insumo.unidad_base, cantidad });
+    document.getElementById('consumoCantidad').value = '';
+    renderReporteConsumos();
+  });
+
+  document.getElementById('reporteConsumosPendientesLista').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-quitar-consumo]');
+    if(!btn) return;
+    reporteConsumosPendientes.splice(Number(btn.dataset.quitarConsumo), 1);
+    renderReporteConsumos();
+  });
+
+  // Inserta un movimiento 'salida' por cada renglon pendiente. Se llama
+  // DESPUES de guardar el reporte (ya con reporteVisitaActualId valido).
+  // visita_ref = el id de la visita en texto: es estable desde que se creo
+  // la visita, no depende de que el reporte ya exista.
+  async function guardarConsumosPendientes(){
+    if(reporteConsumosPendientes.length === 0) return true;
+    const filas = reporteConsumosPendientes.map(c => ({
+      insumo_id: c.insumoId,
+      tipo: 'salida',
+      cantidad_base: c.cantidad,
+      fecha: new Date().toISOString().slice(0, 10),
+      cliente_id: reporteClienteActualId,
+      visita_ref: String(reporteVisitaActualId),
+      usuario_id: (usuarioActual && usuarioActual.id) || null,
+    }));
+    const { error } = await supabaseClient.from('insumo_movimientos').insert(filas);
+    if(error){
+      alert('El reporte se guardó, pero no se pudieron registrar los consumos: ' + error.message);
+      return false;
+    }
+    // Se pasan de "pendientes" a "guardados" localmente (sin insumo_id
+    // relacionado por falta de un refetch; se resuelve con el nombre que
+    // ya teniamos a la mano en el renglon pendiente).
+    reporteConsumosPendientes.forEach(c => {
+      reporteConsumosGuardadosCache.push({
+        insumo_id: c.insumoId,
+        cantidad_base: c.cantidad,
+        insumos: { nombre: c.nombre, unidad_base: c.unidadBase },
+      });
+    });
+    reporteConsumosPendientes = [];
+    renderReporteConsumos();
+    return true;
+  }
 
   function renderReporteAvisos(){
     const cont = document.getElementById('reporteAvisosLista');
@@ -7589,6 +8144,22 @@
     if(errAvisos) console.error('No se pudieron cargar los avisos:', errAvisos);
     reporteAvisosCache = avisos || [];
 
+    // Consumos: insumos disponibles para el selector + los que ya se
+    // guardaron en un intento anterior de este mismo reporte (si el
+    // tecnico salio y volvio a entrar). Los ya guardados no se pueden
+    // editar/quitar: el almacen es un libro mayor append-only.
+    reporteConsumosPendientes = [];
+    if(reporteInsumosCache.length === 0) await cargarInsumosActivosParaConsumos();
+    renderSelectConsumoInsumo();
+    const { data: consumosGuardados, error: errConsumos } = await supabaseClient
+      .from('insumo_movimientos')
+      .select('id, insumo_id, cantidad_base, insumos(nombre, unidad_base)')
+      .eq('tipo', 'salida')
+      .eq('visita_ref', String(visitaId));
+    if(errConsumos) console.error('No se pudieron cargar los consumos ya registrados:', errConsumos);
+    reporteConsumosGuardadosCache = consumosGuardados || [];
+    renderReporteConsumos();
+
     const { data: reporteExistente, error: errReporte } = await supabaseClient
       .from('reportes_visita')
       .select('*')
@@ -7794,6 +8365,11 @@
         return null;
       }
     }
+
+    // Los consumos "por guardar" se insertan como movimientos 'salida'
+    // aqui, ya con el reporte guardado. Si esto falla no se aborta todo
+    // el guardado (el reporte ya quedo bien) - solo se avisa.
+    await guardarConsumosPendientes();
 
     const idsAvisosResueltos = Array.from(document.querySelectorAll('.reporte-aviso-resolver:checked')).map(cb => cb.dataset.avisoId);
     const avisosResueltosDescripciones = reporteAvisosCache
