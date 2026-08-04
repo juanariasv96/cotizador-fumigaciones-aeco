@@ -2288,6 +2288,12 @@
       <h2>Documentación</h2>
       <p style="font-size:12px;color:#777;margin-top:0;">Reportes de visita y certificados generados por los técnicos en campo. Consulta y reimprime lo ya generado; visible solo para dueño y asistente.</p>
 
+      <div class="panel" id="tarifasExtrasPanel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Tarifas de extras por técnico (noche / domingo)</h4>
+        <p class="hint" style="margin-top:0;">Deja el campo vacío si ese técnico todavía no tiene tarifa asignada. Este monto es solo la base que se sugiere al confirmar un extra abajo; se puede ajustar caso por caso.</p>
+        <div id="tarifasExtrasLista"></div>
+      </div>
+
       <div class="grid" style="align-items:end;">
         <div class="field" style="max-width:260px;">
           <label for="docFiltroCliente">Filtrar por cliente</label>
@@ -2490,6 +2496,25 @@
   <div id="reportePanel">
     <h3 style="margin-top:0;" id="reportePanelTitulo">Reporte de visita</h3>
     <p style="font-size:12px;color:#777;margin-top:0;" id="reportePanelSubtitulo"></p>
+
+    <div class="panel" id="reporteTiempoPanel" style="margin:14px 0;">
+      <h4 style="margin-top:0;">Tiempo del servicio</h4>
+      <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:200px;">
+          <button type="button" class="btn secondary" id="btnIniciarServicio" style="width:100%;">Iniciar servicio</button>
+          <div class="hint" id="reporteHoraInicioTexto" style="margin-top:4px;">Sin iniciar</div>
+        </div>
+        <div class="field" style="max-width:200px;">
+          <button type="button" class="btn secondary" id="btnTerminarServicio" style="width:100%;">Terminar servicio</button>
+          <div class="hint" id="reporteHoraFinTexto" style="margin-top:4px;">Sin terminar</div>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <label for="reporteTiempoTraslado">Tiempo de traslado (min)</label>
+          <input type="number" id="reporteTiempoTraslado" min="0" step="1" placeholder="Ej. 20">
+        </div>
+      </div>
+      <div class="hint" id="reporteTiempoSitioTexto" style="margin-top:6px;"></div>
+    </div>
 
     <div class="panel" id="reporteSemaforoPanel" style="margin:14px 0;">
       <h4 style="margin-top:0;">Semáforo de estado</h4>
@@ -8224,6 +8249,8 @@
   let reporteInsumosCache = [];          // insumos activos, para el selector de Consumos
   let reporteConsumosGuardadosCache = []; // salidas ya guardadas de ESTA visita (no editables)
   let reporteConsumosPendientes = [];     // renglones nuevos, se guardan al presionar "Guardar reporte"
+  let reporteHoraInicio = null;          // ISO string o null - se registra al presionar "Iniciar servicio"
+  let reporteHoraFin = null;             // ISO string o null - se registra al presionar "Terminar servicio"
 
   const reporteOverlay = document.getElementById('reporteOverlay');
   const reportePrintOverlay = document.getElementById('reportePrintOverlay');
@@ -8528,6 +8555,50 @@
     if(e.target === celdaSelectorOverlay) cerrarCeldaSelector();
   });
 
+  // ---------- Tiempo del servicio (inicio/fin automáticos + traslado manual) ----------
+  function renderReporteTiempo(){
+    const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('reporteHoraInicioTexto').textContent = reporteHoraInicio ? `Iniciado: ${fmtHora(reporteHoraInicio)}` : 'Sin iniciar';
+    document.getElementById('reporteHoraFinTexto').textContent = reporteHoraFin ? `Terminado: ${fmtHora(reporteHoraFin)}` : 'Sin terminar';
+    document.getElementById('btnIniciarServicio').disabled = !!reporteHoraInicio;
+    document.getElementById('btnTerminarServicio').disabled = !reporteHoraInicio || !!reporteHoraFin;
+    const textoSitio = document.getElementById('reporteTiempoSitioTexto');
+    if(reporteHoraInicio && reporteHoraFin){
+      const minutos = Math.round((new Date(reporteHoraFin) - new Date(reporteHoraInicio)) / 60000);
+      textoSitio.textContent = `Tiempo en sitio: ${minutos} min`;
+    } else {
+      textoSitio.textContent = '';
+    }
+  }
+
+  document.getElementById('btnIniciarServicio').addEventListener('click', async () => {
+    if(!reporteVisitaActualId || reporteHoraInicio) return;
+    reporteHoraInicio = new Date().toISOString();
+    renderReporteTiempo();
+    const { error } = await supabaseClient.from('reportes_visita').upsert({
+      visita_id: reporteVisitaActualId,
+      tecnico_id: (usuarioActual && usuarioActual.id) || null,
+      hora_inicio: reporteHoraInicio,
+    }, { onConflict: 'visita_id' });
+    if(error){
+      alert('No se pudo registrar la hora de inicio: ' + error.message);
+    }
+  });
+
+  document.getElementById('btnTerminarServicio').addEventListener('click', async () => {
+    if(!reporteVisitaActualId || !reporteHoraInicio || reporteHoraFin) return;
+    reporteHoraFin = new Date().toISOString();
+    renderReporteTiempo();
+    const { error } = await supabaseClient.from('reportes_visita').upsert({
+      visita_id: reporteVisitaActualId,
+      tecnico_id: (usuarioActual && usuarioActual.id) || null,
+      hora_fin: reporteHoraFin,
+    }, { onConflict: 'visita_id' });
+    if(error){
+      alert('No se pudo registrar la hora de término: ' + error.message);
+    }
+  });
+
   async function abrirReporteVisita(visitaId){
     const visita = calVisitasCache.find(v => v.id === visitaId);
     if(!visita) return;
@@ -8626,6 +8697,12 @@
     reporteFirmaTecnicoExistente = (reporteExistente && reporteExistente.firma_tecnico_imagen) || null;
     firmaClienteCanvas._limpiar();
     firmaTecnicoCanvas._limpiar();
+
+    reporteHoraInicio = (reporteExistente && reporteExistente.hora_inicio) || null;
+    reporteHoraFin = (reporteExistente && reporteExistente.hora_fin) || null;
+    document.getElementById('reporteTiempoTraslado').value =
+      (reporteExistente && reporteExistente.tiempo_traslado_minutos != null) ? reporteExistente.tiempo_traslado_minutos : '';
+    renderReporteTiempo();
 
     reporteOverlay.classList.remove('hidden');
   }
@@ -8768,6 +8845,10 @@
       firma_cliente_nombre: document.getElementById('firmaClienteNombre').value.trim() || null,
       firma_tecnico_imagen: obtenerFirmaFinal(firmaTecnicoCanvas, reporteFirmaTecnicoExistente),
       firma_tecnico_nombre: document.getElementById('firmaTecnicoNombre').value.trim() || null,
+      hora_inicio: reporteHoraInicio,
+      hora_fin: reporteHoraFin,
+      tiempo_traslado_minutos: document.getElementById('reporteTiempoTraslado').value !== ''
+        ? parseInt(document.getElementById('reporteTiempoTraslado').value, 10) : null,
     };
 
     const { data: reporteGuardado, error: errReporte } = await supabaseClient
@@ -9278,6 +9359,9 @@
   // nunca se dispara un guardado — es puramente ver/reimprimir.
   let documentacionCache = [];
   let documentacionClientesCache = [];
+  let documentacionExtrasCache = {};   // visita_id -> fila de extras_fuera_horario
+  let tarifasExtrasCache = [];         // [{tecnicoId, nombre, tarifaNoche, tarifaDomingo}]
+  let tarifasPorTecnicoId = {};        // tecnico_id -> {tarifa_noche, tarifa_domingo}
 
   const docFiltroCliente = document.getElementById('docFiltroCliente');
   const docFiltroClienteBuscar = document.getElementById('docFiltroClienteBuscar');
@@ -9296,27 +9380,35 @@
   });
 
   async function cargarDocumentacion(){
+    await cargarTarifasExtras();
+
     const [
       { data: clientesData, error: errClientes },
       { data: reportes, error: errRep },
       { data: certificados, error: errCert },
       { data: perfiles, error: errPerf },
+      { data: extras, error: errExtras },
     ] = await Promise.all([
       supabaseClient.from('clientes').select('id, nombre, telefono, direccion').order('nombre'),
       supabaseClient.from('reportes_visita')
-        .select('id, visita_id, fecha_creacion, tecnico_id, visitas_programadas(cliente_id, tipo, fecha_programada, clientes(nombre))'),
+        .select('id, visita_id, fecha_creacion, tecnico_id, hora_inicio, visitas_programadas(cliente_id, tipo, fecha_programada, fecha_realizada, hora, clientes(nombre))'),
       supabaseClient.from('certificados_visita')
         .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
       supabaseClient.from('perfiles_usuario').select('id, nombre'),
+      supabaseClient.from('extras_fuera_horario').select('*'),
     ]);
 
     if(errClientes) console.error('No se pudieron cargar los clientes para Documentación:', errClientes);
     if(errRep) console.error('No se pudieron cargar los reportes de visita:', errRep);
     if(errCert) console.error('No se pudieron cargar los certificados:', errCert);
     if(errPerf) console.error('No se pudieron cargar los perfiles de usuario (nombres de técnico):', errPerf);
+    if(errExtras) console.error('No se pudieron cargar los extras fuera de horario:', errExtras);
 
     documentacionClientesCache = clientesData || [];
     filtrarSelectClientes(docFiltroCliente, documentacionClientesCache, docFiltroClienteBuscar.value, 'Todos');
+
+    documentacionExtrasCache = {};
+    (extras || []).forEach(e => { documentacionExtrasCache[e.visita_id] = e; });
 
     const nombrePorId = {};
     (perfiles || []).forEach(p => { nombrePorId[p.id] = p.nombre; });
@@ -9330,8 +9422,12 @@
         clienteNombre: (visita.clientes && visita.clientes.nombre) || '(cliente no encontrado)',
         fecha: visita.fecha_programada || (r.fecha_creacion || '').slice(0, 10),
         tipoVisita: visita.tipo || 'Mantenimiento',
+        tecnicoId: r.tecnico_id || null,
         tecnicoNombre: nombrePorId[r.tecnico_id] || '-',
         folio: null,
+        horaInicioISO: r.hora_inicio || null,
+        horaProgramada: visita.hora || null,
+        fechaServicio: visita.fecha_realizada || visita.fecha_programada || null,
       };
     });
 
@@ -9351,6 +9447,62 @@
 
     documentacionCache = [...itemsReporte, ...itemsCertificado]
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  }
+
+  // Regla de detección de extras fuera de horario: "noche" si el servicio
+  // arrancó después de las 7pm (se usa hora_inicio real si ya se capturó,
+  // si no la hora programada de la visita); "domingo" si el día del
+  // servicio cae en domingo. Es solo una sugerencia - oficina confirma.
+  function calcularSugerenciaExtra(item){
+    let esNoche = false;
+    if(item.horaInicioISO){
+      esNoche = new Date(item.horaInicioISO).getHours() >= 19;
+    } else if(item.horaProgramada){
+      esNoche = parseInt(item.horaProgramada.slice(0, 2), 10) >= 19;
+    }
+    let esDomingo = false;
+    if(item.fechaServicio){
+      const [y, m, d] = item.fechaServicio.split('-').map(Number);
+      esDomingo = new Date(y, m - 1, d).getDay() === 0;
+    }
+    return { esNoche, esDomingo };
+  }
+
+  function extrasFueraHorarioHtml(item){
+    if(item.tipo !== 'reporte') return '';
+    const sugerencia = calcularSugerenciaExtra(item);
+    const existente = documentacionExtrasCache[item.visitaId];
+    const tarifa = tarifasPorTecnicoId[item.tecnicoId] || {};
+    const aplicaNoche = existente ? existente.aplica_noche : false;
+    const aplicaDomingo = existente ? existente.aplica_domingo : false;
+    const montoNoche = existente && existente.monto_noche != null ? existente.monto_noche
+      : (tarifa.tarifa_noche != null ? tarifa.tarifa_noche : '');
+    const montoDomingo = existente && existente.monto_domingo != null ? existente.monto_domingo
+      : (tarifa.tarifa_domingo != null ? tarifa.tarifa_domingo : '');
+    const textoSugerencia = [sugerencia.esNoche ? 'noche' : null, sugerencia.esDomingo ? 'domingo' : null].filter(Boolean).join(' + ');
+
+    return `
+      <div class="documentacion-extras" style="flex:1 1 100%;border-top:1px dashed var(--gris-borde);margin-top:8px;padding-top:8px;" data-visita-id="${item.visitaId}" data-tecnico-id="${item.tecnicoId || ''}">
+        <div class="hint" style="margin:0 0 6px;">Extras fuera de horario${textoSugerencia ? ' · sugerido: ' + textoSugerencia : ' · sin indicio de fuera de horario'}</div>
+        <div class="grid" style="align-items:end;gap:10px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+            <input type="checkbox" class="extra-noche-check" ${aplicaNoche ? 'checked' : ''}> Aplica noche
+          </label>
+          <div class="field" style="max-width:120px;">
+            <input type="number" min="0" step="any" class="extra-noche-monto" placeholder="Monto" value="${montoNoche}">
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+            <input type="checkbox" class="extra-domingo-check" ${aplicaDomingo ? 'checked' : ''}> Aplica domingo
+          </label>
+          <div class="field" style="max-width:120px;">
+            <input type="number" min="0" step="any" class="extra-domingo-monto" placeholder="Monto" value="${montoDomingo}">
+          </div>
+          <div class="field" style="max-width:140px;">
+            <button type="button" class="btn secondary small" data-guardar-extra style="width:100%;">Guardar extra</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderDocumentacionLista(){
@@ -9381,21 +9533,145 @@
           </div>
         </div>
         <button type="button" class="btn secondary small" data-ver-doc="${d.tipo}" data-visita-id="${d.visitaId}">Ver / Reimprimir</button>
+        ${extrasFueraHorarioHtml(d)}
       </div>
     `).join('');
   }
 
   document.getElementById('documentacionLista').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-ver-doc]');
-    if(!btn) return;
-    btn.disabled = true;
-    await asegurarVisitaEnCache(btn.dataset.visitaId);
-    if(btn.dataset.verDoc === 'reporte'){
-      await verReporteDesdeOficina(btn.dataset.visitaId);
-    } else {
-      await verCertificadoDesdeOficina(btn.dataset.visitaId);
+    const btnVer = e.target.closest('[data-ver-doc]');
+    if(btnVer){
+      btnVer.disabled = true;
+      await asegurarVisitaEnCache(btnVer.dataset.visitaId);
+      if(btnVer.dataset.verDoc === 'reporte'){
+        await verReporteDesdeOficina(btnVer.dataset.visitaId);
+      } else {
+        await verCertificadoDesdeOficina(btnVer.dataset.visitaId);
+      }
+      btnVer.disabled = false;
+      return;
     }
+
+    const btnExtra = e.target.closest('[data-guardar-extra]');
+    if(btnExtra){
+      const bloque = btnExtra.closest('.documentacion-extras');
+      const visitaId = bloque.dataset.visitaId;
+      const tecnicoId = bloque.dataset.tecnicoId || null;
+      const aplicaNoche = bloque.querySelector('.extra-noche-check').checked;
+      const aplicaDomingo = bloque.querySelector('.extra-domingo-check').checked;
+      const montoNocheVal = bloque.querySelector('.extra-noche-monto').value;
+      const montoDomingoVal = bloque.querySelector('.extra-domingo-monto').value;
+      const item = documentacionCache.find(d => d.tipo === 'reporte' && d.visitaId === visitaId);
+      const sugerencia = item ? calcularSugerenciaExtra(item) : { esNoche: false, esDomingo: false };
+
+      btnExtra.disabled = true;
+      const { error } = await supabaseClient.from('extras_fuera_horario').upsert({
+        visita_id: visitaId,
+        tecnico_id: tecnicoId,
+        sugerido_noche: sugerencia.esNoche,
+        sugerido_domingo: sugerencia.esDomingo,
+        aplica_noche: aplicaNoche,
+        monto_noche: aplicaNoche && montoNocheVal !== '' ? parseFloat(montoNocheVal) : null,
+        aplica_domingo: aplicaDomingo,
+        monto_domingo: aplicaDomingo && montoDomingoVal !== '' ? parseFloat(montoDomingoVal) : null,
+        confirmado_por: (usuarioActual && usuarioActual.id) || null,
+        fecha_confirmacion: new Date().toISOString(),
+      }, { onConflict: 'visita_id' });
+      btnExtra.disabled = false;
+
+      if(error){
+        alert('No se pudo guardar el extra: ' + error.message);
+        return;
+      }
+      mostrarToast('Extra fuera de horario guardado.');
+      documentacionExtrasCache[visitaId] = {
+        visita_id: visitaId,
+        tecnico_id: tecnicoId,
+        aplica_noche: aplicaNoche,
+        monto_noche: aplicaNoche && montoNocheVal !== '' ? parseFloat(montoNocheVal) : null,
+        aplica_domingo: aplicaDomingo,
+        monto_domingo: aplicaDomingo && montoDomingoVal !== '' ? parseFloat(montoDomingoVal) : null,
+      };
+      renderDocumentacionLista();
+    }
+  });
+
+  // ---------- Tarifas de extras por técnico (oficina: dueño y asistente) ----------
+  async function cargarTarifasExtras(){
+    const [{ data: tecnicos, error: errTec }, { data: tarifas, error: errTar }] = await Promise.all([
+      supabaseClient.from('perfiles_usuario').select('id, nombre').eq('rol', 'tecnico').eq('activo', true).order('nombre'),
+      supabaseClient.from('tarifas_extras_tecnico').select('*'),
+    ]);
+    if(errTec) console.error('No se pudieron cargar los técnicos para tarifas de extras:', errTec);
+    if(errTar) console.error('No se pudieron cargar las tarifas de extras:', errTar);
+
+    const tarifaPorTecnico = {};
+    (tarifas || []).forEach(t => { tarifaPorTecnico[t.tecnico_id] = t; });
+
+    tarifasExtrasCache = (tecnicos || []).map(t => ({
+      tecnicoId: t.id,
+      nombre: t.nombre,
+      tarifaNoche: tarifaPorTecnico[t.id] ? tarifaPorTecnico[t.id].tarifa_noche : null,
+      tarifaDomingo: tarifaPorTecnico[t.id] ? tarifaPorTecnico[t.id].tarifa_domingo : null,
+    }));
+
+    tarifasPorTecnicoId = {};
+    tarifasExtrasCache.forEach(t => {
+      tarifasPorTecnicoId[t.tecnicoId] = { tarifa_noche: t.tarifaNoche, tarifa_domingo: t.tarifaDomingo };
+    });
+
+    renderTarifasExtras();
+  }
+
+  function renderTarifasExtras(){
+    const cont = document.getElementById('tarifasExtrasLista');
+    if(tarifasExtrasCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay técnicos activos registrados.</div>`;
+      return;
+    }
+    cont.innerHTML = tarifasExtrasCache.map(t => `
+      <div class="insumo-row" data-tecnico-id="${t.tecnicoId}">
+        <div class="insumo-info">
+          <div class="insumo-nombre">${escapeHtml(t.nombre || '(sin nombre)')}</div>
+        </div>
+        <div class="field" style="max-width:130px;">
+          <label>Tarifa noche</label>
+          <input type="number" min="0" step="any" class="tarifa-noche-input" value="${t.tarifaNoche != null ? t.tarifaNoche : ''}" placeholder="0.00">
+        </div>
+        <div class="field" style="max-width:130px;">
+          <label>Tarifa domingo</label>
+          <input type="number" min="0" step="any" class="tarifa-domingo-input" value="${t.tarifaDomingo != null ? t.tarifaDomingo : ''}" placeholder="0.00">
+        </div>
+        <div class="insumo-acciones">
+          <button type="button" class="btn secondary small" data-guardar-tarifa="${t.tecnicoId}">Guardar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('tarifasExtrasLista').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-guardar-tarifa]');
+    if(!btn) return;
+    const fila = btn.closest('.insumo-row');
+    const tecnicoId = btn.dataset.guardarTarifa;
+    const tarifaNocheVal = fila.querySelector('.tarifa-noche-input').value;
+    const tarifaDomingoVal = fila.querySelector('.tarifa-domingo-input').value;
+
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('tarifas_extras_tecnico').upsert({
+      tecnico_id: tecnicoId,
+      tarifa_noche: tarifaNocheVal !== '' ? parseFloat(tarifaNocheVal) : null,
+      tarifa_domingo: tarifaDomingoVal !== '' ? parseFloat(tarifaDomingoVal) : null,
+      actualizado_por: (usuarioActual && usuarioActual.id) || null,
+    }, { onConflict: 'tecnico_id' });
     btn.disabled = false;
+
+    if(error){
+      alert('No se pudo guardar la tarifa: ' + error.message);
+      return;
+    }
+    mostrarToast('Tarifa guardada.');
+    await cargarTarifasExtras();
   });
 
   // abrirImpresionReporte/abrirImpresionCertificado buscan la visita en
