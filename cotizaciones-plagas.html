@@ -2429,10 +2429,9 @@
   <div id="visitaPanel">
     <h3 style="margin-top:0;" id="visitaPanelTitulo">Visita</h3>
     <div class="field">
-      <label for="visitaTecnico">Técnico asignado</label>
-      <select id="visitaTecnico">
-        <option value="">Sin asignar</option>
-      </select>
+      <label>Técnicos asignados</label>
+      <div class="chips-grupo" id="visitaTecnicosChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div class="hint">Toca a uno o varios técnicos: se dividen el trabajo de esta misma visita.</div>
     </div>
     <div class="field">
       <label for="visitaEstatus">Estatus</label>
@@ -2552,8 +2551,8 @@
     </div>
 
     <div class="panel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Mantenimiento según plan</h4>
-      <div id="reportePlanInfo" class="hint"></div>
+      <h4 style="margin-top:0;">Ingrediente activo a aplicar (según Plan de trabajo)</h4>
+      <div id="reportePlanInfo" class="sugerencia-box"></div>
     </div>
 
     <div class="panel" style="margin:14px 0;">
@@ -2786,10 +2785,9 @@
       </div>
     </div>
     <div class="field">
-      <label for="refuerzoTecnico">Técnico asignado (opcional)</label>
-      <select id="refuerzoTecnico">
-        <option value="">Sin asignar</option>
-      </select>
+      <label>Técnicos asignados (opcional)</label>
+      <div class="chips-grupo" id="refuerzoTecnicosChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div class="hint">Toca a uno o varios técnicos: se dividen el trabajo de esta misma visita.</div>
     </div>
     <div class="field">
       <label for="refuerzoNotas">Motivo / notas</label>
@@ -7884,7 +7882,52 @@
     filtrarSelectClientes(calFiltroCliente, calClientesCache, calFiltroClienteBuscar.value, 'Todos');
   });
   const visitaOverlay = document.getElementById('visitaOverlay');
-  const visitaTecnicoSelect = document.getElementById('visitaTecnico');
+  const visitaTecnicosChips = document.getElementById('visitaTecnicosChips');
+  const refuerzoTecnicosChips = document.getElementById('refuerzoTecnicosChips');
+
+  // Una visita puede tener varios tecnicos asignados (tabla puente
+  // visita_tecnicos, para que se puedan dividir el trabajo). tecnico_asignado
+  // se conserva como el tecnico "principal" (el primero seleccionado) solo
+  // por compatibilidad con lo que ya lo usa (filtro de oficina, aviso de
+  // exceso de visitas por dia, resumen del dia). tecnicos_ids es la lista
+  // completa y es la que manda para saber quien puede ver/abrir la visita.
+  function tecnicosDeVisita(visita){
+    if(!visita) return [];
+    if(Array.isArray(visita.tecnicos_ids)) return visita.tecnicos_ids;
+    return visita.tecnico_asignado ? [visita.tecnico_asignado] : [];
+  }
+  function visitaTieneTecnico(visita, tecnicoId){
+    return tecnicosDeVisita(visita).includes(tecnicoId);
+  }
+
+  // Pinta los botones de tecnicos como chips seleccionables con click
+  // (multi-seleccion) dentro del contenedor indicado.
+  function renderTecnicosChips(contenedor, seleccionados){
+    contenedor.innerHTML = calTecnicosCache.map(t => `
+      <button type="button" class="chip-opcion${(seleccionados || []).includes(t.id) ? ' activo' : ''}" data-tecnico-id="${t.id}">${escapeHtml(t.nombre)}</button>
+    `).join('') || '<div class="hint">No hay técnicos activos.</div>';
+  }
+  function tecnicosSeleccionadosDe(contenedor){
+    return Array.from(contenedor.querySelectorAll('.chip-opcion.activo')).map(b => b.dataset.tecnicoId);
+  }
+  [visitaTecnicosChips, refuerzoTecnicosChips].forEach(cont => {
+    cont.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip-opcion');
+      if(!chip) return;
+      chip.classList.toggle('activo');
+    });
+  });
+
+  // Reemplaza en la tabla puente visita_tecnicos la lista de tecnicos
+  // asignados a una visita (borra lo que había y mete la nueva selección).
+  async function guardarTecnicosDeVisita(visitaId, tecnicoIds){
+    const { error: errDelete } = await supabaseClient.from('visita_tecnicos').delete().eq('visita_id', visitaId);
+    if(errDelete) return errDelete;
+    if(tecnicoIds.length === 0) return null;
+    const { error: errInsert } = await supabaseClient.from('visita_tecnicos')
+      .insert(tecnicoIds.map(tecnicoId => ({ visita_id: visitaId, tecnico_id: tecnicoId })));
+    return errInsert || null;
+  }
 
   async function inicializarCalendario(){
     if(!calInicializado){
@@ -7919,7 +7962,6 @@
     calTecnicosCache = data || [];
     const opcionesTecnicos = calTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
     calFiltroTecnico.innerHTML = '<option value="">Todos</option>' + opcionesTecnicos;
-    visitaTecnicoSelect.innerHTML = '<option value="">Sin asignar</option>' + opcionesTecnicos;
   }
 
   async function cargarClientesParaCalendarioFiltro(){
@@ -7952,13 +7994,32 @@
       return;
     }
     calVisitasCache = data || [];
+
+    const idsVisitas = calVisitasCache.map(v => v.id);
+    if(idsVisitas.length > 0){
+      const { data: tecnicosPorVisita, error: errTecnicos } = await supabaseClient
+        .from('visita_tecnicos')
+        .select('visita_id, tecnico_id')
+        .in('visita_id', idsVisitas);
+      if(errTecnicos){
+        console.error('No se pudieron cargar los técnicos asignados por visita:', errTecnicos);
+      } else {
+        const porVisita = {};
+        (tecnicosPorVisita || []).forEach(t => {
+          (porVisita[t.visita_id] = porVisita[t.visita_id] || []).push(t.tecnico_id);
+        });
+        calVisitasCache.forEach(v => {
+          v.tecnicos_ids = porVisita[v.id] || (v.tecnico_asignado ? [v.tecnico_asignado] : []);
+        });
+      }
+    }
   }
 
   function visitasFiltradas(){
     const tecnicoFiltro = calFiltroTecnico.value;
     const clienteFiltro = calFiltroCliente.value;
     return calVisitasCache.filter(v => {
-      if(tecnicoFiltro && v.tecnico_asignado !== tecnicoFiltro) return false;
+      if(tecnicoFiltro && !visitaTieneTecnico(v, tecnicoFiltro)) return false;
       if(clienteFiltro && v.cliente_id !== clienteFiltro) return false;
       return true;
     });
@@ -7987,7 +8048,9 @@
 
       const conteoTecnicoDia = {};
       visitasDelDia.forEach(v => {
-        if(v.tecnico_asignado) conteoTecnicoDia[v.tecnico_asignado] = (conteoTecnicoDia[v.tecnico_asignado] || 0) + 1;
+        tecnicosDeVisita(v).forEach(tecnicoId => {
+          conteoTecnicoDia[tecnicoId] = (conteoTecnicoDia[tecnicoId] || 0) + 1;
+        });
       });
       const hayExceso = Object.values(conteoTecnicoDia).some(n => n > 10);
 
@@ -7996,8 +8059,12 @@
         const tipoServicio = (v.servicios_cliente && v.servicios_cliente.tipo_servicio) || '';
         const estatusClase = (v.estatus || 'Programada').toLowerCase();
         const esRefuerzo = v.tipo === 'Refuerzo';
-        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre;
-        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')})">${escapeHtml(etiqueta)}</button>`;
+        const nombresTecnicos = tecnicosDeVisita(v)
+          .map(tecnicoId => (calTecnicosCache.find(t => t.id === tecnicoId) || {}).nombre)
+          .filter(Boolean);
+        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre + (nombresTecnicos.length > 1 ? ' (2)' : '');
+        const tituloTecnicos = nombresTecnicos.length > 0 ? nombresTecnicos.join(' + ') : 'Sin asignar';
+        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')}) · Técnico(s): ${escapeHtml(tituloTecnicos)}">${escapeHtml(etiqueta)}</button>`;
       }).join('');
 
       celdas += `
@@ -8045,7 +8112,7 @@
     const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
     const tipoServicio = (visita.servicios_cliente && visita.servicios_cliente.tipo_servicio) || '';
     document.getElementById('visitaPanelTitulo').textContent = `${clienteNombre}${tipoServicio ? ' — ' + tipoServicio : ''}`;
-    visitaTecnicoSelect.value = visita.tecnico_asignado || '';
+    renderTecnicosChips(visitaTecnicosChips, tecnicosDeVisita(visita));
     document.getElementById('visitaEstatus').value = visita.estatus || 'Programada';
     document.getElementById('visitaFecha').value = visita.fecha_programada || '';
     document.getElementById('visitaHora').value = visita.hora || '';
@@ -8088,8 +8155,9 @@
       alert('La fecha programada es obligatoria.');
       return;
     }
+    const tecnicosSeleccionados = tecnicosSeleccionadosDe(visitaTecnicosChips);
     const payload = {
-      tecnico_asignado: visitaTecnicoSelect.value || null,
+      tecnico_asignado: tecnicosSeleccionados[0] || null,
       estatus: document.getElementById('visitaEstatus').value,
       fecha_programada: fechaProgramada,
       hora: document.getElementById('visitaHora').value || null,
@@ -8100,9 +8168,15 @@
     const btn = document.getElementById('btnGuardarVisita');
     btn.disabled = true;
     const { error } = await supabaseClient.from('visitas_programadas').update(payload).eq('id', calVisitaActualId);
-    btn.disabled = false;
     if(error){
+      btn.disabled = false;
       alert('No se pudo guardar la visita: ' + error.message);
+      return;
+    }
+    const errTecnicos = await guardarTecnicosDeVisita(calVisitaActualId, tecnicosSeleccionados);
+    btn.disabled = false;
+    if(errTecnicos){
+      alert('La visita se guardó, pero no se pudieron guardar los técnicos asignados: ' + errTecnicos.message);
       return;
     }
     visitaOverlay.classList.add('hidden');
@@ -8139,8 +8213,7 @@
     refuerzoClienteBuscar.value = '';
     filtrarSelectClientes(document.getElementById('refuerzoCliente'), calClientesCache, '', 'Selecciona...');
     document.getElementById('refuerzoServicio').innerHTML = '<option value="">Selecciona un cliente primero...</option>';
-    document.getElementById('refuerzoTecnico').innerHTML = '<option value="">Sin asignar</option>' +
-      calTecnicosCache.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+    renderTecnicosChips(refuerzoTecnicosChips, []);
     document.getElementById('refuerzoFecha').value = '';
     document.getElementById('refuerzoHora').value = '';
     document.getElementById('refuerzoNotas').value = '';
@@ -8185,20 +8258,29 @@
       alert('Selecciona cliente, servicio y fecha.');
       return;
     }
+    const tecnicosSeleccionados = tecnicosSeleccionadosDe(refuerzoTecnicosChips);
     const btn = document.getElementById('btnGuardarRefuerzo');
     btn.disabled = true;
-    const { error } = await supabaseClient.from('visitas_programadas').insert({
+    const { data: nuevaVisita, error } = await supabaseClient.from('visitas_programadas').insert({
       servicio_id: servicioId,
       cliente_id: clienteId,
       fecha_programada: fecha,
       hora: document.getElementById('refuerzoHora').value || null,
-      tecnico_asignado: document.getElementById('refuerzoTecnico').value || null,
+      tecnico_asignado: tecnicosSeleccionados[0] || null,
       notas: document.getElementById('refuerzoNotas').value.trim() || null,
       tipo: 'Refuerzo',
-    });
-    btn.disabled = false;
+    }).select('id').single();
     if(error){
+      btn.disabled = false;
       alert('No se pudo agendar el refuerzo: ' + error.message);
+      return;
+    }
+    const errTecnicos = tecnicosSeleccionados.length > 0
+      ? await guardarTecnicosDeVisita(nuevaVisita.id, tecnicosSeleccionados)
+      : null;
+    btn.disabled = false;
+    if(errTecnicos){
+      alert('El refuerzo se agendó, pero no se pudieron guardar los técnicos asignados: ' + errTecnicos.message);
       return;
     }
     mostrarToast('Refuerzo agendado.');
@@ -8690,6 +8772,38 @@
     }
   });
 
+  // Ingrediente activo y dosis: SOLO del Plan de trabajo del cliente,
+  // ninguna otra fuente. Normalmente ya viene en la misma visita (las
+  // visitas de Mantenimiento nacen del Plan de trabajo con estos campos
+  // rellenados). Pero si la visita es un Refuerzo/Garantía (agendada
+  // aparte, no nace del plan), esos campos vienen vacíos aunque el
+  // cliente sí tenga un Plan de trabajo vigente; en ese caso se busca en
+  // las demás visitas del mismo cliente por si el plan ya definió algo.
+  // Si de verdad no hay Plan de trabajo en ningún lado, queda vacío
+  // (nunca se presugiere desde cotizaciones, servicios_cliente ni
+  // ninguna otra tabla). Usado tanto por el Reporte de visita (solo
+  // lectura para el técnico) como por el Certificado.
+  async function obtenerIngredientesPlan(visita, clienteId){
+    let insecticida = visita.ingrediente_insecticida;
+    let rodenticida = visita.ingrediente_rodenticida;
+    if(!insecticida && !rodenticida){
+      const { data: otraVisitaConPlan, error } = await supabaseClient
+        .from('visitas_programadas')
+        .select('ingrediente_insecticida, ingrediente_rodenticida')
+        .eq('cliente_id', clienteId)
+        .or('ingrediente_insecticida.not.is.null,ingrediente_rodenticida.not.is.null')
+        .order('fecha_programada', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if(error) console.error('No se pudo revisar el Plan de trabajo del cliente:', error);
+      if(otraVisitaConPlan){
+        insecticida = otraVisitaConPlan.ingrediente_insecticida;
+        rodenticida = otraVisitaConPlan.ingrediente_rodenticida;
+      }
+    }
+    return { insecticida, rodenticida };
+  }
+
   async function abrirReporteVisita(visitaId){
     const visita = calVisitasCache.find(v => v.id === visitaId);
     if(!visita) return;
@@ -8712,10 +8826,12 @@
     document.getElementById('reportePanelSubtitulo').textContent =
       `${tipoServicio ? tipoServicio + ' · ' : ''}${tipoVisita} · ${formatDate(visita.fecha_programada)}${visita.hora ? ' ' + visita.hora.slice(0, 5) : ''}`;
 
-    document.getElementById('reportePlanInfo').textContent =
-      (visita.ingrediente_insecticida || visita.ingrediente_rodenticida)
-        ? `Insecticida sugerido: ${visita.ingrediente_insecticida || '—'} · Rodenticida sugerido: ${visita.ingrediente_rodenticida || '—'}`
-        : 'Sin ingredientes sugeridos para esta visita.';
+    const { insecticida: planInsecticida, rodenticida: planRodenticida } =
+      await obtenerIngredientesPlan(visita, reporteClienteActualId);
+    document.getElementById('reportePlanInfo').innerHTML =
+      (planInsecticida || planRodenticida)
+        ? `<div><strong>Insecticida:</strong> ${escapeHtml(planInsecticida || '—')}</div><div><strong>Rodenticida:</strong> ${escapeHtml(planRodenticida || '—')}</div>`
+        : 'Este cliente todavía no tiene un Plan de trabajo con ingredientes definidos.';
 
     const { data: estaciones, error: errEst } = await supabaseClient
       .from('estaciones')
@@ -9141,33 +9257,8 @@
 
       comentarios = '';
 
-      // Ingrediente activo y dosis: SOLO del Plan de trabajo del cliente,
-      // ninguna otra fuente. Normalmente ya viene en esta misma visita (las
-      // visitas de Mantenimiento nacen del Plan de trabajo con estos campos
-      // rellenados). Pero si esta visita es un Refuerzo/Garantía (agendado
-      // aparte, no nace del plan), esos campos vienen vacíos aquí aunque el
-      // cliente sí tenga un Plan de trabajo vigente; en ese caso se busca en
-      // las demás visitas del mismo cliente por si el plan ya definió algo.
-      // Si de verdad no hay Plan de trabajo en ningún lado, queda vacío para
-      // que el técnico lo escriba a mano (nunca se presugiere desde
-      // cotizaciones, servicios_cliente ni ninguna otra tabla).
-      let ingredienteInsecticida = visita.ingrediente_insecticida;
-      let ingredienteRodenticida = visita.ingrediente_rodenticida;
-      if(!ingredienteInsecticida && !ingredienteRodenticida){
-        const { data: otraVisitaConPlan, error: errPlanCliente } = await supabaseClient
-          .from('visitas_programadas')
-          .select('ingrediente_insecticida, ingrediente_rodenticida')
-          .eq('cliente_id', reporteClienteActualId)
-          .or('ingrediente_insecticida.not.is.null,ingrediente_rodenticida.not.is.null')
-          .order('fecha_programada', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if(errPlanCliente) console.error('No se pudo revisar el Plan de trabajo del cliente:', errPlanCliente);
-        if(otraVisitaConPlan){
-          ingredienteInsecticida = otraVisitaConPlan.ingrediente_insecticida;
-          ingredienteRodenticida = otraVisitaConPlan.ingrediente_rodenticida;
-        }
-      }
+      const { insecticida: ingredienteInsecticida, rodenticida: ingredienteRodenticida } =
+        await obtenerIngredientesPlan(visita, reporteClienteActualId);
       ingredienteDosis = [ingredienteInsecticida, ingredienteRodenticida].filter(Boolean).join(' + ');
     }
 
