@@ -896,6 +896,46 @@
   .seguimiento-contacto a{color:var(--verde-oscuro);font-weight:600;text-decoration:none;}
   .seguimiento-contacto a:hover{text-decoration:underline;}
   .seguimiento-contacto .sin-dato{color:#999;font-style:italic;}
+  .seguimiento-card.hoy{border-left:4px solid #b5540a;}
+
+  .seguimiento-filtros{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px;}
+  .seguimiento-filtro-chip{
+    display:flex;align-items:center;gap:6px;
+    padding:8px 14px;
+    border-radius:999px;
+    border:2px solid transparent;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    opacity:.55;
+    background:#eee;
+    color:#555;
+    transition:opacity .15s;
+  }
+  .seguimiento-filtro-chip.activo{opacity:1;border-color:currentColor;}
+  .seguimiento-filtro-chip .conteo{background:rgba(0,0,0,.08);border-radius:999px;padding:1px 7px;font-size:11.5px;}
+  .seguimiento-filtro-chip#seguimientoFiltro_todos{color:var(--verde-oscuro);}
+  .seguimiento-filtro-chip.vencido{color:#b3261e;}
+  .seguimiento-filtro-chip.hoy{color:#b5540a;}
+
+  .seguimiento-recordatorio{
+    margin-top:10px;padding:10px 12px;
+    background:var(--gris-fondo);border-radius:8px;
+  }
+  .seguimiento-recordatorio .recordatorio-titulo{font-size:13px;font-weight:700;color:var(--verde-oscuro);}
+  .seguimiento-card.atrasada .seguimiento-recordatorio .recordatorio-titulo{color:var(--rojo);}
+  .seguimiento-card.hoy .seguimiento-recordatorio .recordatorio-titulo{color:#b5540a;}
+  .seguimiento-recordatorio .recordatorio-nota{font-size:12.5px;color:#555;margin-top:2px;white-space:pre-wrap;}
+  .seguimiento-recordatorio .recordatorio-meta{font-size:11.5px;color:#888;margin-top:4px;}
+  .seguimiento-recordatorio .recordatorio-form{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;
+  }
+  .seguimiento-recordatorio .recordatorio-form input[type="date"]{max-width:160px;}
+  .seguimiento-recordatorio .recordatorio-form input[type="text"]{flex:1 1 180px;}
+  @media (max-width:480px){
+    .seguimiento-recordatorio .recordatorio-form input[type="date"],
+    .seguimiento-recordatorio .recordatorio-form input[type="text"]{flex:1 1 100%;max-width:none;}
+  }
 
   /* ---------- Empleados / Personal ---------- */
   .empleado-card{
@@ -1662,6 +1702,12 @@
       <p style="font-size:12px;color:#777;margin-top:0;">Cotizaciones pendientes por cerrar: llamada de seguimiento cada 2 semanas. Si pasan 2 meses sin cerrar, se marcan automáticamente como Perdida/Rechazada (reversible desde "Cotizaciones Guardadas").</p>
 
       <div class="seguimiento-resumen" id="seguimientoResumen"></div>
+
+      <div class="seguimiento-filtros" id="seguimientoFiltros">
+        <button type="button" class="seguimiento-filtro-chip activo" data-filtro="todos" id="seguimientoFiltro_todos">Todos <span class="conteo">0</span></button>
+        <button type="button" class="seguimiento-filtro-chip vencido" data-filtro="vencidos" id="seguimientoFiltro_vencidos">🔴 Vencidos <span class="conteo">0</span></button>
+        <button type="button" class="seguimiento-filtro-chip hoy" data-filtro="hoy" id="seguimientoFiltro_hoy">🟠 Pendientes hoy <span class="conteo">0</span></button>
+      </div>
 
       <div id="seguimientoLista"></div>
     </div>
@@ -3657,6 +3703,9 @@
       etapa_seguimiento: fila.etapa_seguimiento || 'Enviada',
       fecha_envio: fila.fecha_envio || fechaCreacionCompleta,
       proxima_llamada: fila.proxima_llamada || null,
+      proxima_llamada_nota: fila.proxima_llamada_nota || null,
+      proxima_llamada_actualizada_por: fila.proxima_llamada_actualizada_por || null,
+      proxima_llamada_actualizada_en: fila.proxima_llamada_actualizada_en || null,
       vencida_por_2meses: !!fila.vencida_por_2meses,
       fechaCreacion: fechaCreacionCompleta.slice(0,10),
       fechaActualizacion: fechaActualizacion,
@@ -10579,6 +10628,15 @@
     return c.proxima_llamada < fechaALocalISO(new Date());
   }
 
+  // "Hoy" es un estado aparte de "atrasada": justo el dia en que toca
+  // llamar, no antes de tiempo ni ya vencido.
+  function cotizacionEsHoy(c){
+    if(!c.proxima_llamada) return false;
+    return c.proxima_llamada === fechaALocalISO(new Date());
+  }
+
+  let seguimientoFiltroActivo = 'todos';
+
   function pendientesOrdenadasPorUrgencia(){
     return getCotizaciones()
       .filter(c => estadoDe(c) === 'Pendiente')
@@ -10627,16 +10685,32 @@
     const pendientes = pendientesOrdenadasPorUrgencia();
     renderSeguimientoResumen(pendientes);
 
+    const vencidos = pendientes.filter(cotizacionAtrasada);
+    const deHoy = pendientes.filter(c => !cotizacionAtrasada(c) && cotizacionEsHoy(c));
+    document.getElementById('seguimientoFiltro_todos').querySelector('.conteo').textContent = pendientes.length;
+    document.getElementById('seguimientoFiltro_vencidos').querySelector('.conteo').textContent = vencidos.length;
+    document.getElementById('seguimientoFiltro_hoy').querySelector('.conteo').textContent = deHoy.length;
+
+    let visibles = pendientes;
+    if(seguimientoFiltroActivo === 'vencidos') visibles = vencidos;
+    else if(seguimientoFiltroActivo === 'hoy') visibles = deHoy;
+
     const cont = document.getElementById('seguimientoLista');
-    if(pendientes.length === 0){
-      cont.innerHTML = `<div class="empty-msg">No hay cotizaciones pendientes de seguimiento.</div>`;
+    if(visibles.length === 0){
+      cont.innerHTML = pendientes.length === 0
+        ? `<div class="empty-msg">No hay cotizaciones pendientes de seguimiento.</div>`
+        : `<div class="empty-msg">No hay cotizaciones en este filtro.</div>`;
       return;
     }
 
-    cont.innerHTML = pendientes.map(c => {
+    cont.innerHTML = visibles.map(c => {
       const atrasada = cotizacionAtrasada(c);
+      const esHoy = !atrasada && cotizacionEsHoy(c);
+      const tituloRecordatorio = !c.proxima_llamada
+        ? 'Sin próximo seguimiento programado'
+        : `${atrasada ? '⏰ ' : (esHoy ? '🔔 ' : '')}Próximo seguimiento: ${formatDate(c.proxima_llamada)}${atrasada ? ' (vencido)' : (esHoy ? ' (hoy)' : '')}`;
       return `
-        <div class="seguimiento-card ${atrasada ? 'atrasada' : ''}" data-id="${c.id}">
+        <div class="seguimiento-card ${atrasada ? 'atrasada' : (esHoy ? 'hoy' : '')}" data-id="${c.id}">
           <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <div>
               <strong>${escapeHtml(c.cliente.nombre)}</strong>
@@ -10649,9 +10723,18 @@
             <span>📞 ${c.cliente.telefono ? `<a href="tel:${escapeHtml(c.cliente.telefono)}">${escapeHtml(c.cliente.telefono)}</a>` : '<span class="sin-dato">sin teléfono</span>'}</span>
             <span>✉️ ${c.cliente.email ? `<a href="mailto:${escapeHtml(c.cliente.email)}">${escapeHtml(c.cliente.email)}</a>` : '<span class="sin-dato">sin correo</span>'}</span>
           </div>
-          <div class="seguimiento-llamada ${atrasada ? 'atrasada' : ''}" style="margin-top:4px;font-size:13px;">
-            Próxima llamada: ${c.proxima_llamada ? formatDate(c.proxima_llamada) : '-'} ${atrasada ? '(atrasada)' : ''}
+
+          <div class="seguimiento-recordatorio">
+            <div class="recordatorio-titulo">${tituloRecordatorio}</div>
+            ${c.proxima_llamada_nota ? `<div class="recordatorio-nota">${escapeHtml(c.proxima_llamada_nota)}</div>` : ''}
+            <div class="recordatorio-meta" id="recordatorioMeta_${c.id}">${c.proxima_llamada_actualizada_en ? 'Cargando...' : ''}</div>
+            <div class="recordatorio-form">
+              <input type="date" class="recordatorio-fecha-input" data-id="${c.id}" value="${c.proxima_llamada || ''}">
+              <input type="text" class="recordatorio-nota-input" data-id="${c.id}" placeholder="Nota corta (opcional)" value="${escapeHtml(c.proxima_llamada_nota || '')}">
+              <button type="button" class="btn secondary small" data-action="guardar-recordatorio" data-id="${c.id}">Guardar</button>
+            </div>
           </div>
+
           <div class="actions-row" style="margin-top:10px;">
             <button type="button" class="btn small" data-action="registrar" data-id="${c.id}">Bitácora / Registrar seguimiento</button>
             <button type="button" class="btn secondary small" data-action="ganada" data-id="${c.id}">Marcar Ganada</button>
@@ -10660,7 +10743,24 @@
         </div>
       `;
     }).join('');
+
+    // "Actualizado por X el DD/MM/AAAA" se resuelve aparte (puede pedir a
+    // perfiles_usuario) para no bloquear el primer pintado de la lista.
+    visibles.filter(c => c.proxima_llamada_actualizada_en).forEach(async c => {
+      const el = document.getElementById('recordatorioMeta_' + c.id);
+      if(!el) return;
+      const nombre = await obtenerNombreUsuario(c.proxima_llamada_actualizada_por);
+      el.textContent = `Ajustado por ${nombre || 'alguien del equipo'} el ${formatFechaHora(c.proxima_llamada_actualizada_en)}`;
+    });
   }
+
+  document.getElementById('seguimientoFiltros').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seguimiento-filtro-chip');
+    if(!btn) return;
+    seguimientoFiltroActivo = btn.dataset.filtro;
+    document.querySelectorAll('#seguimientoFiltros .seguimiento-filtro-chip').forEach(b => b.classList.toggle('activo', b === btn));
+    renderSeguimientoLista();
+  });
 
   const seguimientoOverlay = document.getElementById('seguimientoOverlay');
   let seguimientoCotizacionActualId = null;
@@ -10763,6 +10863,36 @@
       const ok = await actualizarEstadoCotizacion(id, nuevoEstado);
       btn.disabled = false;
       if(ok) renderSeguimientoLista();
+    } else if(accion === 'guardar-recordatorio'){
+      // Override manual de proxima_llamada: sigue siendo la MISMA columna
+      // que mueve solo el flujo de bitacora (siguienteEtapaSeguimiento);
+      // este ajuste a mano queda vigente hasta el proximo registro.
+      const form = btn.closest('.recordatorio-form');
+      const nuevaFecha = form.querySelector('.recordatorio-fecha-input').value || null;
+      const nuevaNota = form.querySelector('.recordatorio-nota-input').value.trim() || null;
+      const cot = getCotizaciones().find(c => c.id === id);
+      if(!cot) return;
+
+      btn.disabled = true;
+      const ahora = new Date().toISOString();
+      const { error } = await supabaseClient.from('cotizaciones').update({
+        proxima_llamada: nuevaFecha,
+        proxima_llamada_nota: nuevaNota,
+        proxima_llamada_actualizada_por: (usuarioActual && usuarioActual.id) || null,
+        proxima_llamada_actualizada_en: ahora,
+      }).eq('id', id);
+      btn.disabled = false;
+
+      if(error){
+        alert('No se pudo guardar el próximo seguimiento: ' + error.message);
+        return;
+      }
+      cot.proxima_llamada = nuevaFecha;
+      cot.proxima_llamada_nota = nuevaNota;
+      cot.proxima_llamada_actualizada_por = (usuarioActual && usuarioActual.id) || null;
+      cot.proxima_llamada_actualizada_en = ahora;
+      mostrarToast('Próximo seguimiento actualizado.');
+      renderSeguimientoLista();
     }
   });
 
