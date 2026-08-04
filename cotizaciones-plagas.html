@@ -11119,6 +11119,7 @@
           </div>
 
           <div class="actions-row" style="margin-top:10px;">
+            <button type="button" class="btn secondary small" data-action="ver-cotizacion" data-id="${c.id}">Ver cotización</button>
             <button type="button" class="btn small" data-action="registrar" data-id="${c.id}">Bitácora / Registrar seguimiento</button>
             <button type="button" class="btn secondary small" data-action="ganada" data-id="${c.id}">Marcar Ganada</button>
             <button type="button" class="btn danger small" data-action="perdida" data-id="${c.id}">Marcar Perdida</button>
@@ -11238,7 +11239,10 @@
     const id = btn.dataset.id;
     const accion = btn.dataset.action;
 
-    if(accion === 'registrar' || accion === 'historial'){
+    if(accion === 'ver-cotizacion'){
+      const cot = getCotizaciones().find(c => c.id === id);
+      if(cot) mostrarPreview(cot);
+    } else if(accion === 'registrar' || accion === 'historial'){
       await abrirSeguimientoOverlay(id);
     } else if(accion === 'ganada' || accion === 'perdida'){
       const nuevoEstado = accion === 'ganada' ? 'Cerrada' : 'Perdida';
