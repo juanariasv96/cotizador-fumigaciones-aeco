@@ -1165,16 +1165,18 @@
   .firma-doc-img{max-width:220px;max-height:90px;display:block;}
   .firma-doc-linea{border-top:1px solid #333;margin-top:40px;padding-top:4px;font-size:12px;}
 
-  /* ---------- Certificado oficial ---------- */
-  #certificadoOverlay{
-    position:fixed;inset:0;background:rgba(0,0,0,.55);
-    display:flex;align-items:flex-start;justify-content:center;
-    padding:30px 15px;overflow:auto;z-index:999;
+  /* ---------- Selector de tipo de reporte (un solo modulo de reportes de
+     campo: Cebaderos/Trampas, Lamparas UV, Certificado - todos dentro del
+     mismo #reporteOverlay, cambiando de seccion con estas pestañas en vez
+     de abrir un overlay aparte por tipo de reporte). ---------- */
+  .reporte-tipo-tabs{display:flex;gap:8px;flex-wrap:wrap;}
+  .reporte-tipo-tab{
+    border:1px solid var(--gris-borde);background:var(--blanco);color:var(--verde-oscuro);
+    padding:8px 16px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;
   }
-  #certificadoPanel{
-    background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
-    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
-  }
+  .reporte-tipo-tab.active{background:var(--verde);color:var(--blanco);border-color:var(--verde);}
+
+  /* ---------- Impresion del Certificado oficial ---------- */
   #certificadoPrintOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
@@ -1185,16 +1187,7 @@
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
 
-  /* ---------- Reporte de Lámparas UV ---------- */
-  #lamparasUVOverlay{
-    position:fixed;inset:0;background:rgba(0,0,0,.55);
-    display:flex;align-items:flex-start;justify-content:center;
-    padding:30px 15px;overflow:auto;z-index:999;
-  }
-  #lamparasUVPanel{
-    background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
-    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
-  }
+  /* ---------- Impresion del Reporte de Lámparas UV ---------- */
   #lamparasUVPrintOverlay{
     position:fixed;inset:0;background:rgba(0,0,0,.55);
     display:flex;align-items:flex-start;justify-content:center;
@@ -2513,6 +2506,12 @@
 </div>
 
 <!-- ================= OVERLAY DE REPORTE DE VISITA (tecnico) ================= -->
+<!-- ================= MODULO UNICO DE REPORTES DE CAMPO (tecnico) =================
+     Un solo overlay para los 3 tipos de reporte de una visita (Cebaderos/
+     Trampas, Lámparas UV, Certificado): se cambia de sección con las
+     pestañas de "Tipo de reporte", nunca se abre un overlay/módulo aparte
+     por tipo. Tiempo, semáforo, avisos y firmas son compartidos por los 3
+     (las firmas no se repiten: se capturan una sola vez aquí). -->
 <div id="reporteOverlay" class="hidden">
   <div id="reportePanel">
     <h3 style="margin-top:0;" id="reportePanelTitulo">Reporte de visita</h3>
@@ -2557,52 +2556,132 @@
       <div id="reportePlanInfo" class="hint"></div>
     </div>
 
-    <div class="panel" id="reporteAvisosPanel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Reportado por el cliente / visita anterior</h4>
-      <div id="reporteAvisosLista"></div>
-      <div class="grid" style="align-items:end;margin-top:10px;">
-        <div class="field" style="flex:1 1 300px;">
-          <label for="reporteNuevoAviso">Dejar aviso para la próxima visita (opcional)</label>
-          <input type="text" id="reporteNuevoAviso" placeholder="Ej. Falta revisar caja del patio trasero">
-        </div>
-      </div>
-    </div>
-
     <div class="panel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Estaciones</h4>
-      <div id="reporteEstacionesLista"></div>
+      <h4 style="margin-top:0;">Tipo de reporte</h4>
+      <div class="reporte-tipo-tabs" id="reporteTipoTabs">
+        <button type="button" class="reporte-tipo-tab active" data-reporte-tipo="estaciones">Cebaderos / Trampas</button>
+        <button type="button" class="reporte-tipo-tab hidden" id="reporteTipoTabLamparas" data-reporte-tipo="lamparas">Lámparas UV</button>
+        <button type="button" class="reporte-tipo-tab" data-reporte-tipo="certificado">Certificado</button>
+      </div>
     </div>
 
-    <!-- Consumos: insumos usados en esta visita. Cada renglon "por guardar"
-         se vuelve un movimiento 'salida' al presionar "Guardar reporte" -
-         los ya guardados quedan fijos (el almacen es un libro mayor sin
-         edicion) y solo se pueden agregar mas, nunca quitar uno ya guardado. -->
-    <div class="panel" id="reporteConsumosPanel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Consumos</h4>
-      <div id="reporteConsumosGuardadosLista"></div>
-      <div class="grid" style="align-items:end;margin-top:8px;">
-        <div class="field">
-          <label for="consumoInsumoSelect">Insumo</label>
-          <select id="consumoInsumoSelect">
-            <option value="">Selecciona...</option>
-          </select>
-        </div>
-        <div class="field" style="max-width:160px;">
-          <label for="consumoCantidad" id="consumoCantidadLabel">Cantidad</label>
-          <input type="number" id="consumoCantidad" min="0" step="any" placeholder="Ej. 50">
-        </div>
-        <div class="field" style="max-width:150px;">
-          <button type="button" class="btn secondary small" id="btnAgregarConsumo" style="width:100%;">+ Agregar</button>
+    <!-- ---------- Sección: Cebaderos / Trampas ---------- -->
+    <div data-reporte-seccion="estaciones">
+      <div class="panel" id="reporteAvisosPanel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Reportado por el cliente / visita anterior</h4>
+        <div id="reporteAvisosLista"></div>
+        <div class="grid" style="align-items:end;margin-top:10px;">
+          <div class="field" style="flex:1 1 300px;">
+            <label for="reporteNuevoAviso">Dejar aviso para la próxima visita (opcional)</label>
+            <input type="text" id="reporteNuevoAviso" placeholder="Ej. Falta revisar caja del patio trasero">
+          </div>
         </div>
       </div>
-      <div id="reporteConsumosPendientesLista" style="margin-top:10px;"></div>
+
+      <div class="panel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Estaciones</h4>
+        <div id="reporteEstacionesLista"></div>
+      </div>
+
+      <!-- Consumos: insumos usados en esta visita. Cada renglon "por guardar"
+           se vuelve un movimiento 'salida' al presionar "Guardar reporte" -
+           los ya guardados quedan fijos (el almacen es un libro mayor sin
+           edicion) y solo se pueden agregar mas, nunca quitar uno ya guardado. -->
+      <div class="panel" id="reporteConsumosPanel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Consumos</h4>
+        <div id="reporteConsumosGuardadosLista"></div>
+        <div class="grid" style="align-items:end;margin-top:8px;">
+          <div class="field">
+            <label for="consumoInsumoSelect">Insumo</label>
+            <select id="consumoInsumoSelect">
+              <option value="">Selecciona...</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:160px;">
+            <label for="consumoCantidad" id="consumoCantidadLabel">Cantidad</label>
+            <input type="number" id="consumoCantidad" min="0" step="any" placeholder="Ej. 50">
+          </div>
+          <div class="field" style="max-width:150px;">
+            <button type="button" class="btn secondary small" id="btnAgregarConsumo" style="width:100%;">+ Agregar</button>
+          </div>
+        </div>
+        <div id="reporteConsumosPendientesLista" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="field">
+        <label for="reporteObservaciones">Observaciones generales</label>
+        <textarea id="reporteObservaciones" rows="3"></textarea>
+      </div>
     </div>
 
-    <div class="field">
-      <label for="reporteObservaciones">Observaciones generales</label>
-      <textarea id="reporteObservaciones" rows="3"></textarea>
+    <!-- ---------- Sección: Lámparas UV ---------- -->
+    <div data-reporte-seccion="lamparas" class="hidden">
+      <div class="grid">
+        <div class="field">
+          <label for="lamparasUVFolio">Folio</label>
+          <input type="number" id="lamparasUVFolio" readonly>
+        </div>
+        <div class="field">
+          <label for="lamparasUVFecha">Fecha de servicio</label>
+          <input type="date" id="lamparasUVFecha">
+        </div>
+      </div>
+
+      <div id="lamparasUVLista" style="margin-top:14px;"></div>
+
+      <div class="field" style="margin-top:14px;">
+        <label for="lamparasUVObservaciones">Observaciones de lámparas UV</label>
+        <textarea id="lamparasUVObservaciones" rows="3"></textarea>
+      </div>
     </div>
 
+    <!-- ---------- Sección: Certificado ---------- -->
+    <div data-reporte-seccion="certificado" class="hidden">
+      <p style="font-size:12px;color:#777;margin-top:0;">Las casillas vienen presugeridas para agilizar; ajusta lo que haga falta antes de guardar.</p>
+
+      <div class="grid">
+        <div class="field">
+          <label for="certificadoFolio">Folio</label>
+          <input type="number" id="certificadoFolio" readonly>
+        </div>
+        <div class="field">
+          <label for="certificadoFecha">Fecha</label>
+          <input type="date" id="certificadoFecha">
+        </div>
+      </div>
+
+      <div class="panel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Servicios a realizar</h4>
+        <div id="certificadoServiciosLista" class="cert-checklist"></div>
+        <div class="field cert-otros-linea">
+          <label for="certificadoServiciosOtros">Otros</label>
+          <input type="text" id="certificadoServiciosOtros" placeholder="Especifica otro servicio realizado">
+        </div>
+      </div>
+
+      <div class="panel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Áreas a tratar</h4>
+        <div id="certificadoAreasLista" class="cert-checklist"></div>
+        <div class="field cert-otros-linea">
+          <label for="certificadoAreasOtros">Otros</label>
+          <input type="text" id="certificadoAreasOtros" placeholder="Especifica otra área tratada">
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label for="certificadoComentarios">Comentarios</label>
+          <textarea id="certificadoComentarios" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="certificadoIngredienteDosis">Ingrediente activo y dosis</label>
+          <textarea id="certificadoIngredienteDosis" rows="3" placeholder="Ej. Bifentrina + Imidacloprid, 5.0 ML"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firmas: compartidas por los 3 tipos de reporte de esta visita, se
+         capturan una sola vez aquí (no se vuelve a firmar por tipo). -->
     <div class="grid" style="margin-top:14px;">
       <div class="field firma-bloque">
         <label>Firma del cliente</label>
@@ -2626,8 +2705,8 @@
 
     <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
       <button type="button" class="btn secondary small" id="btnCerrarReporteVisita">Cancelar</button>
-      <button type="button" class="btn secondary" id="btnGenerarLamparasUV">Reporte de Lámparas UV</button>
-      <button type="button" class="btn secondary" id="btnGenerarCertificado">Generar Certificado</button>
+      <button type="button" class="btn hidden" id="btnGuardarLamparasUV" data-reporte-seccion="lamparas">Guardar e imprimir reporte de Lámparas UV</button>
+      <button type="button" class="btn hidden" id="btnGuardarCertificado" data-reporte-seccion="certificado">Guardar e imprimir certificado</button>
       <button type="button" class="btn" id="btnGuardarReporteVisita">Guardar reporte</button>
     </div>
   </div>
@@ -2655,61 +2734,6 @@
   </div>
 </div>
 
-<!-- ================= OVERLAY DE CERTIFICADO OFICIAL (tecnico, al cerrar visita) ================= -->
-<div id="certificadoOverlay" class="hidden">
-  <div id="certificadoPanel">
-    <h3 style="margin-top:0;" id="certificadoPanelTitulo">Certificado</h3>
-    <p style="font-size:12px;color:#777;margin-top:0;">Las casillas vienen presugeridas para agilizar; ajusta lo que haga falta antes de guardar.</p>
-
-    <div class="grid">
-      <div class="field">
-        <label for="certificadoFolio">Folio</label>
-        <input type="number" id="certificadoFolio" readonly>
-      </div>
-      <div class="field">
-        <label for="certificadoFecha">Fecha</label>
-        <input type="date" id="certificadoFecha">
-      </div>
-    </div>
-
-    <div class="panel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Servicios a realizar</h4>
-      <div id="certificadoServiciosLista" class="cert-checklist"></div>
-      <div class="field cert-otros-linea">
-        <label for="certificadoServiciosOtros">Otros</label>
-        <input type="text" id="certificadoServiciosOtros" placeholder="Especifica otro servicio realizado">
-      </div>
-    </div>
-
-    <div class="panel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Áreas a tratar</h4>
-      <div id="certificadoAreasLista" class="cert-checklist"></div>
-      <div class="field cert-otros-linea">
-        <label for="certificadoAreasOtros">Otros</label>
-        <input type="text" id="certificadoAreasOtros" placeholder="Especifica otra área tratada">
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="field">
-        <label for="certificadoComentarios">Comentarios</label>
-        <textarea id="certificadoComentarios" rows="3"></textarea>
-      </div>
-      <div class="field">
-        <label for="certificadoIngredienteDosis">Ingrediente activo y dosis</label>
-        <textarea id="certificadoIngredienteDosis" rows="3" placeholder="Ej. Bifentrina + Imidacloprid, 5.0 ML"></textarea>
-      </div>
-    </div>
-
-    <p class="hint">Las firmas del reporte de visita se reutilizan para este certificado (no se vuelve a firmar).</p>
-
-    <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
-      <button type="button" class="btn secondary small" id="btnCerrarCertificado">Cancelar</button>
-      <button type="button" class="btn" id="btnGuardarCertificado">Guardar e imprimir certificado</button>
-    </div>
-  </div>
-</div>
-
 <!-- ================= OVERLAY DE IMPRESION DEL CERTIFICADO ================= -->
 <div id="certificadoPrintOverlay" class="hidden">
   <div id="certificadoPrintSheet">
@@ -2719,39 +2743,6 @@
       <button class="btn" id="btnImprimirCertificadoDoc">Imprimir</button>
     </div>
     <div class="doc" id="certificadoDocContent"><!-- contenido generado por JS --></div>
-  </div>
-</div>
-
-<!-- ================= OVERLAY DE REPORTE DE LAMPARAS UV (tecnico) ================= -->
-<div id="lamparasUVOverlay" class="hidden">
-  <div id="lamparasUVPanel">
-    <h3 style="margin-top:0;" id="lamparasUVPanelTitulo">Reporte de Lámparas UV</h3>
-    <p style="font-size:12px;color:#777;margin-top:0;">Una fila por cada lámpara UV registrada del cliente.</p>
-
-    <div class="grid">
-      <div class="field">
-        <label for="lamparasUVFolio">Folio</label>
-        <input type="number" id="lamparasUVFolio" readonly>
-      </div>
-      <div class="field">
-        <label for="lamparasUVFecha">Fecha de servicio</label>
-        <input type="date" id="lamparasUVFecha">
-      </div>
-    </div>
-
-    <div id="lamparasUVLista" style="margin-top:14px;"></div>
-
-    <div class="field" style="margin-top:14px;">
-      <label for="lamparasUVObservaciones">Observaciones generales</label>
-      <textarea id="lamparasUVObservaciones" rows="3"></textarea>
-    </div>
-
-    <p class="hint">Las firmas del reporte de visita se reutilizan para este reporte (no se vuelve a firmar).</p>
-
-    <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
-      <button type="button" class="btn secondary small" id="btnCerrarLamparasUV">Cancelar</button>
-      <button type="button" class="btn" id="btnGuardarLamparasUV">Guardar e imprimir reporte</button>
-    </div>
   </div>
 </div>
 
@@ -8318,9 +8309,43 @@
   let reporteHoraInicio = null;          // ISO string o null - se registra al presionar "Iniciar servicio"
   let reporteHoraFin = null;             // ISO string o null - se registra al presionar "Terminar servicio"
 
+  // Lámparas UV y Certificado son secciones del MISMO módulo de reportes de
+  // campo (pestañas dentro de #reporteOverlay, no overlays aparte). Cada
+  // una carga su folio/datos una sola vez por apertura del reporte (no en
+  // cada click de pestaña), para no desperdiciar folios consecutivos.
+  let lamparasUVCache = [];
+  let certificadoCargado = false;
+  let lamparasUVCargado = false;
+  let reporteTipoActivo = 'estaciones';
+
   const reporteOverlay = document.getElementById('reporteOverlay');
   const reportePrintOverlay = document.getElementById('reportePrintOverlay');
   const reporteDocContent = document.getElementById('reporteDocContent');
+
+  async function activarReporteTipoTab(tipo){
+    reporteTipoActivo = tipo;
+    document.querySelectorAll('#reporteTipoTabs .reporte-tipo-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.reporteTipo === tipo);
+    });
+    document.querySelectorAll('#reportePanel [data-reporte-seccion]').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.reporteSeccion !== tipo);
+    });
+
+    if(tipo === 'certificado' && !certificadoCargado){
+      certificadoCargado = true;
+      await cargarCertificadoEnPanel();
+    }
+    if(tipo === 'lamparas' && !lamparasUVCargado){
+      lamparasUVCargado = true;
+      await cargarLamparasUVEnPanel();
+    }
+  }
+
+  document.getElementById('reporteTipoTabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.reporte-tipo-tab');
+    if(!tab) return;
+    activarReporteTipoTab(tab.dataset.reporteTipo);
+  });
 
   // ---------- Consumos del Reporte de visita (tecnico registra salidas) ----------
   async function cargarInsumosActivosParaConsumos(){
@@ -8697,13 +8722,20 @@
       .select('*')
       .eq('cliente_id', reporteClienteActualId)
       .eq('activo', true)
-      .neq('tipo_estacion', 'Lámpara UV')
       .order('numero');
     if(errEst){
       alert('No se pudieron cargar las estaciones: ' + errEst.message);
       return;
     }
-    reporteEstacionesCache = estaciones || [];
+    // Las lámparas UV tienen su propia sección/catálogo dentro de este
+    // mismo módulo (pestaña "Lámparas UV"): no se mezclan con la tabla de
+    // cebaderos/trampas (que trae un selector de fauna que no les aplica).
+    reporteEstacionesCache = (estaciones || []).filter(e => e.tipo_estacion !== 'Lámpara UV');
+    lamparasUVCache = (estaciones || []).filter(e => e.tipo_estacion === 'Lámpara UV');
+    document.getElementById('reporteTipoTabLamparas').classList.toggle('hidden', lamparasUVCache.length === 0);
+    certificadoCargado = false;
+    lamparasUVCargado = false;
+    await activarReporteTipoTab('estaciones');
 
     const { data: avisos, error: errAvisos } = await supabaseClient
       .from('avisos_cliente')
@@ -8996,19 +9028,6 @@
     abrirImpresionReporte(resultado.payloadReporte, resultado.filasEstaciones, resultado.avisosResueltosDescripciones);
   });
 
-  document.getElementById('btnGenerarCertificado').addEventListener('click', async ()=>{
-    const btn = document.getElementById('btnGenerarCertificado');
-    btn.disabled = true;
-    const resultado = await guardarReporteVisitaActual();
-    btn.disabled = false;
-    if(!resultado) return;
-
-    mostrarToast('Reporte guardado.');
-    reporteOverlay.classList.add('hidden');
-    await abrirCertificadoOverlay(reporteVisitaActualId, resultado.payloadReporte);
-  });
-
-
   // ---------- Certificado oficial (lo llena el técnico al cerrar la visita) ----------
   // Columnas exactas del formato en papel (Folio 4949): se respeta el mismo
   // agrupamiento visual que el PDF original, no una lista alfabética.
@@ -9063,36 +9082,24 @@
     return resultado;
   }
 
-  let certificadoVisitaActualId = null;
-  let certificadoClienteActualId = null;
   let certificadoExistenteIdActual = null;
-  let certificadoFirmasActuales = { firma_tecnico_imagen: null, firma_tecnico_nombre: null, firma_cliente_imagen: null, firma_cliente_nombre: null };
   let certificadoNombreArchivoActual = 'Certificado';
 
-  const certificadoOverlay = document.getElementById('certificadoOverlay');
   const certificadoPrintOverlay = document.getElementById('certificadoPrintOverlay');
   const certificadoDocContent = document.getElementById('certificadoDocContent');
 
-  async function abrirCertificadoOverlay(visitaId, payloadReporte){
-    const visita = calVisitasCache.find(v => v.id === visitaId);
+  // Carga la sección "Certificado" dentro del mismo panel de reporte (se
+  // llama una sola vez por apertura, la primera vez que el técnico entra a
+  // esa pestaña - ver activarReporteTipoTab). Usa el mismo cliente/visita
+  // ya cargados por abrirReporteVisita.
+  async function cargarCertificadoEnPanel(){
+    const visita = calVisitasCache.find(v => v.id === reporteVisitaActualId);
     if(!visita) return;
-
-    certificadoVisitaActualId = visitaId;
-    certificadoClienteActualId = visita.cliente_id;
-    certificadoFirmasActuales = {
-      firma_tecnico_imagen: payloadReporte.firma_tecnico_imagen,
-      firma_tecnico_nombre: payloadReporte.firma_tecnico_nombre,
-      firma_cliente_imagen: payloadReporte.firma_cliente_imagen,
-      firma_cliente_nombre: payloadReporte.firma_cliente_nombre,
-    };
-
-    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
-    document.getElementById('certificadoPanelTitulo').textContent = `Certificado — ${clienteNombre}`;
 
     const { data: existente, error: errExistente } = await supabaseClient
       .from('certificados_visita')
       .select('*')
-      .eq('visita_id', visitaId)
+      .eq('visita_id', reporteVisitaActualId)
       .maybeSingle();
     if(errExistente) console.error('No se pudo revisar si ya existe un certificado para esta visita:', errExistente);
     certificadoExistenteIdActual = (existente && existente.id) || null;
@@ -9125,7 +9132,7 @@
       const { data: ultimoCert, error: errUltimo } = await supabaseClient
         .from('certificados_visita')
         .select('areas')
-        .eq('cliente_id', certificadoClienteActualId)
+        .eq('cliente_id', reporteClienteActualId)
         .order('fecha_creacion', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -9150,7 +9157,7 @@
         const { data: otraVisitaConPlan, error: errPlanCliente } = await supabaseClient
           .from('visitas_programadas')
           .select('ingrediente_insecticida, ingrediente_rodenticida')
-          .eq('cliente_id', certificadoClienteActualId)
+          .eq('cliente_id', reporteClienteActualId)
           .or('ingrediente_insecticida.not.is.null,ingrediente_rodenticida.not.is.null')
           .order('fecha_programada', { ascending: false })
           .limit(1)
@@ -9171,13 +9178,7 @@
     document.getElementById('certificadoAreasOtros').value = areas.otros || '';
     document.getElementById('certificadoComentarios').value = comentarios;
     document.getElementById('certificadoIngredienteDosis').value = ingredienteDosis;
-
-    certificadoOverlay.classList.remove('hidden');
   }
-
-  document.getElementById('btnCerrarCertificado').addEventListener('click', ()=>{
-    certificadoOverlay.classList.add('hidden');
-  });
 
   function docChecklistHtml(columnas, valores){
     const v = valores || {};
@@ -9192,7 +9193,7 @@
 
   function abrirImpresionCertificado(cert){
     const emp = getEmpresa();
-    const visita = calVisitasCache.find(v => v.id === certificadoVisitaActualId);
+    const visita = calVisitasCache.find(v => v.id === reporteVisitaActualId);
     const cliente = (visita && visita.clientes) || {};
 
     certificadoDocContent.innerHTML = `
@@ -9381,24 +9382,33 @@
     const btn = document.getElementById('btnGuardarCertificado');
     btn.disabled = true;
 
+    // Guarda primero el reporte de visita (estaciones/avisos/consumos y las
+    // firmas compartidas, marca la visita como Realizada) - el certificado
+    // reutiliza esas mismas firmas recién guardadas, no vuelve a firmar.
+    const resultado = await guardarReporteVisitaActual();
+    if(!resultado){
+      btn.disabled = false;
+      return;
+    }
+
     const servicios = leerCertChecklist('certificadoServiciosLista');
     servicios.otros = document.getElementById('certificadoServiciosOtros').value.trim();
     const areas = leerCertChecklist('certificadoAreasLista');
     areas.otros = document.getElementById('certificadoAreasOtros').value.trim();
 
     const payloadCertificado = {
-      visita_id: certificadoVisitaActualId,
-      cliente_id: certificadoClienteActualId,
+      visita_id: reporteVisitaActualId,
+      cliente_id: reporteClienteActualId,
       folio: Number(document.getElementById('certificadoFolio').value),
       fecha: document.getElementById('certificadoFecha').value,
       servicios,
       areas,
       comentarios: document.getElementById('certificadoComentarios').value.trim() || null,
       ingrediente_dosis: document.getElementById('certificadoIngredienteDosis').value.trim() || null,
-      firma_tecnico_imagen: certificadoFirmasActuales.firma_tecnico_imagen,
-      firma_tecnico_nombre: certificadoFirmasActuales.firma_tecnico_nombre,
-      firma_cliente_imagen: certificadoFirmasActuales.firma_cliente_imagen,
-      firma_cliente_nombre: certificadoFirmasActuales.firma_cliente_nombre,
+      firma_tecnico_imagen: resultado.payloadReporte.firma_tecnico_imagen,
+      firma_tecnico_nombre: resultado.payloadReporte.firma_tecnico_nombre,
+      firma_cliente_imagen: resultado.payloadReporte.firma_cliente_imagen,
+      firma_cliente_nombre: resultado.payloadReporte.firma_cliente_nombre,
       tecnico_id: (usuarioActual && usuarioActual.id) || null,
       actualizado_por: (usuarioActual && usuarioActual.id) || null,
     };
@@ -9414,7 +9424,7 @@
     }
 
     mostrarToast('Certificado guardado.');
-    certificadoOverlay.classList.add('hidden');
+    reporteOverlay.classList.add('hidden');
     abrirImpresionCertificado(payloadCertificado);
   });
 
@@ -9433,13 +9443,8 @@
     ).join('');
   }
 
-  let lamparasUVVisitaActualId = null;
-  let lamparasUVClienteActualId = null;
   let lamparasUVExistenteIdActual = null;
-  let lamparasUVCache = [];
-  let lamparasUVFirmasActuales = { firma_tecnico_imagen: null, firma_tecnico_nombre: null, firma_cliente_imagen: null, firma_cliente_nombre: null };
 
-  const lamparasUVOverlay = document.getElementById('lamparasUVOverlay');
   const lamparasUVPrintOverlay = document.getElementById('lamparasUVPrintOverlay');
   const lamparasUVDocContent = document.getElementById('lamparasUVDocContent');
 
@@ -9476,44 +9481,16 @@
     `;
   }
 
-  async function abrirLamparasUVOverlay(visitaId, payloadReporte){
-    const visita = calVisitasCache.find(v => v.id === visitaId);
-    if(!visita) return;
-
-    lamparasUVVisitaActualId = visitaId;
-    lamparasUVClienteActualId = visita.cliente_id;
-    lamparasUVFirmasActuales = {
-      firma_tecnico_imagen: payloadReporte.firma_tecnico_imagen,
-      firma_tecnico_nombre: payloadReporte.firma_tecnico_nombre,
-      firma_cliente_imagen: payloadReporte.firma_cliente_imagen,
-      firma_cliente_nombre: payloadReporte.firma_cliente_nombre,
-    };
-
-    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
-    document.getElementById('lamparasUVPanelTitulo').textContent = `Reporte de Lámparas UV — ${clienteNombre}`;
-
-    const { data: lamparas, error: errLamp } = await supabaseClient
-      .from('estaciones')
-      .select('*')
-      .eq('cliente_id', lamparasUVClienteActualId)
-      .eq('activo', true)
-      .eq('tipo_estacion', 'Lámpara UV')
-      .order('numero');
-    if(errLamp){
-      alert('No se pudieron cargar las lámparas UV: ' + errLamp.message);
-      return;
-    }
-    lamparasUVCache = lamparas || [];
-
-    if(lamparasUVCache.length === 0){
-      alert('Este cliente no tiene lámparas UV registradas. Agrégalas primero en Estaciones (tipo "Lámpara UV").');
-      return;
-    }
-
+  // Carga la sección "Lámparas UV" dentro del mismo panel de reporte (se
+  // llama una sola vez por apertura, la primera vez que el técnico entra a
+  // esa pestaña - ver activarReporteTipoTab). lamparasUVCache ya viene
+  // cargado desde abrirReporteVisita (esa pestaña solo se muestra si el
+  // cliente tiene lámparas UV activas).
+  async function cargarLamparasUVEnPanel(){
     const { data: existente, error: errExistente } = await supabaseClient
       .from('reportes_lamparas_uv')
       .select('*')
-      .eq('visita_id', visitaId)
+      .eq('visita_id', reporteVisitaActualId)
       .maybeSingle();
     if(errExistente) console.error('No se pudo revisar si ya existe un reporte de lámparas UV para esta visita:', errExistente);
     lamparasUVExistenteIdActual = (existente && existente.id) || null;
@@ -9552,29 +9529,11 @@
     document.getElementById('lamparasUVFecha').value = fecha;
     document.getElementById('lamparasUVObservaciones').value = observaciones;
     renderLamparasUVDetalle(detalleMap);
-
-    lamparasUVOverlay.classList.remove('hidden');
   }
-
-  document.getElementById('btnGenerarLamparasUV').addEventListener('click', async ()=>{
-    const btn = document.getElementById('btnGenerarLamparasUV');
-    btn.disabled = true;
-    const resultado = await guardarReporteVisitaActual();
-    btn.disabled = false;
-    if(!resultado) return;
-
-    mostrarToast('Reporte guardado.');
-    reporteOverlay.classList.add('hidden');
-    await abrirLamparasUVOverlay(reporteVisitaActualId, resultado.payloadReporte);
-  });
-
-  document.getElementById('btnCerrarLamparasUV').addEventListener('click', ()=>{
-    lamparasUVOverlay.classList.add('hidden');
-  });
 
   function abrirImpresionLamparasUV(reporte, filasLamparas){
     const emp = getEmpresa();
-    const visita = calVisitasCache.find(v => v.id === lamparasUVVisitaActualId);
+    const visita = calVisitasCache.find(v => v.id === reporteVisitaActualId);
     const cliente = (visita && visita.clientes) || {};
 
     const lamparaPorId = {};
@@ -9645,6 +9604,15 @@
     const btn = document.getElementById('btnGuardarLamparasUV');
     btn.disabled = true;
 
+    // Guarda primero el reporte de visita (estaciones/avisos/consumos y las
+    // firmas compartidas, marca la visita como Realizada) - el reporte de
+    // lámparas UV reutiliza esas mismas firmas recién guardadas.
+    const resultado = await guardarReporteVisitaActual();
+    if(!resultado){
+      btn.disabled = false;
+      return;
+    }
+
     const filasLamparas = Array.from(document.querySelectorAll('#lamparasUVLista [data-estacion-id]')).map(fila => ({
       estacion_id: fila.dataset.estacionId,
       conteo_insectos: fila.querySelector('.lampara-conteo').value !== '' ? parseInt(fila.querySelector('.lampara-conteo').value, 10) : null,
@@ -9654,15 +9622,15 @@
     }));
 
     const payloadLamparasUV = {
-      visita_id: lamparasUVVisitaActualId,
-      cliente_id: lamparasUVClienteActualId,
+      visita_id: reporteVisitaActualId,
+      cliente_id: reporteClienteActualId,
       folio: Number(document.getElementById('lamparasUVFolio').value),
       fecha: document.getElementById('lamparasUVFecha').value,
       observaciones: document.getElementById('lamparasUVObservaciones').value.trim() || null,
-      firma_tecnico_imagen: lamparasUVFirmasActuales.firma_tecnico_imagen,
-      firma_tecnico_nombre: lamparasUVFirmasActuales.firma_tecnico_nombre,
-      firma_cliente_imagen: lamparasUVFirmasActuales.firma_cliente_imagen,
-      firma_cliente_nombre: lamparasUVFirmasActuales.firma_cliente_nombre,
+      firma_tecnico_imagen: resultado.payloadReporte.firma_tecnico_imagen,
+      firma_tecnico_nombre: resultado.payloadReporte.firma_tecnico_nombre,
+      firma_cliente_imagen: resultado.payloadReporte.firma_cliente_imagen,
+      firma_cliente_nombre: resultado.payloadReporte.firma_cliente_nombre,
       tecnico_id: (usuarioActual && usuarioActual.id) || null,
       actualizado_por: (usuarioActual && usuarioActual.id) || null,
     };
@@ -9700,14 +9668,14 @@
 
     btn.disabled = false;
     mostrarToast('Reporte de lámparas UV guardado.');
-    lamparasUVOverlay.classList.add('hidden');
+    reporteOverlay.classList.add('hidden');
     abrirImpresionLamparasUV(payloadLamparasUV, filasLamparas);
   });
 
   async function verLamparasUVDesdeOficina(visitaId){
     const visita = calVisitasCache.find(v => v.id === visitaId);
-    lamparasUVVisitaActualId = visitaId;
-    lamparasUVClienteActualId = visita ? visita.cliente_id : null;
+    reporteVisitaActualId = visitaId;
+    reporteClienteActualId = visita ? visita.cliente_id : null;
 
     const { data: reporte, error } = await supabaseClient
       .from('reportes_lamparas_uv')
@@ -9722,7 +9690,7 @@
     const { data: lamparas, error: errLamp } = await supabaseClient
       .from('estaciones')
       .select('*')
-      .eq('cliente_id', lamparasUVClienteActualId)
+      .eq('cliente_id', reporteClienteActualId)
       .eq('tipo_estacion', 'Lámpara UV')
       .order('numero');
     if(errLamp) console.error('No se pudieron cargar las lámparas UV:', errLamp);
@@ -10162,7 +10130,7 @@
   }
 
   async function verCertificadoDesdeOficina(visitaId){
-    certificadoVisitaActualId = visitaId;
+    reporteVisitaActualId = visitaId;
     const { data: cert, error } = await supabaseClient
       .from('certificados_visita')
       .select('*')
