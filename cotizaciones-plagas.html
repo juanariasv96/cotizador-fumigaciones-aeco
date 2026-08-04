@@ -3347,9 +3347,10 @@
       usuarioActual.rol !== 'dueño');
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
-    // sus reportes de visita) mas Vehiculos (para ver/operar SOLO su
-    // vehiculo asignado — la RLS ya lo filtra). El resto de pestanas
-    // quedan ocultas.
+    // sus reportes de visita) mas Vehiculos (para elegir cualquier
+    // vehiculo activo de la flotilla por nombre y registrar su carga de
+    // gasolina — la RLS ya lo filtra). El resto de pestanas quedan
+    // ocultas.
     if(usuarioActual.rol === 'tecnico'){
       document.querySelectorAll('.tab-btn').forEach(btn => {
         if(btn.dataset.tab !== 'calendario' && btn.dataset.tab !== 'vehiculos') btn.classList.add('hidden');
@@ -10689,14 +10690,13 @@
 
 
   // ---------- Vehiculos / Flotilla ----------
-  // Oficina (dueno/asistente) administra toda la flotilla. Un tecnico
-  // solo ve/opera su(s) vehiculo(s) asignado(s) — la RLS de
-  // vehiculos_setup.sql ya filtra el select a eso, asi que aqui no hace
-  // falta filtrar de nuevo por tecnico: si un tecnico abre el detalle,
-  // por construccion es su propio vehiculo. Editar ficha/mantenimientos/
-  // multas es solo oficina; borrar cualquier cosa es solo dueno; cargar
-  // gasolina (insert) SI la puede hacer el tecnico para su vehiculo,
-  // reflejando la unica excepcion que tiene en la RLS.
+  // Oficina (dueno/asistente) administra toda la flotilla. Un tecnico ve
+  // TODOS los vehiculos activos (para elegir por nombre cual cargo) y
+  // puede registrar cargas de gasolina (con odometro, litros/monto y
+  // foto de ticket) para cualquiera de ellos — la RLS de
+  // vehiculos_setup.sql ya filtra el select/insert a eso, asi que aqui
+  // no hace falta filtrar de nuevo. Editar ficha/mantenimientos/multas
+  // es solo oficina; borrar cualquier cosa es solo dueno.
   let vehiculosCache = [];
   let vehiculosTecnicosCache = [];
   let vehiculoDetalleActualId = null;
@@ -10726,10 +10726,11 @@
   function esDuenoParaVehiculos(){
     return !!usuarioActual && usuarioActual.rol === 'dueño';
   }
-  // El tecnico solo da de alta cargas de gasolina de su vehiculo asignado
-  // (litros/monto de ESA carga + foto de ticket); no debe ver cifras
-  // monetarias agregadas ni el historico de costos (gasto por km, gasto
-  // total, desglose mensual, costos de mantenimiento, montos de multas).
+  // El tecnico da de alta cargas de gasolina de cualquier vehiculo activo
+  // (odometro, litros/monto de ESA carga + foto de ticket); no debe ver
+  // cifras monetarias agregadas ni el historico de costos (gasto por km,
+  // gasto total, desglose mensual, costos de mantenimiento, montos de
+  // multas).
   function esTecnicoParaVehiculos(){
     return !!usuarioActual && usuarioActual.rol === 'tecnico';
   }
@@ -11144,8 +11145,8 @@
     }
 
     // Alta de mantenimientos/multas: solo oficina. Cargas de gasolina: el
-    // tecnico tambien puede (si esta viendo el detalle, por RLS es su
-    // propio vehiculo asignado), asi que ese formulario no se oculta.
+    // tecnico tambien puede, para cualquier vehiculo activo (la RLS ya
+    // lo permite), asi que ese formulario no se oculta.
     document.getElementById('vehiculoMantenimientoForm').classList.toggle('hidden', !oficina);
     document.getElementById('vehiculoMultaForm').classList.toggle('hidden', !oficina);
 
