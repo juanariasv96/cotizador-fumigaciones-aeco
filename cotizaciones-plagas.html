@@ -3117,6 +3117,14 @@
 
     <div class="vehiculo-ficha-grid" id="vehiculoFichaGrid"></div>
 
+    <!-- El tecnico no ve la ficha administrativa completa (seguro, poliza,
+         vencimientos, etc.) ni el historico: solo este mini resumen de
+         ultimo/proximo servicio. -->
+    <div class="vehiculo-subseccion hidden" id="vehiculoResumenTecnicoSeccion">
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Servicio</h3>
+      <div class="vehiculo-ficha-grid" id="vehiculoResumenTecnicoGrid"></div>
+    </div>
+
     <div class="vehiculo-subseccion" id="vehiculoDesgloseMensualSeccion">
       <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Gasto mensual de este vehículo</h3>
       <div id="vehiculoDesgloseMensual"></div>
@@ -3124,6 +3132,9 @@
 
     <div class="vehiculo-subseccion">
       <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Cargas de gasolina</h3>
+      <!-- El tecnico no ve el historico completo (vehiculoCargasLista):
+           solo sus ultimas 2 cargas, de solo lectura. -->
+      <div id="vehiculoCargasRecientesTecnico" class="hidden" style="margin-bottom:14px;"></div>
       <div class="grid" style="align-items:end;">
         <div class="field" style="max-width:160px;">
           <label for="cargaFecha">Fecha</label>
@@ -3171,7 +3182,7 @@
       <div id="vehiculoCargasLista" style="margin-top:10px;"></div>
     </div>
 
-    <div class="vehiculo-subseccion">
+    <div class="vehiculo-subseccion" id="vehiculoMantenimientoSeccion">
       <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Mantenimientos</h3>
       <div class="grid" id="vehiculoMantenimientoForm" style="align-items:end;">
         <div class="field" style="max-width:160px;">
@@ -3230,7 +3241,7 @@
       <div id="vehiculoMantenimientosLista" style="margin-top:10px;"></div>
     </div>
 
-    <div class="vehiculo-subseccion">
+    <div class="vehiculo-subseccion" id="vehiculoMultaSeccion">
       <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 10px 0;">Multas</h3>
       <div class="grid" id="vehiculoMultaForm" style="align-items:end;">
         <div class="field" style="max-width:160px;">
@@ -10818,6 +10829,12 @@
   }
   function renderVehiculosAlertaBanner(){
     const banner = document.getElementById('vehiculosAlertaBanner');
+    // Vencimientos de seguro/verificacion/tarjeta son dato administrativo:
+    // el tecnico no lo ve (el ya tiene su propio resumen de servicio).
+    if(esTecnicoParaVehiculos()){
+      banner.classList.add('hidden');
+      return;
+    }
     const conAlerta = vehiculosCache.filter(v => vehiculoEstadoGeneral(v) !== 'ok');
     if(!conAlerta.length){
       banner.classList.add('hidden');
@@ -10888,11 +10905,12 @@
         : `<div class="empty-msg">No hay vehículos registrados todavía.</div>`;
       return;
     }
+    const esTecnico = esTecnicoParaVehiculos();
     cont.innerHTML = visibles.map(v => `
       <div class="vehiculo-card ${v.activo ? '' : 'inactivo'}" data-id="${v.id}">
         <strong>${escapeHtml(v.alias)}</strong> ${v.activo ? '' : '<span class="badge vencida">Inactivo</span>'}
         <div class="hint">${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' '))}${v.placas ? ' · ' + escapeHtml(v.placas) : ''}</div>
-        <div class="vehiculo-badges">${renderVehiculoBadges(v)}</div>
+        ${esTecnico ? '' : `<div class="vehiculo-badges">${renderVehiculoBadges(v)}</div>`}
       </div>
     `).join('');
   }
@@ -11049,15 +11067,26 @@
   }
 
   // ---- Detalle: metricas + ficha + cargas + mantenimientos + multas ----
+  // El tecnico no ve el historico: solo necesita sus ultimas 2 cargas y
+  // el ultimo servicio, asi que para el pedimos menos filas (en vez de
+  // traer todo el historico y solo ocultarlo en pantalla) y ni
+  // molestamos con multas, que no le aplican.
   async function cargarVehiculoRegistros(vehiculoId){
+    const esTecnico = esTecnicoParaVehiculos();
+    let cargasQuery = supabaseClient.from('vehiculo_cargas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false });
+    let mantQuery = supabaseClient.from('vehiculo_mantenimientos').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false });
+    if(esTecnico){
+      cargasQuery = cargasQuery.limit(2);
+      mantQuery = mantQuery.limit(1);
+    }
     const [
       { data: cargasData, error: errCargas },
       { data: mantData, error: errMant },
       { data: multasData, error: errMultas },
     ] = await Promise.all([
-      supabaseClient.from('vehiculo_cargas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
-      supabaseClient.from('vehiculo_mantenimientos').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
-      supabaseClient.from('vehiculo_multas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
+      cargasQuery,
+      mantQuery,
+      esTecnico ? Promise.resolve({ data: [], error: null }) : supabaseClient.from('vehiculo_multas').select('*').eq('vehiculo_id', vehiculoId).order('fecha', { ascending: false }),
     ]);
     if(errCargas) console.error('No se pudieron cargar las cargas de gasolina:', errCargas);
     if(errMant) console.error('No se pudieron cargar los mantenimientos:', errMant);
@@ -11105,54 +11134,106 @@
 
     document.getElementById('vehiculoDetalleAlias').textContent = v.alias;
     document.getElementById('vehiculoDetallePlacas').textContent = v.placas || '';
-    document.getElementById('vehiculoDetalleBadges').innerHTML = renderVehiculoBadges(v);
+    // Vencimientos de seguro/verificacion/tarjeta: dato administrativo,
+    // el tecnico no lo ve (tiene su propio resumen de servicio abajo).
+    document.getElementById('vehiculoDetalleBadges').innerHTML = esTecnico ? '' : renderVehiculoBadges(v);
 
     document.getElementById('btnEditarVehiculo').classList.toggle('hidden', !oficina);
     document.getElementById('btnEliminarVehiculo').classList.toggle('hidden', !dueno);
 
     const metricas = calcularMetricasVehiculo(v, vehiculoCargasCache, vehiculoMantenimientosCache);
-    document.getElementById('vehiculoResumen').innerHTML = `
+    document.getElementById('vehiculoResumen').innerHTML = esTecnico ? `
+      <div class="stat"><div class="valor">${metricas.kmActual.toLocaleString('es-MX')} km</div><div class="label">Km actual</div></div>
+    ` : `
       <div class="stat"><div class="valor">${metricas.kmActual.toLocaleString('es-MX')} km</div><div class="label">Km actual</div></div>
       <div class="stat"><div class="valor">${metricas.rendimiento != null ? metricas.rendimiento.toFixed(1) : 'N/D'}</div><div class="label">Rendimiento (km/l)</div></div>
-      ${esTecnico ? '' : `
       <div class="stat"><div class="valor">${metricas.gastoPorKm != null ? formatMoney(metricas.gastoPorKm) : 'N/D'}</div><div class="label">Gasto por km (gasolina)</div></div>
       <div class="stat"><div class="valor">${formatMoney(metricas.gastoTotal)}</div><div class="label">Gasto total (gasolina + mtto.)</div></div>
-      `}
     `;
 
-    const tecnico = vehiculosTecnicosCache.find(t => t.id === v.asignado_usuario_id);
     const proximoServicioPartes = [];
     if(v.proximo_servicio_km) proximoServicioPartes.push(Number(v.proximo_servicio_km).toLocaleString('es-MX') + ' km');
     if(v.proximo_servicio_fecha) proximoServicioPartes.push(formatDate(v.proximo_servicio_fecha));
-    document.getElementById('vehiculoFichaGrid').innerHTML = `
-      <div><span>Marca / Modelo / Año:</span> ${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' ') || '-')}</div>
-      <div><span>Color:</span> ${escapeHtml(v.color || '-')}</div>
-      <div><span>Placas:</span> ${escapeHtml(v.placas || '-')}</div>
-      <div><span>Asignado a:</span> ${escapeHtml(tecnico ? tecnico.nombre : 'Sin asignar')}</div>
-      <div><span>Aseguradora:</span> ${escapeHtml(v.aseguradora || '-')}</div>
-      <div><span>Póliza:</span> ${escapeHtml(v.poliza || '-')}</div>
-      <div><span>Seguro vence:</span> ${v.seguro_vence ? formatDate(v.seguro_vence) : '-'}</div>
-      <div><span>Verificación vence:</span> ${v.verificacion_vence ? formatDate(v.verificacion_vence) : '-'}</div>
-      <div><span>Tarjeta circulación vence:</span> ${v.tarjeta_circulacion_vence ? formatDate(v.tarjeta_circulacion_vence) : '-'}</div>
-      <div><span>Próximo servicio:</span> ${proximoServicioPartes.length ? escapeHtml(proximoServicioPartes.join(' / ')) : '-'}</div>
-      <div><span>Estado:</span> ${v.activo ? '<span class="badge vigente">Activo</span>' : '<span class="badge vencida">Inactivo</span>'}</div>
-      ${v.nota ? `<div style="grid-column:1/-1;"><span>Nota:</span> ${escapeHtml(v.nota)}</div>` : ''}
-    `;
+
+    // El tecnico no ve la ficha administrativa completa (seguro, poliza,
+    // vencimientos, asignacion, nota): solo un mini resumen de solo
+    // lectura con el ultimo servicio hecho y el proximo programado.
+    document.getElementById('vehiculoFichaGrid').classList.toggle('hidden', esTecnico);
+    document.getElementById('vehiculoResumenTecnicoSeccion').classList.toggle('hidden', !esTecnico);
+    if(esTecnico){
+      const ultimoServicio = vehiculoMantenimientosCache[0] || null;
+      document.getElementById('vehiculoResumenTecnicoGrid').innerHTML = `
+        <div><span>Último servicio:</span> ${ultimoServicio
+          ? escapeHtml(`${MANTENIMIENTO_TIPO_LABEL[ultimoServicio.tipo] || ultimoServicio.tipo || 'Servicio'} — ${formatDate(ultimoServicio.fecha)}${ultimoServicio.odometro ? ' — ' + Number(ultimoServicio.odometro).toLocaleString('es-MX') + ' km' : ''}`)
+          : 'Sin servicios registrados.'}</div>
+        <div><span>Próximo servicio:</span> ${proximoServicioPartes.length ? escapeHtml(proximoServicioPartes.join(' / ')) : 'No definido.'}</div>
+      `;
+    } else {
+      const tecnico = vehiculosTecnicosCache.find(t => t.id === v.asignado_usuario_id);
+      document.getElementById('vehiculoFichaGrid').innerHTML = `
+        <div><span>Marca / Modelo / Año:</span> ${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' ') || '-')}</div>
+        <div><span>Color:</span> ${escapeHtml(v.color || '-')}</div>
+        <div><span>Placas:</span> ${escapeHtml(v.placas || '-')}</div>
+        <div><span>Asignado a:</span> ${escapeHtml(tecnico ? tecnico.nombre : 'Sin asignar')}</div>
+        <div><span>Aseguradora:</span> ${escapeHtml(v.aseguradora || '-')}</div>
+        <div><span>Póliza:</span> ${escapeHtml(v.poliza || '-')}</div>
+        <div><span>Seguro vence:</span> ${v.seguro_vence ? formatDate(v.seguro_vence) : '-'}</div>
+        <div><span>Verificación vence:</span> ${v.verificacion_vence ? formatDate(v.verificacion_vence) : '-'}</div>
+        <div><span>Tarjeta circulación vence:</span> ${v.tarjeta_circulacion_vence ? formatDate(v.tarjeta_circulacion_vence) : '-'}</div>
+        <div><span>Próximo servicio:</span> ${proximoServicioPartes.length ? escapeHtml(proximoServicioPartes.join(' / ')) : '-'}</div>
+        <div><span>Estado:</span> ${v.activo ? '<span class="badge vigente">Activo</span>' : '<span class="badge vencida">Inactivo</span>'}</div>
+        ${v.nota ? `<div style="grid-column:1/-1;"><span>Nota:</span> ${escapeHtml(v.nota)}</div>` : ''}
+      `;
+    }
 
     document.getElementById('vehiculoDesgloseMensualSeccion').classList.toggle('hidden', esTecnico);
     if(!esTecnico){
       renderTablaDesgloseMensual('vehiculoDesgloseMensual', calcularDesgloseMensual(vehiculoCargasCache, vehiculoMantenimientosCache));
     }
 
-    // Alta de mantenimientos/multas: solo oficina. Cargas de gasolina: el
-    // tecnico tambien puede, para cualquier vehiculo activo (la RLS ya
-    // lo permite), asi que ese formulario no se oculta.
+    // Alta de mantenimientos/multas: solo oficina, y esas dos secciones
+    // completas (con su historico) se ocultan enteras para el tecnico.
     document.getElementById('vehiculoMantenimientoForm').classList.toggle('hidden', !oficina);
     document.getElementById('vehiculoMultaForm').classList.toggle('hidden', !oficina);
+    document.getElementById('vehiculoMantenimientoSeccion').classList.toggle('hidden', esTecnico);
+    document.getElementById('vehiculoMultaSeccion').classList.toggle('hidden', esTecnico);
 
-    renderVehiculoCargasLista(dueno, esTecnico);
-    renderVehiculoMantenimientosLista(dueno, esTecnico);
-    renderVehiculoMultasLista(dueno, oficina, esTecnico);
+    // Cargas de gasolina: el tecnico si puede agregar (el formulario
+    // sigue visible) para cualquier vehiculo activo, pero en vez del
+    // historico completo solo ve sus ultimas 2 cargas (cuanto y cuando).
+    document.getElementById('vehiculoCargasLista').classList.toggle('hidden', esTecnico);
+    document.getElementById('vehiculoCargasRecientesTecnico').classList.toggle('hidden', !esTecnico);
+    if(esTecnico){
+      renderVehiculoCargasRecientesTecnico();
+    } else {
+      renderVehiculoCargasLista(dueno, esTecnico);
+      renderVehiculoMantenimientosLista(dueno, esTecnico);
+      renderVehiculoMultasLista(dueno, oficina, esTecnico);
+    }
+  }
+
+  // Resumen de solo lectura para el tecnico: fecha/monto/litros de sus
+  // ultimas 2 cargas (cargarVehiculoRegistros ya limita la consulta a 2
+  // filas para este rol), sin thumbnail de ticket ni boton de borrar.
+  function renderVehiculoCargasRecientesTecnico(){
+    const cont = document.getElementById('vehiculoCargasRecientesTecnico');
+    if(!vehiculoCargasCache.length){
+      cont.innerHTML = `<div class="empty-msg">Sin cargas registradas todavía.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <div class="hint" style="margin-bottom:6px;">Últimas cargas registradas:</div>
+      ${vehiculoCargasCache.map(c => `
+        <div class="vehiculo-registro-card">
+          <div class="vehiculo-registro-info">
+            <div>
+              <strong>${formatDate(c.fecha)}</strong>${c.monto ? ' — ' + formatMoney(c.monto) : ''}${c.litros ? ' · ' + Number(c.litros).toFixed(1) + ' L' : ''}
+              <div class="hint">${[c.gasolinera, c.tipo_combustible].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    `;
   }
 
   function renderVehiculoCargasLista(dueno, esTecnico){
