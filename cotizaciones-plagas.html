@@ -2215,45 +2215,67 @@
 
       <h3 style="margin-top:28px;">Registrar compra (entrada)</h3>
       <p style="font-size:12px;color:#777;margin-top:0;">El envase se captura por compra, porque puede variar de tamaño. La cantidad y el costo por unidad se calculan solos.</p>
-      <div class="grid" style="align-items:end;">
-        <div class="field">
-          <label for="compraInsumo">Insumo</label>
-          <select id="compraInsumo">
-            <option value="">Selecciona...</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="compraProveedor">Proveedor</label>
-          <input type="text" id="compraProveedor" placeholder="Ej. Agroquímicos del Norte">
-        </div>
-        <div class="field" style="max-width:170px;">
-          <label for="compraFecha">Fecha</label>
-          <input type="date" id="compraFecha">
-        </div>
-        <div class="field" style="max-width:140px;">
-          <label for="compraNumEnvases">Núm. de envases</label>
-          <input type="number" id="compraNumEnvases" min="0" step="any" placeholder="Ej. 4">
-        </div>
-        <div class="field" style="max-width:210px;">
-          <label for="compraContenidoEnvase" id="compraContenidoEnvaseLabel">Contenido por envase</label>
-          <input type="number" id="compraContenidoEnvase" min="0" step="any" placeholder="Ej. 1000">
-        </div>
-        <div class="field" style="max-width:170px;">
-          <label for="compraTipoPrecio">El precio que voy a dar es...</label>
-          <select id="compraTipoPrecio">
-            <option value="total">Total de la compra</option>
-            <option value="envase">Por envase</option>
-          </select>
-        </div>
-        <div class="field" style="max-width:150px;">
-          <label for="compraPrecio">Precio ($)</label>
-          <input type="number" id="compraPrecio" min="0" step="any" placeholder="Ej. 3600">
-        </div>
-        <div class="field" style="max-width:220px;">
-          <button type="button" class="btn" id="btnRegistrarCompra" style="width:100%;">Registrar compra</button>
-        </div>
+
+      <div class="field" style="max-width:280px;">
+        <label for="compraModo">Cómo vas a capturarla</label>
+        <select id="compraModo">
+          <option value="manual">Captura manual</option>
+          <option value="xml">Subir factura (XML CFDI)</option>
+        </select>
       </div>
-      <div class="hint" id="compraPreview"></div>
+
+      <div id="compraManualSection">
+        <div class="grid" style="align-items:end;">
+          <div class="field">
+            <label for="compraInsumo">Insumo</label>
+            <select id="compraInsumo">
+              <option value="">Selecciona...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="compraProveedor">Proveedor</label>
+            <input type="text" id="compraProveedor" placeholder="Ej. Agroquímicos del Norte">
+          </div>
+          <div class="field" style="max-width:170px;">
+            <label for="compraFecha">Fecha</label>
+            <input type="date" id="compraFecha">
+          </div>
+          <div class="field" style="max-width:140px;">
+            <label for="compraNumEnvases">Núm. de envases</label>
+            <input type="number" id="compraNumEnvases" min="0" step="any" placeholder="Ej. 4">
+          </div>
+          <div class="field" style="max-width:210px;">
+            <label for="compraContenidoEnvase" id="compraContenidoEnvaseLabel">Contenido por envase</label>
+            <input type="number" id="compraContenidoEnvase" min="0" step="any" placeholder="Ej. 1000">
+          </div>
+          <div class="field" style="max-width:170px;">
+            <label for="compraTipoPrecio">El precio que voy a dar es...</label>
+            <select id="compraTipoPrecio">
+              <option value="total">Total de la compra</option>
+              <option value="envase">Por envase</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:150px;">
+            <label for="compraPrecio">Precio ($)</label>
+            <input type="number" id="compraPrecio" min="0" step="any" placeholder="Ej. 3600">
+          </div>
+          <div class="field" style="max-width:220px;">
+            <button type="button" class="btn" id="btnRegistrarCompra" style="width:100%;">Registrar compra</button>
+          </div>
+        </div>
+        <div class="hint" id="compraPreview"></div>
+      </div>
+
+      <div id="compraXmlSection" class="hidden">
+        <div class="field" style="max-width:320px;">
+          <label for="compraXmlArchivo">Archivo XML de la factura (CFDI 4.0)</label>
+          <input type="file" id="compraXmlArchivo" accept=".xml,text/xml">
+        </div>
+        <div class="hint" id="compraXmlEstado"></div>
+        <div id="compraXmlResumen" class="hidden" style="font-size:13px;color:#444;background:var(--verde-suave);border:1px solid var(--verde-claro);border-radius:8px;padding:10px 14px;margin:10px 0;"></div>
+        <div id="compraXmlLineas"></div>
+        <button type="button" class="btn" id="btnConfirmarCompraXml" style="width:100%;max-width:320px;margin-top:10px;" disabled>Registrar compra desde factura</button>
+      </div>
 
       <h3 style="margin-top:28px;">Niveles en vivo</h3>
       <div id="stockLista"></div>
@@ -7398,6 +7420,367 @@
     `).join('');
   }
 
+  // ---------- Registrar compra desde factura (XML CFDI 4.0) ----------
+  // Parseo 100% en el navegador (DOMParser), sin backend. Los namespaces
+  // del CFDI son fijos aunque el prefijo varie entre facturadores, por
+  // eso se busca por namespace (getElementsByTagNameNS) y no por prefijo.
+  const CFDI_NS = 'http://www.sat.gob.mx/cfd/4';
+  const TFD_NS = 'http://www.sat.gob.mx/TimbreFiscalDigital';
+
+  let facturaXmlParseada = null; // { uuid, emisorRfc, emisorNombre, fecha, total, subtotal, iva, conceptos:[...] }
+  let facturaXmlLineas = [];     // paralelo a facturaXmlParseada.conceptos: { insumoId, factor }
+  let facturaXmlAliasCache = {}; // clave `${rfc}|||${descripcion}` -> fila de insumo_alias
+
+  document.getElementById('compraModo').addEventListener('change', (e) => {
+    const esXml = e.target.value === 'xml';
+    document.getElementById('compraManualSection').classList.toggle('hidden', esXml);
+    document.getElementById('compraXmlSection').classList.toggle('hidden', !esXml);
+  });
+
+  function claveAlias(rfc, descripcion){
+    return `${rfc}|||${(descripcion || '').trim()}`;
+  }
+
+  function parseFacturaXml(xmlText){
+    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    if(doc.querySelector('parsererror')){
+      throw new Error('El archivo no es un XML válido.');
+    }
+    const comprobante = doc.getElementsByTagNameNS(CFDI_NS, 'Comprobante')[0];
+    if(!comprobante){
+      throw new Error('El XML no parece un CFDI 4.0 (no se encontró el nodo Comprobante).');
+    }
+    const emisor = doc.getElementsByTagNameNS(CFDI_NS, 'Emisor')[0];
+    if(!emisor){
+      throw new Error('El XML no tiene nodo Emisor.');
+    }
+    const timbre = doc.getElementsByTagNameNS(TFD_NS, 'TimbreFiscalDigital')[0];
+    if(!timbre || !timbre.getAttribute('UUID')){
+      throw new Error('El XML no tiene Timbre Fiscal Digital (UUID). ¿Es una factura timbrada?');
+    }
+    const conceptosNodos = Array.from(doc.getElementsByTagNameNS(CFDI_NS, 'Concepto'));
+    if(conceptosNodos.length === 0){
+      throw new Error('El XML no tiene conceptos.');
+    }
+    let iva = 0;
+    const impuestos = doc.getElementsByTagNameNS(CFDI_NS, 'Impuestos')[0];
+    if(impuestos && impuestos.getAttribute('TotalImpuestosTrasladados')){
+      iva = parseFloat(impuestos.getAttribute('TotalImpuestosTrasladados')) || 0;
+    }
+    return {
+      uuid: timbre.getAttribute('UUID'),
+      emisorRfc: emisor.getAttribute('Rfc') || '',
+      emisorNombre: emisor.getAttribute('Nombre') || emisor.getAttribute('Rfc') || '',
+      fecha: (comprobante.getAttribute('Fecha') || '').slice(0, 10),
+      total: parseFloat(comprobante.getAttribute('Total')) || 0,
+      subtotal: parseFloat(comprobante.getAttribute('SubTotal')) || 0,
+      iva,
+      conceptos: conceptosNodos.map(c => ({
+        descripcion: c.getAttribute('Descripcion') || '',
+        cantidad: parseFloat(c.getAttribute('Cantidad')) || 0,
+        claveUnidad: c.getAttribute('ClaveUnidad') || '',
+        unidad: c.getAttribute('Unidad') || '',
+        valorUnitario: parseFloat(c.getAttribute('ValorUnitario')) || 0,
+        importe: parseFloat(c.getAttribute('Importe')) || 0,
+      })),
+    };
+  }
+
+  async function cargarAliasParaFactura(factura){
+    facturaXmlAliasCache = {};
+    const descripciones = [...new Set(factura.conceptos.map(c => c.descripcion))];
+    if(descripciones.length === 0) return;
+    const { data, error } = await supabaseClient
+      .from('insumo_alias')
+      .select('descripcion_proveedor, insumo_id, factor_a_base, unidad_factura')
+      .eq('emisor_rfc', factura.emisorRfc)
+      .in('descripcion_proveedor', descripciones);
+    if(error){
+      console.error('No se pudieron cargar los alias del proveedor:', error);
+      return;
+    }
+    (data || []).forEach(a => {
+      facturaXmlAliasCache[claveAlias(factura.emisorRfc, a.descripcion_proveedor)] = a;
+    });
+  }
+
+  function resetCompraXml(){
+    facturaXmlParseada = null;
+    facturaXmlLineas = [];
+    document.getElementById('compraXmlResumen').classList.add('hidden');
+    document.getElementById('compraXmlResumen').innerHTML = '';
+    document.getElementById('compraXmlLineas').innerHTML = '';
+    document.getElementById('btnConfirmarCompraXml').disabled = true;
+  }
+
+  document.getElementById('compraXmlArchivo').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const estado = document.getElementById('compraXmlEstado');
+    resetCompraXml();
+    estado.textContent = 'Leyendo archivo...';
+    try {
+      const texto = await file.text();
+      const factura = parseFacturaXml(texto);
+      const { data: existente, error: errorExistente } = await supabaseClient
+        .from('facturas_importadas')
+        .select('uuid')
+        .eq('uuid', factura.uuid)
+        .maybeSingle();
+      if(errorExistente) throw new Error(errorExistente.message);
+      if(existente){
+        estado.innerHTML = `<strong style="color:#b3261e;">Esta factura ya se registró.</strong> (UUID ${escapeHtml(factura.uuid)})`;
+        return;
+      }
+      await cargarAliasParaFactura(factura);
+      facturaXmlParseada = factura;
+      facturaXmlLineas = factura.conceptos.map(c => {
+        const alias = facturaXmlAliasCache[claveAlias(factura.emisorRfc, c.descripcion)];
+        return {
+          insumoId: alias ? alias.insumo_id : '',
+          factor: alias ? String(alias.factor_a_base) : '',
+        };
+      });
+      estado.textContent = '';
+      renderResumenFacturaXml();
+      renderLineasFacturaXml();
+    } catch(err){
+      console.error('No se pudo leer la factura XML:', err);
+      estado.innerHTML = `<strong style="color:#b3261e;">${escapeHtml(err.message || 'No se pudo leer el archivo.')}</strong>`;
+    }
+  });
+
+  function renderResumenFacturaXml(){
+    const f = facturaXmlParseada;
+    const cont = document.getElementById('compraXmlResumen');
+    cont.classList.remove('hidden');
+    cont.innerHTML = `
+      <div><strong>${escapeHtml(f.emisorNombre)}</strong> (${escapeHtml(f.emisorRfc)})</div>
+      <div>Fecha: ${escapeHtml(f.fecha)} · UUID: ${escapeHtml(f.uuid)}</div>
+      <div>Total: ${formatMoney(f.total)} · IVA: ${formatMoney(f.iva)}</div>
+    `;
+  }
+
+  function opcionesInsumoSelect(seleccionId){
+    const activos = insumosCache.filter(i => i.activo);
+    return `<option value="">Selecciona...</option>` +
+      activos.map(i => `<option value="${i.id}" ${i.id === seleccionId ? 'selected' : ''}>${escapeHtml(i.nombre)} (${escapeHtml(i.unidad_base)})</option>`).join('') +
+      `<option value="__nuevo__" ${seleccionId === '__nuevo__' ? 'selected' : ''}>+ Crear insumo nuevo...</option>`;
+  }
+
+  function previewTextoLinea(idx){
+    const estado = facturaXmlLineas[idx];
+    const concepto = facturaXmlParseada.conceptos[idx];
+    const insumoSel = insumosCache.find(i => i.id === estado.insumoId);
+    const factor = parseFloat(estado.factor);
+    if(!insumoSel || !factor || factor <= 0) return '';
+    const cantidadBase = concepto.cantidad * factor;
+    const costoUnitario = concepto.importe / cantidadBase;
+    const unidad = UNIDAD_BASE_LABEL[insumoSel.unidad_base] || insumoSel.unidad_base;
+    return `= ${formatCantidadBase(cantidadBase, insumoSel.unidad_base)} · costo unitario ${formatMoney(costoUnitario)} por ${unidad}`;
+  }
+
+  function actualizarPreviewLineaXml(idx){
+    const fila = document.querySelector(`#compraXmlLineas [data-idx="${idx}"]`);
+    if(!fila) return;
+    const previewEl = fila.querySelector('[data-linea-preview]');
+    if(previewEl) previewEl.textContent = previewTextoLinea(idx);
+  }
+
+  function actualizarBotonConfirmarXml(){
+    const btn = document.getElementById('btnConfirmarCompraXml');
+    if(!facturaXmlParseada){ btn.disabled = true; return; }
+    const listo = facturaXmlLineas.every(l => l.insumoId && l.insumoId !== '__nuevo__' && parseFloat(l.factor) > 0);
+    btn.disabled = !listo;
+  }
+
+  function renderLineasFacturaXml(){
+    const cont = document.getElementById('compraXmlLineas');
+    cont.innerHTML = facturaXmlParseada.conceptos.map((c, idx) => {
+      const estado = facturaXmlLineas[idx];
+      const unidadFactura = c.unidad || c.claveUnidad || 'unidad';
+      const insumoSel = insumosCache.find(i => i.id === estado.insumoId);
+      const unidadBase = insumoSel ? (UNIDAD_BASE_LABEL[insumoSel.unidad_base] || insumoSel.unidad_base) : 'unidad base';
+      return `
+        <div class="insumo-row" data-idx="${idx}">
+          <div class="insumo-info">
+            <div class="insumo-nombre">${escapeHtml(c.descripcion)}</div>
+            <div class="insumo-meta">Cantidad: ${c.cantidad} ${escapeHtml(unidadFactura)} · Valor unitario: ${formatMoney(c.valorUnitario)} · Importe: ${formatMoney(c.importe)}</div>
+            <div class="grid" style="margin-top:8px;align-items:end;">
+              <div class="field" style="max-width:230px;">
+                <label>Insumo</label>
+                <select data-linea-insumo>${opcionesInsumoSelect(estado.insumoId)}</select>
+              </div>
+              <div class="field" style="max-width:230px;">
+                <label>Factor (1 ${escapeHtml(unidadFactura)} de la factura = ___ ${unidadBase})</label>
+                <input type="number" min="0" step="any" data-linea-factor value="${estado.factor || ''}" placeholder="Ej. 1000">
+              </div>
+            </div>
+            ${estado.insumoId === '__nuevo__' ? `
+            <div class="grid" style="margin-top:8px;align-items:end;background:var(--gris-fondo);padding:8px;border-radius:6px;">
+              <div class="field">
+                <label>Nombre del insumo nuevo</label>
+                <input type="text" data-nuevo-nombre value="${escapeHtml(c.descripcion)}">
+              </div>
+              <div class="field" style="max-width:150px;">
+                <label>Categoría</label>
+                <select data-nuevo-categoria>
+                  <option value="quimico">Químico</option>
+                  <option value="insumo">Insumo</option>
+                  <option value="lampara">Lámpara</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:130px;">
+                <label>Unidad base</label>
+                <select data-nuevo-unidad>
+                  <option value="ml">ml</option>
+                  <option value="g">g</option>
+                  <option value="pieza">pieza</option>
+                  <option value="l">l</option>
+                  <option value="kg">kg</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:170px;">
+                <button type="button" class="btn secondary small" data-crear-insumo style="width:100%;">Crear insumo</button>
+              </div>
+            </div>` : ''}
+            <div class="hint" data-linea-preview style="margin-top:6px;">${previewTextoLinea(idx)}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    actualizarBotonConfirmarXml();
+  }
+
+  document.getElementById('compraXmlLineas').addEventListener('change', (e) => {
+    const fila = e.target.closest('[data-idx]');
+    if(!fila) return;
+    const idx = parseInt(fila.dataset.idx, 10);
+    if(e.target.matches('[data-linea-insumo]')){
+      facturaXmlLineas[idx].insumoId = e.target.value;
+      if(e.target.value && e.target.value !== '__nuevo__' && !facturaXmlLineas[idx].factor){
+        const concepto = facturaXmlParseada.conceptos[idx];
+        const alias = facturaXmlAliasCache[claveAlias(facturaXmlParseada.emisorRfc, concepto.descripcion)];
+        if(alias && alias.insumo_id === e.target.value){
+          facturaXmlLineas[idx].factor = String(alias.factor_a_base);
+        }
+      }
+      renderLineasFacturaXml();
+    }
+  });
+
+  document.getElementById('compraXmlLineas').addEventListener('input', (e) => {
+    if(!e.target.matches('[data-linea-factor]')) return;
+    const fila = e.target.closest('[data-idx]');
+    const idx = parseInt(fila.dataset.idx, 10);
+    facturaXmlLineas[idx].factor = e.target.value;
+    actualizarPreviewLineaXml(idx);
+    actualizarBotonConfirmarXml();
+  });
+
+  document.getElementById('compraXmlLineas').addEventListener('click', async (e) => {
+    const btnCrear = e.target.closest('[data-crear-insumo]');
+    if(!btnCrear) return;
+    const fila = btnCrear.closest('[data-idx]');
+    const idx = parseInt(fila.dataset.idx, 10);
+    const nombre = fila.querySelector('[data-nuevo-nombre]').value.trim();
+    const categoria = fila.querySelector('[data-nuevo-categoria]').value;
+    const unidadBase = fila.querySelector('[data-nuevo-unidad]').value;
+    if(!nombre){ alert('Escribe el nombre del insumo nuevo.'); return; }
+    btnCrear.disabled = true;
+    const { data, error } = await supabaseClient.from('insumos').insert({
+      nombre, categoria, unidad_base: unidadBase, stock_minimo: 0,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    }).select().single();
+    btnCrear.disabled = false;
+    if(error){
+      alert('No se pudo crear el insumo: ' + error.message);
+      return;
+    }
+    insumosCache.push(data);
+    insumosCache.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    renderSelectComprasInsumo();
+    facturaXmlLineas[idx].insumoId = data.id;
+    renderLineasFacturaXml();
+  });
+
+  document.getElementById('btnConfirmarCompraXml').addEventListener('click', async () => {
+    const factura = facturaXmlParseada;
+    if(!factura) return;
+    const btn = document.getElementById('btnConfirmarCompraXml');
+    btn.disabled = true;
+
+    // Doble chequeo de duplicado justo antes de guardar (por si se subio
+    // la misma factura en otra pestana mientras se llenaba esta).
+    const { data: existente, error: errorExistente } = await supabaseClient
+      .from('facturas_importadas').select('uuid').eq('uuid', factura.uuid).maybeSingle();
+    if(errorExistente){
+      alert('No se pudo verificar la factura: ' + errorExistente.message);
+      btn.disabled = false;
+      return;
+    }
+    if(existente){
+      document.getElementById('compraXmlEstado').innerHTML = `<strong style="color:#b3261e;">Esta factura ya se registró.</strong>`;
+      btn.disabled = false;
+      return;
+    }
+
+    const movimientos = factura.conceptos.map((c, idx) => {
+      const factor = parseFloat(facturaXmlLineas[idx].factor);
+      const cantidadBase = c.cantidad * factor;
+      return {
+        insumo_id: facturaXmlLineas[idx].insumoId,
+        tipo: 'entrada',
+        cantidad_base: cantidadBase,
+        costo_unitario: c.importe / cantidadBase,
+        fecha: factura.fecha,
+        proveedor: factura.emisorNombre,
+        num_envases: c.cantidad,
+        contenido_envase: factor,
+        precio_total: c.importe,
+        usuario_id: (usuarioActual && usuarioActual.id) || null,
+      };
+    });
+
+    const { error: errorMov } = await supabaseClient.from('insumo_movimientos').insert(movimientos);
+    if(errorMov){
+      alert('No se pudo registrar la compra: ' + errorMov.message);
+      btn.disabled = false;
+      return;
+    }
+
+    const { error: errorFactura } = await supabaseClient.from('facturas_importadas').insert({
+      uuid: factura.uuid,
+      emisor_rfc: factura.emisorRfc,
+      total: factura.total,
+      fecha: factura.fecha,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    });
+    if(errorFactura){
+      console.error('La compra se registró pero no se pudo marcar la factura como importada (podría duplicarse si se vuelve a subir):', errorFactura);
+    }
+
+    const aliasFilas = factura.conceptos.map((c, idx) => ({
+      emisor_rfc: factura.emisorRfc,
+      descripcion_proveedor: c.descripcion,
+      insumo_id: facturaXmlLineas[idx].insumoId,
+      factor_a_base: parseFloat(facturaXmlLineas[idx].factor),
+      unidad_factura: c.unidad || c.claveUnidad || null,
+      creado_por: (usuarioActual && usuarioActual.id) || null,
+    }));
+    const { error: errorAlias } = await supabaseClient.from('insumo_alias')
+      .upsert(aliasFilas, { onConflict: 'emisor_rfc,descripcion_proveedor' });
+    if(errorAlias){
+      console.error('No se pudieron guardar los alias del proveedor:', errorAlias);
+    }
+
+    mostrarToast(`Compra registrada desde factura: ${movimientos.length} insumo(s).`);
+    document.getElementById('compraXmlArchivo').value = '';
+    document.getElementById('compraXmlEstado').textContent = '';
+    resetCompraXml();
+    await cargarStockInsumos();
+  });
 
   // ---------- Calendario de visitas ----------
   const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
