@@ -866,6 +866,7 @@
   .documentacion-meta{font-size:12px;color:#666;}
   .badge.doc-reporte{background:#e7f0fd;color:#1d4ed8;}
   .badge.doc-certificado{background:#e3f5e1;color:#016937;}
+  .badge.doc-lamparas{background:#fdf1d8;color:#8a5a00;}
 
   /* ---------- Resumen del día (oficina) ---------- */
   .resumen-tecnico-card{
@@ -1180,6 +1181,26 @@
     padding:30px 15px;overflow:auto;z-index:999;
   }
   #certificadoPrintSheet{
+    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+
+  /* ---------- Reporte de Lámparas UV ---------- */
+  #lamparasUVOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #lamparasUVPanel{
+    background:var(--blanco);width:100%;max-width:860px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #lamparasUVPrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #lamparasUVPrintSheet{
     background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
@@ -2605,6 +2626,7 @@
 
     <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
       <button type="button" class="btn secondary small" id="btnCerrarReporteVisita">Cancelar</button>
+      <button type="button" class="btn secondary" id="btnGenerarLamparasUV">Reporte de Lámparas UV</button>
       <button type="button" class="btn secondary" id="btnGenerarCertificado">Generar Certificado</button>
       <button type="button" class="btn" id="btnGuardarReporteVisita">Guardar reporte</button>
     </div>
@@ -2697,6 +2719,50 @@
       <button class="btn" id="btnImprimirCertificadoDoc">Imprimir</button>
     </div>
     <div class="doc" id="certificadoDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE REPORTE DE LAMPARAS UV (tecnico) ================= -->
+<div id="lamparasUVOverlay" class="hidden">
+  <div id="lamparasUVPanel">
+    <h3 style="margin-top:0;" id="lamparasUVPanelTitulo">Reporte de Lámparas UV</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;">Una fila por cada lámpara UV registrada del cliente.</p>
+
+    <div class="grid">
+      <div class="field">
+        <label for="lamparasUVFolio">Folio</label>
+        <input type="number" id="lamparasUVFolio" readonly>
+      </div>
+      <div class="field">
+        <label for="lamparasUVFecha">Fecha de servicio</label>
+        <input type="date" id="lamparasUVFecha">
+      </div>
+    </div>
+
+    <div id="lamparasUVLista" style="margin-top:14px;"></div>
+
+    <div class="field" style="margin-top:14px;">
+      <label for="lamparasUVObservaciones">Observaciones generales</label>
+      <textarea id="lamparasUVObservaciones" rows="3"></textarea>
+    </div>
+
+    <p class="hint">Las firmas del reporte de visita se reutilizan para este reporte (no se vuelve a firmar).</p>
+
+    <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarLamparasUV">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarLamparasUV">Guardar e imprimir reporte</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE IMPRESION DEL REPORTE DE LAMPARAS UV ================= -->
+<div id="lamparasUVPrintOverlay" class="hidden">
+  <div id="lamparasUVPrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarLamparasUVPreview">Cerrar</button>
+      <button class="btn" id="btnImprimirLamparasUVDoc">Imprimir</button>
+    </div>
+    <div class="doc" id="lamparasUVDocContent"><!-- contenido generado por JS --></div>
   </div>
 </div>
 
@@ -8631,6 +8697,7 @@
       .select('*')
       .eq('cliente_id', reporteClienteActualId)
       .eq('activo', true)
+      .neq('tipo_estacion', 'Lámpara UV')
       .order('numero');
     if(errEst){
       alert('No se pudieron cargar las estaciones: ' + errEst.message);
@@ -9352,6 +9419,333 @@
   });
 
 
+  // ---------- Reporte de Lámparas UV (lo llena el técnico, una fila por
+  // lámpara UV activa del cliente). Mismo patrón que el Certificado: folio
+  // propio consecutivo, encabezado ligado a la visita (unique visita_id) y
+  // reutiliza las firmas ya capturadas en el reporte de visita (no se
+  // vuelve a firmar). ----------
+  const CATALOGO_ESTADO_TUBO = [['Bueno', 'Bueno'], ['Por cambiar', 'Por cambiar'], ['Cambiado', 'Cambiado']];
+
+  function opcionesEstadoTuboHtml(valorActual){
+    const actual = valorActual || 'Bueno';
+    return CATALOGO_ESTADO_TUBO.map(([cod, label]) =>
+      `<option value="${cod}" ${actual === cod ? 'selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
+  }
+
+  let lamparasUVVisitaActualId = null;
+  let lamparasUVClienteActualId = null;
+  let lamparasUVExistenteIdActual = null;
+  let lamparasUVCache = [];
+  let lamparasUVFirmasActuales = { firma_tecnico_imagen: null, firma_tecnico_nombre: null, firma_cliente_imagen: null, firma_cliente_nombre: null };
+
+  const lamparasUVOverlay = document.getElementById('lamparasUVOverlay');
+  const lamparasUVPrintOverlay = document.getElementById('lamparasUVPrintOverlay');
+  const lamparasUVDocContent = document.getElementById('lamparasUVDocContent');
+
+  function renderLamparasUVDetalle(detalleMap){
+    const cont = document.getElementById('lamparasUVLista');
+    if(lamparasUVCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">Este cliente no tiene lámparas UV registradas.</div>`;
+      return;
+    }
+
+    const filas = lamparasUVCache.map(e => {
+      const d = detalleMap[e.id] || {};
+      return `
+        <tr data-estacion-id="${e.id}">
+          <td>${e.numero}</td>
+          <td>${escapeHtml(e.ubicacion)}</td>
+          <td><input type="number" min="0" class="lampara-conteo" value="${d.conteo_insectos != null ? d.conteo_insectos : ''}" placeholder="0"></td>
+          <td><select class="lampara-estado-tubo">${opcionesEstadoTuboHtml(d.estado_tubo)}</select></td>
+          <td style="text-align:center;"><input type="checkbox" class="lampara-cambiado" ${d.tubo_cambiado ? 'checked' : ''}></td>
+          <td><textarea class="lampara-notas" rows="1" placeholder="Notas...">${escapeHtml(d.notas || '')}</textarea></td>
+        </tr>
+      `;
+    }).join('');
+
+    cont.innerHTML = `
+      <div class="reporte-tabla-scroll">
+        <table class="reporte-tabla-estaciones">
+          <thead>
+            <tr><th>#</th><th>Ubicación</th><th>Conteo insectos</th><th>Estado tubo/foco</th><th>¿Cambiado?</th><th>Notas</th></tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  async function abrirLamparasUVOverlay(visitaId, payloadReporte){
+    const visita = calVisitasCache.find(v => v.id === visitaId);
+    if(!visita) return;
+
+    lamparasUVVisitaActualId = visitaId;
+    lamparasUVClienteActualId = visita.cliente_id;
+    lamparasUVFirmasActuales = {
+      firma_tecnico_imagen: payloadReporte.firma_tecnico_imagen,
+      firma_tecnico_nombre: payloadReporte.firma_tecnico_nombre,
+      firma_cliente_imagen: payloadReporte.firma_cliente_imagen,
+      firma_cliente_nombre: payloadReporte.firma_cliente_nombre,
+    };
+
+    const clienteNombre = (visita.clientes && visita.clientes.nombre) || '';
+    document.getElementById('lamparasUVPanelTitulo').textContent = `Reporte de Lámparas UV — ${clienteNombre}`;
+
+    const { data: lamparas, error: errLamp } = await supabaseClient
+      .from('estaciones')
+      .select('*')
+      .eq('cliente_id', lamparasUVClienteActualId)
+      .eq('activo', true)
+      .eq('tipo_estacion', 'Lámpara UV')
+      .order('numero');
+    if(errLamp){
+      alert('No se pudieron cargar las lámparas UV: ' + errLamp.message);
+      return;
+    }
+    lamparasUVCache = lamparas || [];
+
+    if(lamparasUVCache.length === 0){
+      alert('Este cliente no tiene lámparas UV registradas. Agrégalas primero en Estaciones (tipo "Lámpara UV").');
+      return;
+    }
+
+    const { data: existente, error: errExistente } = await supabaseClient
+      .from('reportes_lamparas_uv')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(errExistente) console.error('No se pudo revisar si ya existe un reporte de lámparas UV para esta visita:', errExistente);
+    lamparasUVExistenteIdActual = (existente && existente.id) || null;
+
+    const folioInput = document.getElementById('lamparasUVFolio');
+    const puedeEditarFolio = usuarioActual && (usuarioActual.rol === 'dueño' || usuarioActual.rol === 'asistente');
+    folioInput.readOnly = !puedeEditarFolio;
+
+    let detalleExistente = [];
+    let fecha, observaciones;
+
+    if(existente){
+      folioInput.value = existente.folio;
+      fecha = existente.fecha;
+      observaciones = existente.observaciones || '';
+      const { data: detalle, error: errDetalle } = await supabaseClient
+        .from('reportes_lamparas_uv_detalle')
+        .select('*')
+        .eq('reporte_id', existente.id);
+      if(errDetalle) console.error('No se pudo cargar el detalle de lámparas UV:', errDetalle);
+      detalleExistente = detalle || [];
+    } else {
+      const { data: folioNuevo, error: errFolio } = await supabaseClient.rpc('siguiente_folio_lamparas_uv');
+      if(errFolio){
+        alert('No se pudo asignar el folio del reporte de lámparas UV: ' + errFolio.message);
+        return;
+      }
+      folioInput.value = folioNuevo;
+      fecha = fechaALocalISO(new Date());
+      observaciones = '';
+    }
+
+    const detalleMap = {};
+    detalleExistente.forEach(d => { detalleMap[d.estacion_id] = d; });
+
+    document.getElementById('lamparasUVFecha').value = fecha;
+    document.getElementById('lamparasUVObservaciones').value = observaciones;
+    renderLamparasUVDetalle(detalleMap);
+
+    lamparasUVOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnGenerarLamparasUV').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnGenerarLamparasUV');
+    btn.disabled = true;
+    const resultado = await guardarReporteVisitaActual();
+    btn.disabled = false;
+    if(!resultado) return;
+
+    mostrarToast('Reporte guardado.');
+    reporteOverlay.classList.add('hidden');
+    await abrirLamparasUVOverlay(reporteVisitaActualId, resultado.payloadReporte);
+  });
+
+  document.getElementById('btnCerrarLamparasUV').addEventListener('click', ()=>{
+    lamparasUVOverlay.classList.add('hidden');
+  });
+
+  function abrirImpresionLamparasUV(reporte, filasLamparas){
+    const emp = getEmpresa();
+    const visita = calVisitasCache.find(v => v.id === lamparasUVVisitaActualId);
+    const cliente = (visita && visita.clientes) || {};
+
+    const lamparaPorId = {};
+    lamparasUVCache.forEach(e => { lamparaPorId[e.id] = e; });
+
+    const filasHtml = filasLamparas.map(f => {
+      const e = lamparaPorId[f.estacion_id] || {};
+      return `
+        <tr>
+          <td>${e.numero || '-'}</td>
+          <td>${escapeHtml(e.ubicacion || '-')}</td>
+          <td>${f.conteo_insectos != null ? f.conteo_insectos : '-'}</td>
+          <td>${escapeHtml(f.estado_tubo || '-')}</td>
+          <td>${f.tubo_cambiado ? 'Sí' : 'No'}</td>
+          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    lamparasUVDocContent.innerHTML = `
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(emp.nombre || "Nombre de tu empresa")}</h2>
+          <p>${escapeHtml(emp.direccion || "Dirección de la empresa")}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || "-")} ${emp.email ? " | " + escapeHtml(emp.email) : ""}</p>
+        </div>
+        <div class="doc-logo">${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}</div>
+      </div>
+
+      <div class="doc-title"><h1>Reporte de Lámparas UV</h1></div>
+
+      <div class="doc-cliente-folio">
+        <div class="cliente-bloque">
+          <p><strong>Cliente:</strong> ${escapeHtml(cliente.nombre || '')}</p>
+          <p>${escapeHtml(cliente.direccion || '')}</p>
+        </div>
+        <div class="folio-bloque">
+          <p><strong>Folio:</strong> ${reporte.folio}</p>
+          <p><strong>Fecha de servicio:</strong> ${formatDate(reporte.fecha)}</p>
+        </div>
+      </div>
+
+      <h3>Lámparas revisadas</h3>
+      <table>
+        <thead><tr><th>#</th><th>Ubicación</th><th>Conteo insectos</th><th>Estado tubo/foco</th><th>¿Cambiado?</th><th>Notas</th></tr></thead>
+        <tbody>${filasHtml || '<tr><td colspan="6">Sin lámparas registradas.</td></tr>'}</tbody>
+      </table>
+
+      ${reporte.observaciones ? `<h3>Observaciones</h3><p style="white-space:pre-wrap;">${escapeHtml(reporte.observaciones)}</p>` : ''}
+
+      <h3>Firmas</h3>
+      <div class="grid">
+        <div>${firmaHtml(reporte.firma_cliente_imagen, reporte.firma_cliente_nombre, 'Firma del cliente')}</div>
+        <div>${firmaHtml(reporte.firma_tecnico_imagen, reporte.firma_tecnico_nombre, 'Firma del técnico')}</div>
+      </div>
+    `;
+    lamparasUVPrintOverlay.classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarLamparasUVPreview').addEventListener('click', ()=>{
+    lamparasUVPrintOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnImprimirLamparasUVDoc').addEventListener('click', ()=>{
+    window.print();
+  });
+
+  document.getElementById('btnGuardarLamparasUV').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnGuardarLamparasUV');
+    btn.disabled = true;
+
+    const filasLamparas = Array.from(document.querySelectorAll('#lamparasUVLista [data-estacion-id]')).map(fila => ({
+      estacion_id: fila.dataset.estacionId,
+      conteo_insectos: fila.querySelector('.lampara-conteo').value !== '' ? parseInt(fila.querySelector('.lampara-conteo').value, 10) : null,
+      estado_tubo: fila.querySelector('.lampara-estado-tubo').value || null,
+      tubo_cambiado: fila.querySelector('.lampara-cambiado').checked,
+      notas: fila.querySelector('.lampara-notas').value.trim() || null,
+    }));
+
+    const payloadLamparasUV = {
+      visita_id: lamparasUVVisitaActualId,
+      cliente_id: lamparasUVClienteActualId,
+      folio: Number(document.getElementById('lamparasUVFolio').value),
+      fecha: document.getElementById('lamparasUVFecha').value,
+      observaciones: document.getElementById('lamparasUVObservaciones').value.trim() || null,
+      firma_tecnico_imagen: lamparasUVFirmasActuales.firma_tecnico_imagen,
+      firma_tecnico_nombre: lamparasUVFirmasActuales.firma_tecnico_nombre,
+      firma_cliente_imagen: lamparasUVFirmasActuales.firma_cliente_imagen,
+      firma_cliente_nombre: lamparasUVFirmasActuales.firma_cliente_nombre,
+      tecnico_id: (usuarioActual && usuarioActual.id) || null,
+      actualizado_por: (usuarioActual && usuarioActual.id) || null,
+    };
+
+    const { data: reporteGuardado, error: errReporte } = await supabaseClient
+      .from('reportes_lamparas_uv')
+      .upsert(payloadLamparasUV, { onConflict: 'visita_id' })
+      .select('id')
+      .single();
+
+    if(errReporte){
+      btn.disabled = false;
+      alert('No se pudo guardar el reporte de lámparas UV: ' + errReporte.message);
+      return;
+    }
+
+    if(filasLamparas.length > 0){
+      const detalleParaGuardar = filasLamparas.map(f => ({
+        reporte_id: reporteGuardado.id,
+        estacion_id: f.estacion_id,
+        conteo_insectos: f.conteo_insectos,
+        estado_tubo: f.estado_tubo,
+        tubo_cambiado: f.tubo_cambiado,
+        notas: f.notas,
+      }));
+      const { error: errDetalle } = await supabaseClient
+        .from('reportes_lamparas_uv_detalle')
+        .upsert(detalleParaGuardar, { onConflict: 'reporte_id,estacion_id' });
+      if(errDetalle){
+        btn.disabled = false;
+        alert('El reporte se guardó, pero no se pudo guardar el detalle de lámparas: ' + errDetalle.message);
+        return;
+      }
+    }
+
+    btn.disabled = false;
+    mostrarToast('Reporte de lámparas UV guardado.');
+    lamparasUVOverlay.classList.add('hidden');
+    abrirImpresionLamparasUV(payloadLamparasUV, filasLamparas);
+  });
+
+  async function verLamparasUVDesdeOficina(visitaId){
+    const visita = calVisitasCache.find(v => v.id === visitaId);
+    lamparasUVVisitaActualId = visitaId;
+    lamparasUVClienteActualId = visita ? visita.cliente_id : null;
+
+    const { data: reporte, error } = await supabaseClient
+      .from('reportes_lamparas_uv')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(error || !reporte){
+      alert('No se encontró el reporte de lámparas UV guardado.');
+      return;
+    }
+
+    const { data: lamparas, error: errLamp } = await supabaseClient
+      .from('estaciones')
+      .select('*')
+      .eq('cliente_id', lamparasUVClienteActualId)
+      .eq('tipo_estacion', 'Lámpara UV')
+      .order('numero');
+    if(errLamp) console.error('No se pudieron cargar las lámparas UV:', errLamp);
+    lamparasUVCache = lamparas || [];
+
+    const { data: detalle, error: errDetalle } = await supabaseClient
+      .from('reportes_lamparas_uv_detalle')
+      .select('*')
+      .eq('reporte_id', reporte.id);
+    if(errDetalle) console.error('No se pudo cargar el detalle de lámparas UV:', errDetalle);
+
+    const filasLamparas = (detalle || []).map(d => ({
+      estacion_id: d.estacion_id,
+      conteo_insectos: d.conteo_insectos,
+      estado_tubo: d.estado_tubo,
+      tubo_cambiado: d.tubo_cambiado,
+      notas: d.notas,
+    }));
+
+    abrirImpresionLamparasUV(reporte, filasLamparas);
+  }
+
+
   // ---------- Documentación (oficina: dueño y asistente) ----------
   // Lista de solo consulta: reutiliza abrirImpresionReporte/abrirImpresionCertificado
   // ya construidos para el técnico, pero llamándolos directo (sin pasar por
@@ -9386,6 +9780,7 @@
       { data: clientesData, error: errClientes },
       { data: reportes, error: errRep },
       { data: certificados, error: errCert },
+      { data: reportesLamparasUV, error: errLampUV },
       { data: perfiles, error: errPerf },
       { data: extras, error: errExtras },
     ] = await Promise.all([
@@ -9394,6 +9789,8 @@
         .select('id, visita_id, fecha_creacion, tecnico_id, hora_inicio, visitas_programadas(cliente_id, tipo, fecha_programada, fecha_realizada, hora, clientes(nombre))'),
       supabaseClient.from('certificados_visita')
         .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
+      supabaseClient.from('reportes_lamparas_uv')
+        .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
       supabaseClient.from('perfiles_usuario').select('id, nombre'),
       supabaseClient.from('extras_fuera_horario').select('*'),
     ]);
@@ -9401,6 +9798,7 @@
     if(errClientes) console.error('No se pudieron cargar los clientes para Documentación:', errClientes);
     if(errRep) console.error('No se pudieron cargar los reportes de visita:', errRep);
     if(errCert) console.error('No se pudieron cargar los certificados:', errCert);
+    if(errLampUV) console.error('No se pudieron cargar los reportes de lámparas UV:', errLampUV);
     if(errPerf) console.error('No se pudieron cargar los perfiles de usuario (nombres de técnico):', errPerf);
     if(errExtras) console.error('No se pudieron cargar los extras fuera de horario:', errExtras);
 
@@ -9445,7 +9843,21 @@
       };
     });
 
-    documentacionCache = [...itemsReporte, ...itemsCertificado]
+    const itemsLamparasUV = (reportesLamparasUV || []).map(l => {
+      const visita = l.visitas_programadas || {};
+      return {
+        tipo: 'lamparas_uv',
+        visitaId: l.visita_id,
+        clienteId: l.cliente_id,
+        clienteNombre: (l.clientes && l.clientes.nombre) || '(cliente no encontrado)',
+        fecha: l.fecha,
+        tipoVisita: visita.tipo || 'Mantenimiento',
+        tecnicoNombre: nombrePorId[l.tecnico_id] || '-',
+        folio: l.folio,
+      };
+    });
+
+    documentacionCache = [...itemsReporte, ...itemsCertificado, ...itemsLamparasUV]
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   }
 
@@ -9505,6 +9917,9 @@
     `;
   }
 
+  const DOC_TIPO_LABEL = { reporte: 'Reporte de visita', certificado: 'Certificado', lamparas_uv: 'Reporte de Lámparas UV' };
+  const DOC_TIPO_BADGE_CLASS = { reporte: 'doc-reporte', certificado: 'doc-certificado', lamparas_uv: 'doc-lamparas' };
+
   function renderDocumentacionLista(){
     const clienteFiltro = docFiltroCliente.value;
     const mesFiltro = docFiltroMes.value; // "YYYY-MM" o ""
@@ -9526,7 +9941,7 @@
         <div class="documentacion-info">
           <div>
             <strong>${escapeHtml(d.clienteNombre)}</strong>
-            <span class="badge ${d.tipo === 'certificado' ? 'doc-certificado' : 'doc-reporte'}">${d.tipo === 'certificado' ? 'Certificado' : 'Reporte de visita'}</span>
+            <span class="badge ${DOC_TIPO_BADGE_CLASS[d.tipo] || 'doc-reporte'}">${DOC_TIPO_LABEL[d.tipo] || d.tipo}</span>
           </div>
           <div class="documentacion-meta">
             ${formatDate(d.fecha)} · ${escapeHtml(d.tipoVisita)} · Técnico: ${escapeHtml(d.tecnicoNombre)}${d.folio ? ' · Folio: ' + d.folio : ''}
@@ -9545,6 +9960,8 @@
       await asegurarVisitaEnCache(btnVer.dataset.visitaId);
       if(btnVer.dataset.verDoc === 'reporte'){
         await verReporteDesdeOficina(btnVer.dataset.visitaId);
+      } else if(btnVer.dataset.verDoc === 'lamparas_uv'){
+        await verLamparasUVDesdeOficina(btnVer.dataset.visitaId);
       } else {
         await verCertificadoDesdeOficina(btnVer.dataset.visitaId);
       }
@@ -9705,6 +10122,7 @@
       .from('estaciones')
       .select('*')
       .eq('cliente_id', reporteClienteActualId)
+      .neq('tipo_estacion', 'Lámpara UV')
       .order('numero');
     if(errEst) console.error('No se pudieron cargar las estaciones:', errEst);
     reporteEstacionesCache = estaciones || [];
