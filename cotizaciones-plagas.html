@@ -638,7 +638,7 @@
       size:letter;
       margin:12mm;
     }
-    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#ventaMostradorPrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
     #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
@@ -649,6 +649,8 @@
     #reportePrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #certificadoPrintOverlay{position:static;display:block;padding:0;background:none;}
     #certificadoPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+    #ventaMostradorPrintOverlay{position:static;display:block;padding:0;background:none;}
+    #ventaMostradorPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     .print-toolbar{display:none;}
 
     .doc{padding:0;}
@@ -1230,6 +1232,17 @@
     padding:30px 15px;overflow:auto;z-index:999;
   }
   #lamparasUVPrintSheet{
+    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+
+  /* ---------- Impresion de la Nota de venta (mostrador) ---------- */
+  #ventaMostradorPrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:999;
+  }
+  #ventaMostradorPrintSheet{
     background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
@@ -2341,6 +2354,51 @@
       </div>
       <div id="comprasProveedorLista"></div>
       <div id="comprasProveedorDetalle" class="hidden" style="margin-top:14px;"></div>
+
+      <h3 style="margin-top:28px;">Ventas de mostrador</h3>
+      <p style="font-size:12px;color:#777;margin-top:0;">Para productos que no se usan en servicio y se venden directo en mostrador. Cada venta descuenta del stock igual que un consumo, pero queda marcada como venta y con su propio folio de nota. Es un libro mayor sin edición: una vez guardada, la venta ya no se puede editar ni borrar.</p>
+
+      <div class="grid" style="align-items:end;">
+        <div class="field">
+          <label for="ventaMostradorInsumo">Producto</label>
+          <select id="ventaMostradorInsumo">
+            <option value="">Selecciona...</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label for="ventaMostradorCantidad" id="ventaMostradorCantidadLabel">Cantidad</label>
+          <input type="number" id="ventaMostradorCantidad" min="0" step="any" placeholder="Ej. 2">
+        </div>
+        <div class="field" style="max-width:170px;">
+          <label for="ventaMostradorTipoPrecio">El precio que vas a dar es...</label>
+          <select id="ventaMostradorTipoPrecio">
+            <option value="total">Total de la venta</option>
+            <option value="unitario">Por unidad</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label for="ventaMostradorPrecio">Precio ($)</label>
+          <input type="number" id="ventaMostradorPrecio" min="0" step="any" placeholder="Ej. 250">
+        </div>
+        <div class="field" style="max-width:200px;">
+          <label for="ventaMostradorComprador">Comprador (opcional)</label>
+          <input type="text" id="ventaMostradorComprador" placeholder="Ej. Juan Pérez">
+        </div>
+        <div class="field" style="max-width:170px;">
+          <label for="ventaMostradorFecha">Fecha</label>
+          <input type="date" id="ventaMostradorFecha">
+        </div>
+        <div class="field" style="flex:1 1 240px;">
+          <label for="ventaMostradorNota">Nota (opcional)</label>
+          <input type="text" id="ventaMostradorNota" placeholder="Ej. Pagó con transferencia">
+        </div>
+        <div class="field" style="max-width:220px;">
+          <button type="button" class="btn" id="btnRegistrarVentaMostrador" style="width:100%;">Registrar venta</button>
+        </div>
+      </div>
+      <div class="hint" id="ventaMostradorPreview"></div>
+
+      <div id="ventaMostradorLista" style="margin-top:14px;"></div>
     </div>
   </section>
 
@@ -2801,6 +2859,17 @@
       <button class="btn" id="btnImprimirLamparasUVDoc">Imprimir</button>
     </div>
     <div class="doc" id="lamparasUVDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE IMPRESION DE NOTA DE VENTA (mostrador) ================= -->
+<div id="ventaMostradorPrintOverlay" class="hidden">
+  <div id="ventaMostradorPrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarVentaMostradorPreview">Cerrar</button>
+      <button class="btn" id="btnImprimirVentaMostradorDoc">Imprimir</button>
+    </div>
+    <div class="doc" id="ventaMostradorDocContent"><!-- contenido generado por JS --></div>
   </div>
 </div>
 
@@ -7307,6 +7376,7 @@
   let insumoEditandoId = null; // si no es null, el formulario de catalogo esta en modo "editar"
   let comprasProveedorCache = [];      // filas crudas de la vista almacen_compras_detalle
   let comprasProveedorSeleccionado = undefined; // clave (proveedor_normalizado, o null = "Sin proveedor") del grupo abierto en el detalle
+  let ventaMostradorCache = [];        // filas de la vista ventas_mostrador_detalle
 
   function formatCantidadBase(cantidad, unidadBase){
     const n = Number(cantidad) || 0;
@@ -7318,7 +7388,9 @@
   async function cargarAlmacen(){
     const hoyInput = document.getElementById('compraFecha');
     if(hoyInput && !hoyInput.value) hoyInput.value = new Date().toISOString().slice(0, 10);
-    await Promise.all([cargarInsumos(), cargarStockInsumos(), cargarComprasPorProveedor()]);
+    const hoyVentaInput = document.getElementById('ventaMostradorFecha');
+    if(hoyVentaInput && !hoyVentaInput.value) hoyVentaInput.value = new Date().toISOString().slice(0, 10);
+    await Promise.all([cargarInsumos(), cargarStockInsumos(), cargarComprasPorProveedor(), cargarVentasMostrador()]);
   }
 
   // ---------- Catálogo ----------
@@ -7337,6 +7409,7 @@
     insumosCache = data || [];
     renderInsumosLista();
     renderSelectComprasInsumo();
+    renderSelectVentaMostradorInsumo();
   }
 
   function renderInsumosLista(){
@@ -7672,6 +7745,213 @@
   }
 
   document.getElementById('comprasProveedorRango').addEventListener('change', cargarComprasPorProveedor);
+
+  // ---------- Ventas de mostrador ----------
+  // Venta directa de un insumo del catálogo (productos que no se usan en
+  // servicio, se venden tal cual). Se guardan DOS filas: una en
+  // ventas_mostrador (folio propio + precio) y una 'salida' en
+  // insumo_movimientos ligada por venta_mostrador_id, para que el stock
+  // baje exactamente igual que un consumo por visita. Mismo espiritu de
+  // libro mayor sin edicion que el resto del almacen: no hay editar/borrar.
+  function renderSelectVentaMostradorInsumo(){
+    const select = document.getElementById('ventaMostradorInsumo');
+    const seleccionActual = select.value;
+    const activos = insumosCache.filter(i => i.activo);
+    select.innerHTML = `<option value="">Selecciona...</option>` +
+      activos.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)} (${escapeHtml(i.unidad_base)})</option>`).join('');
+    if(seleccionActual) select.value = seleccionActual;
+    actualizarEtiquetaCantidadVenta();
+  }
+
+  function actualizarEtiquetaCantidadVenta(){
+    const insumo = insumosCache.find(i => i.id === document.getElementById('ventaMostradorInsumo').value);
+    const unidad = insumo ? (UNIDAD_BASE_LABEL[insumo.unidad_base] || insumo.unidad_base) : 'unidad';
+    document.getElementById('ventaMostradorCantidadLabel').textContent = `Cantidad (${unidad})`;
+  }
+  document.getElementById('ventaMostradorInsumo').addEventListener('change', () => {
+    actualizarEtiquetaCantidadVenta();
+    actualizarPreviewVentaMostrador();
+  });
+
+  // Igual que calcularCompra(): el usuario da precio unitario O total y se
+  // deriva el otro, para no obligar a hacer la cuenta a mano.
+  function calcularVentaMostrador(){
+    const insumo = insumosCache.find(i => i.id === document.getElementById('ventaMostradorInsumo').value);
+    const cantidadBase = parseFloat(document.getElementById('ventaMostradorCantidad').value);
+    const tipoPrecio = document.getElementById('ventaMostradorTipoPrecio').value;
+    const precioCapturado = parseFloat(document.getElementById('ventaMostradorPrecio').value);
+
+    if(!insumo || !cantidadBase || cantidadBase <= 0 || !precioCapturado || precioCapturado <= 0){
+      return null;
+    }
+    const precioTotal = tipoPrecio === 'unitario' ? precioCapturado * cantidadBase : precioCapturado;
+    const precioUnitario = precioTotal / cantidadBase;
+    return { insumo, cantidadBase, precioTotal, precioUnitario };
+  }
+
+  function actualizarPreviewVentaMostrador(){
+    const preview = document.getElementById('ventaMostradorPreview');
+    const calculo = calcularVentaMostrador();
+    if(!calculo){
+      preview.textContent = '';
+      return;
+    }
+    preview.textContent =
+      `= ${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} · ` +
+      `precio unitario ${formatMoney(calculo.precioUnitario)} · ` +
+      `total ${formatMoney(calculo.precioTotal)}`;
+  }
+  ['ventaMostradorCantidad', 'ventaMostradorTipoPrecio', 'ventaMostradorPrecio'].forEach(id => {
+    document.getElementById(id).addEventListener('input', actualizarPreviewVentaMostrador);
+    document.getElementById(id).addEventListener('change', actualizarPreviewVentaMostrador);
+  });
+
+  document.getElementById('btnRegistrarVentaMostrador').addEventListener('click', async () => {
+    const calculo = calcularVentaMostrador();
+    if(!calculo){
+      alert('Revisa el producto, la cantidad y el precio: todos son obligatorios y mayores a 0.');
+      return;
+    }
+    const comprador = document.getElementById('ventaMostradorComprador').value.trim();
+    const nota = document.getElementById('ventaMostradorNota').value.trim();
+    const fecha = document.getElementById('ventaMostradorFecha').value || new Date().toISOString().slice(0, 10);
+
+    const btn = document.getElementById('btnRegistrarVentaMostrador');
+    btn.disabled = true;
+
+    const { data: venta, error: errorVenta } = await supabaseClient.from('ventas_mostrador').insert({
+      insumo_id: calculo.insumo.id,
+      cantidad_base: calculo.cantidadBase,
+      precio_unitario: calculo.precioUnitario,
+      precio_total: calculo.precioTotal,
+      comprador: comprador || null,
+      nota: nota || null,
+      fecha,
+      usuario_id: (usuarioActual && usuarioActual.id) || null,
+    }).select().single();
+
+    if(errorVenta){
+      btn.disabled = false;
+      alert('No se pudo registrar la venta: ' + errorVenta.message);
+      return;
+    }
+
+    const { error: errorMov } = await supabaseClient.from('insumo_movimientos').insert({
+      insumo_id: calculo.insumo.id,
+      tipo: 'salida',
+      cantidad_base: calculo.cantidadBase,
+      fecha,
+      venta_mostrador_id: venta.id,
+      usuario_id: (usuarioActual && usuarioActual.id) || null,
+    });
+    btn.disabled = false;
+
+    if(errorMov){
+      alert(`La venta se registró (folio ${venta.folio}), pero no se pudo descontar del stock: ` + errorMov.message);
+    } else {
+      mostrarToast(`Venta registrada: folio ${venta.folio}, -${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} de ${calculo.insumo.nombre}.`);
+    }
+
+    document.getElementById('ventaMostradorCantidad').value = '';
+    document.getElementById('ventaMostradorPrecio').value = '';
+    document.getElementById('ventaMostradorComprador').value = '';
+    document.getElementById('ventaMostradorNota').value = '';
+    document.getElementById('ventaMostradorPreview').textContent = '';
+    await cargarStockInsumos();
+    await cargarVentasMostrador();
+  });
+
+  async function cargarVentasMostrador(){
+    const cont = document.getElementById('ventaMostradorLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const { data, error } = await supabaseClient
+      .from('ventas_mostrador_detalle')
+      .select('*')
+      .order('fecha', { ascending: false })
+      .order('folio', { ascending: false });
+    if(error){
+      console.error('No se pudieron cargar las ventas de mostrador:', error);
+      cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    ventaMostradorCache = data || [];
+    renderVentaMostradorLista();
+  }
+
+  function renderVentaMostradorLista(){
+    const cont = document.getElementById('ventaMostradorLista');
+    if(ventaMostradorCache.length === 0){
+      cont.innerHTML = `<div class="empty-msg">Todavía no hay ventas de mostrador registradas.</div>`;
+      return;
+    }
+    cont.innerHTML = ventaMostradorCache.map(v => `
+      <div class="insumo-row" data-id="${v.id}">
+        <div class="insumo-info">
+          <div class="insumo-nombre">${escapeHtml(v.insumo_nombre)} × ${formatCantidadBase(v.cantidad_base, v.unidad_base)} — ${formatMoney(v.precio_total)}</div>
+          <div class="insumo-meta">Folio ${v.folio} · ${formatDate(v.fecha)}${v.comprador ? ' · ' + escapeHtml(v.comprador) : ''}${v.nota ? ' · ' + escapeHtml(v.nota) : ''}</div>
+        </div>
+        <div class="insumo-acciones">
+          <button type="button" class="btn secondary small" data-imprimir-venta="${v.id}">Imprimir nota</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('ventaMostradorLista').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-imprimir-venta]');
+    if(!btn) return;
+    const venta = ventaMostradorCache.find(v => v.id === btn.dataset.imprimirVenta);
+    if(!venta) return;
+    abrirImpresionVentaMostrador(venta);
+  });
+
+  function abrirImpresionVentaMostrador(venta){
+    const emp = getEmpresa();
+    document.getElementById('ventaMostradorDocContent').innerHTML = `
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(emp.nombre || "Nombre de tu empresa")}</h2>
+          <p>${escapeHtml(emp.direccion || "Dirección de la empresa")}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || "-")} ${emp.email ? " | " + escapeHtml(emp.email) : ""}</p>
+        </div>
+        <div class="doc-logo">${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}</div>
+      </div>
+      <div class="doc-title"><h1>Nota de venta</h1></div>
+      <div class="doc-cliente-folio">
+        <div class="cliente-bloque">
+          <p><strong>Comprador:</strong></p>
+          <p>${escapeHtml(venta.comprador || 'Mostrador')}</p>
+        </div>
+        <div class="folio-bloque">
+          <p><strong>Folio:</strong> ${venta.folio}</p>
+          <p><strong>Fecha:</strong> ${formatDate(venta.fecha)}</p>
+        </div>
+      </div>
+      <table class="doc-price-table">
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>${escapeHtml(venta.insumo_nombre)}</td>
+            <td>${formatCantidadBase(venta.cantidad_base, venta.unidad_base)}</td>
+            <td>${formatMoney(venta.precio_unitario)}</td>
+            <td>${formatMoney(venta.precio_total)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="doc-totales">
+        <div class="doc-total-final"><span>Total</span><span>${formatMoney(venta.precio_total)}</span></div>
+      </div>
+      ${venta.nota ? `<div class="doc-section"><h3>Nota</h3><p style="white-space:pre-wrap;">${escapeHtml(venta.nota)}</p></div>` : ''}
+    `;
+    document.getElementById('ventaMostradorPrintOverlay').classList.remove('hidden');
+  }
+
+  document.getElementById('btnCerrarVentaMostradorPreview').addEventListener('click', () => {
+    document.getElementById('ventaMostradorPrintOverlay').classList.add('hidden');
+  });
+  document.getElementById('btnImprimirVentaMostradorDoc').addEventListener('click', () => {
+    window.print();
+  });
 
   // ---------- Registrar compra desde factura (XML CFDI 4.0) ----------
   // Parseo 100% en el navegador (DOMParser), sin backend. Los namespaces
