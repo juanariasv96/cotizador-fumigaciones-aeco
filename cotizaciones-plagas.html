@@ -8476,20 +8476,33 @@
     await cargarVentasMostrador();
   });
 
+  // La vista ventas_mostrador_detalle (solo lectura, no se toca aqui) trae
+  // el nombre/unidad del insumo para mostrar; las columnas de cancelacion e
+  // insumo_id (necesario para la reversa de stock) se traen aparte desde la
+  // tabla base ventas_mostrador y se combinan por id, para no depender de
+  // si esa vista ya expone o no las columnas nuevas.
   async function cargarVentasMostrador(){
     const cont = document.getElementById('ventaMostradorLista');
     cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
-    const { data, error } = await supabaseClient
-      .from('ventas_mostrador_detalle')
-      .select('*')
-      .order('fecha', { ascending: false })
-      .order('folio', { ascending: false });
+    const [{ data, error }, baseRes] = await Promise.all([
+      supabaseClient
+        .from('ventas_mostrador_detalle')
+        .select('*')
+        .order('fecha', { ascending: false })
+        .order('folio', { ascending: false }),
+      supabaseClient
+        .from('ventas_mostrador')
+        .select('id, insumo_id, cancelada, cancelada_por, cancelada_en, motivo_cancelacion'),
+    ]);
     if(error){
       console.error('No se pudieron cargar las ventas de mostrador:', error);
       cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
       return;
     }
-    ventaMostradorCache = data || [];
+    const baseData = baseRes.error ? [] : (baseRes.data || []);
+    if(baseRes.error) console.error('No se pudieron cargar los datos de cancelación de ventas de mostrador:', baseRes.error);
+    const basePorId = new Map(baseData.map(b => [b.id, b]));
+    ventaMostradorCache = (data || []).map(v => ({ ...v, ...(basePorId.get(v.id) || {}) }));
     renderVentaMostradorLista();
   }
 
@@ -8502,23 +8515,78 @@
     cont.innerHTML = ventaMostradorCache.map(v => `
       <div class="insumo-row" data-id="${v.id}">
         <div class="insumo-info">
-          <div class="insumo-nombre">${escapeHtml(v.insumo_nombre)} × ${formatCantidadBase(v.cantidad_base, v.unidad_base)} — ${formatMoney(v.precio_total)}</div>
-          <div class="insumo-meta">Folio ${v.folio} · ${formatDate(v.fecha)}${v.comprador ? ' · ' + escapeHtml(v.comprador) : ''}${v.nota ? ' · ' + escapeHtml(v.nota) : ''}</div>
+          <div class="insumo-nombre">${escapeHtml(v.insumo_nombre)} × ${formatCantidadBase(v.cantidad_base, v.unidad_base)} — ${formatMoney(v.precio_total)}${v.cancelada ? ' <span style="color:#b3261e;font-weight:bold;">(CANCELADA)</span>' : ''}</div>
+          <div class="insumo-meta">Folio ${v.folio} · ${formatDate(v.fecha)}${v.comprador ? ' · ' + escapeHtml(v.comprador) : ''}${v.nota ? ' · ' + escapeHtml(v.nota) : ''}${v.cancelada ? ' · Cancelada el ' + formatDate((v.cancelada_en || '').slice(0, 10)) + (v.motivo_cancelacion ? ' — ' + escapeHtml(v.motivo_cancelacion) : '') : ''}</div>
         </div>
         <div class="insumo-acciones">
           <button type="button" class="btn secondary small" data-imprimir-venta="${v.id}">Imprimir nota</button>
+          ${v.cancelada ? '' : `<button type="button" class="btn danger small" data-cancelar-venta="${v.id}">Cancelar venta</button>`}
         </div>
       </div>
     `).join('');
   }
 
   document.getElementById('ventaMostradorLista').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-imprimir-venta]');
-    if(!btn) return;
-    const venta = ventaMostradorCache.find(v => v.id === btn.dataset.imprimirVenta);
-    if(!venta) return;
-    abrirImpresionVentaMostrador(venta);
+    const btnImprimir = e.target.closest('[data-imprimir-venta]');
+    if(btnImprimir){
+      const venta = ventaMostradorCache.find(v => v.id === btnImprimir.dataset.imprimirVenta);
+      if(venta) abrirImpresionVentaMostrador(venta);
+      return;
+    }
+    const btnCancelar = e.target.closest('[data-cancelar-venta]');
+    if(btnCancelar){
+      cancelarVentaMostrador(btnCancelar.dataset.cancelarVenta);
+    }
   });
+
+  // Cancelacion suave (soft-cancel): la venta NO se borra ni se edita, solo
+  // se marca cancelada=true (queda visible en el historial marcada como
+  // CANCELADA) y se revierte el stock con un movimiento de REVERSA
+  // ('entrada' en insumo_movimientos por la misma cantidad_base, ligado a
+  // la venta via venta_mostrador_id) en vez de tocar/borrar la salida
+  // original — asi insumo_movimientos sigue siendo un libro mayor
+  // append-only y el historial de movimientos queda completo y auditable.
+  // Permiso: oficina (dueno o asistente), protegido ademas en RLS.
+  async function cancelarVentaMostrador(id){
+    const venta = ventaMostradorCache.find(v => v.id === id);
+    if(!venta || venta.cancelada) return;
+
+    const motivo = prompt(`Cancelar venta folio ${venta.folio} (${venta.insumo_nombre}, ${formatMoney(venta.precio_total)}).\nEsto regresa ${formatCantidadBase(venta.cantidad_base, venta.unidad_base)} al stock y no se puede deshacer.\n\nMotivo (opcional):`);
+    if(motivo === null) return;
+    if(!confirm(`¿Confirmas cancelar la venta folio ${venta.folio}?`)) return;
+
+    const ahora = new Date().toISOString();
+    const { error: errorCancel } = await supabaseClient
+      .from('ventas_mostrador')
+      .update({
+        cancelada: true,
+        cancelada_por: (usuarioActual && usuarioActual.id) || null,
+        cancelada_en: ahora,
+        motivo_cancelacion: motivo.trim() || null,
+      })
+      .eq('id', id)
+      .eq('cancelada', false);
+    if(errorCancel){
+      alert('No se pudo cancelar la venta: ' + errorCancel.message);
+      return;
+    }
+
+    const { error: errorMov } = await supabaseClient.from('insumo_movimientos').insert({
+      insumo_id: venta.insumo_id,
+      tipo: 'entrada',
+      cantidad_base: venta.cantidad_base,
+      fecha: new Date().toISOString().slice(0, 10),
+      venta_mostrador_id: id,
+      usuario_id: (usuarioActual && usuarioActual.id) || null,
+    });
+    if(errorMov){
+      alert(`La venta quedó marcada como cancelada, pero no se pudo regresar el stock automáticamente: ${errorMov.message}. Avisa para corregirlo a mano.`);
+    } else {
+      mostrarToast(`Venta folio ${venta.folio} cancelada. Se regresó ${formatCantidadBase(venta.cantidad_base, venta.unidad_base)} de ${venta.insumo_nombre} al stock.`);
+    }
+    await cargarVentasMostrador();
+    await cargarStockInsumos();
+  }
 
   function abrirImpresionVentaMostrador(venta){
     const emp = getEmpresa();
