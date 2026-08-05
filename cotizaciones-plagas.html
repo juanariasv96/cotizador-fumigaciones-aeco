@@ -2270,6 +2270,29 @@
           <button type="button" class="btn" id="btnGuardarInsumo" style="width:100%;">+ Agregar insumo</button>
         </div>
       </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;">
+          <input type="checkbox" id="insumoVendibleMostrador" style="width:auto;">
+          Se vende también en mostrador (por presentación/bote completo)
+        </label>
+      </div>
+      <div class="grid hidden" id="insumoVentaMostradorCampos" style="align-items:end;margin-top:6px;">
+        <div class="field" style="max-width:200px;">
+          <label for="insumoPresentacionVentaBase" id="insumoPresentacionVentaBaseLabel">Tamaño de la presentación</label>
+          <input type="number" id="insumoPresentacionVentaBase" min="0" step="any" placeholder="Ej. 1000">
+        </div>
+        <div class="field" style="max-width:200px;">
+          <label for="insumoPresentacionVentaLabel">Etiqueta (opcional)</label>
+          <input type="text" id="insumoPresentacionVentaLabel" placeholder="Ej. Bote 1 L">
+        </div>
+        <div class="field" style="max-width:170px;">
+          <label for="insumoPrecioVenta">Precio de venta ($)</label>
+          <input type="number" id="insumoPrecioVenta" min="0" step="any" placeholder="Ej. 450">
+        </div>
+      </div>
+      <div class="hint hidden" id="insumoPrecioVentaSugerencia" style="margin-top:6px;"></div>
+
       <div class="hint hidden" id="insumoEditandoAviso" style="margin-top:6px;">
         Editando <strong id="insumoEditandoNombre"></strong> —
         <button type="button" class="btn secondary small" id="btnCancelarEdicionInsumo">Cancelar edición</button>
@@ -2378,15 +2401,15 @@
             <option value="">Selecciona...</option>
           </select>
         </div>
-        <div class="field" style="max-width:150px;">
-          <label for="ventaMostradorCantidad" id="ventaMostradorCantidadLabel">Cantidad</label>
+        <div class="field" style="max-width:170px;">
+          <label for="ventaMostradorCantidad" id="ventaMostradorCantidadLabel">Cantidad (presentaciones)</label>
           <input type="number" id="ventaMostradorCantidad" min="0" step="any" placeholder="Ej. 2">
         </div>
         <div class="field" style="max-width:170px;">
           <label for="ventaMostradorTipoPrecio">El precio que vas a dar es...</label>
           <select id="ventaMostradorTipoPrecio">
+            <option value="unitario">Por presentación</option>
             <option value="total">Total de la venta</option>
-            <option value="unitario">Por unidad</option>
           </select>
         </div>
         <div class="field" style="max-width:150px;">
@@ -2410,6 +2433,7 @@
         </div>
       </div>
       <div class="hint" id="ventaMostradorPreview"></div>
+      <div class="hint hidden" id="ventaMostradorAvisoMinimo" style="color:#b3261e;font-weight:bold;"></div>
 
       <h3 style="margin-top:28px;">Historial de ventas</h3>
       <div id="ventaMostradorLista"></div>
@@ -7426,6 +7450,25 @@
   // =====================================================================
   const UNIDAD_BASE_LABEL = { ml: 'ml', g: 'g', pieza: 'pieza(s)', l: 'l', kg: 'kg' };
   const CATEGORIA_INSUMO_LABEL = { quimico: 'Químico', insumo: 'Insumo', lampara: 'Lámpara', otro: 'Otro' };
+  // Margen mínimo exigido sobre el costo al capturar el precio de venta de
+  // mostrador (20% = costo x 1.2). Por ahora es solo AVISO (se puede
+  // guardar/vender por debajo, con confirmación): para volverlo tope duro,
+  // cambia los confirm() que lo usan por un return que bloquee el guardado.
+  const MARGEN_MINIMO_VENTA_MOSTRADOR = 0.2;
+
+  // Busca en el stock en vivo (ya cargado en stockInsumosCache) el costo
+  // promedio ponderado por unidad_base de un insumo, para sugerir/validar
+  // el precio de venta de mostrador. null si todavía no hay compras
+  // registradas (no se puede sugerir un mínimo).
+  function costoPromedioDe(nombreInsumo){
+    const fila = stockInsumosCache.find(s => s.nombre === nombreInsumo);
+    return (fila && fila.costo_promedio != null) ? Number(fila.costo_promedio) : null;
+  }
+
+  function precioMinimoSugerido(costoPromedio, presentacionBase){
+    if(costoPromedio == null || !presentacionBase || presentacionBase <= 0) return null;
+    return costoPromedio * presentacionBase * (1 + MARGEN_MINIMO_VENTA_MOSTRADOR);
+  }
 
   let insumosCache = [];       // catalogo completo (activos e inactivos), para la pestaña Almacen
   let stockInsumosCache = [];  // filas de la vista stock_insumos
@@ -7453,7 +7496,10 @@
   async function cargarVentaMostradorModulo(){
     const hoyVentaInput = document.getElementById('ventaMostradorFecha');
     if(hoyVentaInput && !hoyVentaInput.value) hoyVentaInput.value = new Date().toISOString().slice(0, 10);
-    await Promise.all([cargarInsumos(), cargarVentasMostrador()]);
+    // cargarStockInsumos() se necesita aqui tambien (no solo en el tab
+    // Almacen) para tener el costo_promedio con el que avisar si el precio
+    // de venta queda por debajo del minimo sugerido.
+    await Promise.all([cargarInsumos(), cargarVentasMostrador(), cargarStockInsumos()]);
   }
 
   // ---------- Catálogo ----------
@@ -7501,9 +7547,64 @@
     document.getElementById('insumoCategoria').value = 'quimico';
     document.getElementById('insumoUnidadBase').value = 'ml';
     document.getElementById('insumoStockMinimo').value = '0';
+    document.getElementById('insumoVendibleMostrador').checked = false;
+    document.getElementById('insumoPresentacionVentaBase').value = '';
+    document.getElementById('insumoPresentacionVentaLabel').value = '';
+    document.getElementById('insumoPrecioVenta').value = '';
+    document.getElementById('insumoVentaMostradorCampos').classList.add('hidden');
+    document.getElementById('insumoPrecioVentaSugerencia').classList.add('hidden');
     document.getElementById('btnGuardarInsumo').textContent = '+ Agregar insumo';
     document.getElementById('insumoEditandoAviso').classList.add('hidden');
+    actualizarEtiquetaPresentacionVenta();
   }
+
+  function actualizarEtiquetaPresentacionVenta(){
+    const unidadBase = document.getElementById('insumoUnidadBase').value;
+    const unidad = UNIDAD_BASE_LABEL[unidadBase] || unidadBase;
+    document.getElementById('insumoPresentacionVentaBaseLabel').textContent = `Tamaño de la presentación (en ${unidad})`;
+  }
+  document.getElementById('insumoUnidadBase').addEventListener('change', () => {
+    actualizarEtiquetaPresentacionVenta();
+    actualizarSugerenciaPrecioVenta();
+  });
+
+  document.getElementById('insumoVendibleMostrador').addEventListener('change', (e) => {
+    document.getElementById('insumoVentaMostradorCampos').classList.toggle('hidden', !e.target.checked);
+    actualizarSugerenciaPrecioVenta();
+  });
+
+  // Muestra costo actual y precio mínimo sugerido (costo x presentación x
+  // 1.2) junto al campo de precio de venta, para que quien da de alta el
+  // insumo vea de inmediato si está cobrando abajo del margen esperado.
+  function actualizarSugerenciaPrecioVenta(){
+    const el = document.getElementById('insumoPrecioVentaSugerencia');
+    if(!document.getElementById('insumoVendibleMostrador').checked){
+      el.classList.add('hidden');
+      return;
+    }
+    const nombre = document.getElementById('insumoNombre').value.trim();
+    const unidadBase = document.getElementById('insumoUnidadBase').value;
+    const unidad = UNIDAD_BASE_LABEL[unidadBase] || unidadBase;
+    const presentacionBase = parseFloat(document.getElementById('insumoPresentacionVentaBase').value);
+    const costo = nombre ? costoPromedioDe(nombre) : null;
+
+    if(costo == null){
+      el.textContent = 'Aún no hay costo registrado para este insumo (sin compras todavía), no se puede sugerir un precio mínimo.';
+      el.classList.remove('hidden');
+      return;
+    }
+    if(!presentacionBase || presentacionBase <= 0){
+      el.textContent = `Costo actual: ${formatMoney(costo)}/${unidad}. Escribe el tamaño de la presentación para ver el precio mínimo sugerido.`;
+      el.classList.remove('hidden');
+      return;
+    }
+    const minimo = precioMinimoSugerido(costo, presentacionBase);
+    el.textContent = `Costo actual: ${formatMoney(costo)}/${unidad} · Costo de la presentación: ${formatMoney(costo * presentacionBase)} · Mínimo sugerido (+20%): ${formatMoney(minimo)}`;
+    el.classList.remove('hidden');
+  }
+  ['insumoNombre', 'insumoPresentacionVentaBase', 'insumoPrecioVenta'].forEach(id => {
+    document.getElementById(id).addEventListener('input', actualizarSugerenciaPrecioVenta);
+  });
 
   document.getElementById('btnGuardarInsumo').addEventListener('click', async () => {
     const nombre = document.getElementById('insumoNombre').value.trim();
@@ -7511,17 +7612,43 @@
     const categoria = document.getElementById('insumoCategoria').value;
     const unidadBase = document.getElementById('insumoUnidadBase').value;
     const stockMinimo = parseFloat(document.getElementById('insumoStockMinimo').value) || 0;
+    const vendibleMostrador = document.getElementById('insumoVendibleMostrador').checked;
+    const presentacionVentaBase = parseFloat(document.getElementById('insumoPresentacionVentaBase').value) || null;
+    const presentacionVentaLabel = document.getElementById('insumoPresentacionVentaLabel').value.trim() || null;
+    const precioVenta = parseFloat(document.getElementById('insumoPrecioVenta').value) || null;
+
+    if(vendibleMostrador && (!presentacionVentaBase || presentacionVentaBase <= 0)){
+      alert('Escribe el tamaño de la presentación de venta (en unidad base) para poder marcarlo como vendible en mostrador.');
+      return;
+    }
+
+    if(vendibleMostrador && precioVenta){
+      const costo = costoPromedioDe(nombre);
+      const minimo = precioMinimoSugerido(costo, presentacionVentaBase);
+      if(minimo != null && precioVenta < minimo){
+        const seguir = confirm(
+          `El precio de venta (${formatMoney(precioVenta)}) está por debajo del mínimo sugerido ` +
+          `(${formatMoney(minimo)}, costo de la presentación + 20%). ¿Guardarlo así de todos modos?`
+        );
+        if(!seguir) return;
+      }
+    }
 
     const btn = document.getElementById('btnGuardarInsumo');
     btn.disabled = true;
     let error;
+    const payload = {
+      nombre, categoria, unidad_base: unidadBase, stock_minimo: stockMinimo,
+      vendible_mostrador: vendibleMostrador,
+      presentacion_venta_base: vendibleMostrador ? presentacionVentaBase : null,
+      presentacion_venta_label: vendibleMostrador ? presentacionVentaLabel : null,
+      precio_venta: vendibleMostrador ? precioVenta : null,
+    };
     if(insumoEditandoId){
-      ({ error } = await supabaseClient.from('insumos').update({
-        nombre, categoria, unidad_base: unidadBase, stock_minimo: stockMinimo,
-      }).eq('id', insumoEditandoId));
+      ({ error } = await supabaseClient.from('insumos').update(payload).eq('id', insumoEditandoId));
     } else {
       ({ error } = await supabaseClient.from('insumos').insert({
-        nombre, categoria, unidad_base: unidadBase, stock_minimo: stockMinimo,
+        ...payload,
         creado_por: (usuarioActual && usuarioActual.id) || null,
       }));
     }
@@ -7548,10 +7675,17 @@
       document.getElementById('insumoCategoria').value = insumo.categoria || 'quimico';
       document.getElementById('insumoUnidadBase').value = insumo.unidad_base;
       document.getElementById('insumoStockMinimo').value = insumo.stock_minimo;
+      document.getElementById('insumoVendibleMostrador').checked = !!insumo.vendible_mostrador;
+      document.getElementById('insumoPresentacionVentaBase').value = insumo.presentacion_venta_base || '';
+      document.getElementById('insumoPresentacionVentaLabel').value = insumo.presentacion_venta_label || '';
+      document.getElementById('insumoPrecioVenta').value = insumo.precio_venta || '';
+      document.getElementById('insumoVentaMostradorCampos').classList.toggle('hidden', !insumo.vendible_mostrador);
       document.getElementById('btnGuardarInsumo').textContent = 'Guardar cambios';
       document.getElementById('insumoEditandoNombre').textContent = insumo.nombre;
       document.getElementById('insumoEditandoAviso').classList.remove('hidden');
       document.getElementById('insumoNombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      actualizarEtiquetaPresentacionVenta();
+      actualizarSugerenciaPrecioVenta();
       return;
     }
     const btnToggle = e.target.closest('[data-toggle-insumo]');
@@ -8188,55 +8322,88 @@
   // =====================================================================
   let ventaMostradorCache = [];        // filas de la vista ventas_mostrador_detalle
 
+  // Solo se venden en mostrador los insumos dados de alta como
+  // vendible_mostrador=true (con su presentacion_venta_base ya capturada
+  // en el catalogo); un insumo puede seguir usandose por ml en servicio al
+  // mismo tiempo, eso no cambia aqui.
   function renderSelectVentaMostradorInsumo(){
     const select = document.getElementById('ventaMostradorInsumo');
     const seleccionActual = select.value;
-    const activos = insumosCache.filter(i => i.activo);
+    const vendibles = insumosCache.filter(i => i.activo && i.vendible_mostrador);
     select.innerHTML = `<option value="">Selecciona...</option>` +
-      activos.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)} (${escapeHtml(i.unidad_base)})</option>`).join('');
+      vendibles.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)} (${escapeHtml(i.presentacion_venta_label || formatCantidadBase(i.presentacion_venta_base, i.unidad_base))})</option>`).join('');
     if(seleccionActual) select.value = seleccionActual;
     actualizarEtiquetaCantidadVenta();
   }
 
+  function etiquetaPresentacionDe(insumo){
+    return insumo.presentacion_venta_label || `presentación de ${formatCantidadBase(insumo.presentacion_venta_base, insumo.unidad_base)}`;
+  }
+
   function actualizarEtiquetaCantidadVenta(){
     const insumo = insumosCache.find(i => i.id === document.getElementById('ventaMostradorInsumo').value);
-    const unidad = insumo ? (UNIDAD_BASE_LABEL[insumo.unidad_base] || insumo.unidad_base) : 'unidad';
-    document.getElementById('ventaMostradorCantidadLabel').textContent = `Cantidad (${unidad})`;
+    document.getElementById('ventaMostradorCantidadLabel').textContent =
+      `Cantidad (${insumo ? etiquetaPresentacionDe(insumo) : 'presentaciones'})`;
+  }
+
+  // Al elegir el producto, precarga el precio de venta del catalogo
+  // (precio_venta, por presentacion). El usuario lo puede seguir ajustando;
+  // solo es un punto de partida, igual que pide el dueño.
+  function autocompletarPrecioVentaMostrador(){
+    const insumo = insumosCache.find(i => i.id === document.getElementById('ventaMostradorInsumo').value);
+    document.getElementById('ventaMostradorTipoPrecio').value = 'unitario';
+    document.getElementById('ventaMostradorPrecio').value = (insumo && insumo.precio_venta) ? insumo.precio_venta : '';
   }
   document.getElementById('ventaMostradorInsumo').addEventListener('change', () => {
     actualizarEtiquetaCantidadVenta();
+    autocompletarPrecioVentaMostrador();
     actualizarPreviewVentaMostrador();
   });
 
-  // Igual que calcularCompra(): el usuario da precio unitario O total y se
-  // deriva el otro, para no obligar a hacer la cuenta a mano. Este precio
-  // es el de VENTA (propio de este modulo); no toca el costo_unitario ni
-  // el costo promedio ponderado del almacen.
+  // El usuario captura CANTIDAD DE PRESENTACIONES (botes), no ml: el
+  // equivalente en unidad_base (cantidadBase) es el que realmente descuenta
+  // el stock, exactamente igual que antes (insumo_movimientos, libro
+  // mayor). precio_unitario que se guarda en BD sigue siendo $/unidad_base
+  // (no $/presentacion) para no romper el significado de esa columna ni la
+  // nota impresa, que muestra cantidad en ml junto al precio unitario.
   function calcularVentaMostrador(){
     const insumo = insumosCache.find(i => i.id === document.getElementById('ventaMostradorInsumo').value);
-    const cantidadBase = parseFloat(document.getElementById('ventaMostradorCantidad').value);
+    const cantidadPresentaciones = parseFloat(document.getElementById('ventaMostradorCantidad').value);
     const tipoPrecio = document.getElementById('ventaMostradorTipoPrecio').value;
     const precioCapturado = parseFloat(document.getElementById('ventaMostradorPrecio').value);
 
-    if(!insumo || !cantidadBase || cantidadBase <= 0 || !precioCapturado || precioCapturado <= 0){
+    if(!insumo || !insumo.presentacion_venta_base || !cantidadPresentaciones || cantidadPresentaciones <= 0 || !precioCapturado || precioCapturado <= 0){
       return null;
     }
-    const precioTotal = tipoPrecio === 'unitario' ? precioCapturado * cantidadBase : precioCapturado;
-    const precioUnitario = precioTotal / cantidadBase;
-    return { insumo, cantidadBase, precioTotal, precioUnitario };
+    const cantidadBase = cantidadPresentaciones * insumo.presentacion_venta_base;
+    const precioTotal = tipoPrecio === 'unitario' ? precioCapturado * cantidadPresentaciones : precioCapturado;
+    const precioPorPresentacion = precioTotal / cantidadPresentaciones;
+    const precioUnitarioBase = precioTotal / cantidadBase;
+    return { insumo, cantidadPresentaciones, cantidadBase, precioTotal, precioPorPresentacion, precioUnitarioBase };
   }
 
   function actualizarPreviewVentaMostrador(){
     const preview = document.getElementById('ventaMostradorPreview');
+    const aviso = document.getElementById('ventaMostradorAvisoMinimo');
     const calculo = calcularVentaMostrador();
     if(!calculo){
       preview.textContent = '';
+      aviso.classList.add('hidden');
       return;
     }
     preview.textContent =
-      `= ${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} · ` +
-      `precio unitario ${formatMoney(calculo.precioUnitario)} · ` +
-      `total ${formatMoney(calculo.precioTotal)}`;
+      `${calculo.cantidadPresentaciones} × ${etiquetaPresentacionDe(calculo.insumo)} = ` +
+      `${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} a descontar del stock · ` +
+      `precio por presentación ${formatMoney(calculo.precioPorPresentacion)} · total ${formatMoney(calculo.precioTotal)}`;
+
+    const costo = costoPromedioDe(calculo.insumo.nombre);
+    const minimo = precioMinimoSugerido(costo, calculo.insumo.presentacion_venta_base);
+    if(minimo != null && calculo.precioPorPresentacion < minimo){
+      aviso.textContent = `Aviso: el precio por presentación (${formatMoney(calculo.precioPorPresentacion)}) está por debajo del mínimo sugerido (${formatMoney(minimo)}, costo + 20%).`;
+      aviso.classList.remove('hidden');
+    } else {
+      aviso.classList.add('hidden');
+    }
   }
   ['ventaMostradorCantidad', 'ventaMostradorTipoPrecio', 'ventaMostradorPrecio'].forEach(id => {
     document.getElementById(id).addEventListener('input', actualizarPreviewVentaMostrador);
@@ -8246,12 +8413,18 @@
   document.getElementById('btnRegistrarVentaMostrador').addEventListener('click', async () => {
     const calculo = calcularVentaMostrador();
     if(!calculo){
-      alert('Revisa el producto, la cantidad y el precio: todos son obligatorios y mayores a 0.');
+      alert('Revisa el producto, la cantidad (en presentaciones/botes) y el precio: todos son obligatorios y mayores a 0.');
       return;
     }
     const comprador = document.getElementById('ventaMostradorComprador').value.trim();
-    const nota = document.getElementById('ventaMostradorNota').value.trim();
+    const notaCapturada = document.getElementById('ventaMostradorNota').value.trim();
     const fecha = document.getElementById('ventaMostradorFecha').value || new Date().toISOString().slice(0, 10);
+
+    // Deja explícito a cuántas presentaciones/botes correspondió, sin
+    // necesidad de tocar la vista de historial (que sigue mostrando
+    // cantidad_base en ml y la nota, igual que antes).
+    const notaPresentacion = `${calculo.cantidadPresentaciones} × ${etiquetaPresentacionDe(calculo.insumo)}`;
+    const nota = notaCapturada ? `${notaPresentacion} · ${notaCapturada}` : notaPresentacion;
 
     const btn = document.getElementById('btnRegistrarVentaMostrador');
     btn.disabled = true;
@@ -8259,10 +8432,12 @@
     const { data: venta, error: errorVenta } = await supabaseClient.from('ventas_mostrador').insert({
       insumo_id: calculo.insumo.id,
       cantidad_base: calculo.cantidadBase,
-      precio_unitario: calculo.precioUnitario,
+      precio_unitario: calculo.precioUnitarioBase,
       precio_total: calculo.precioTotal,
+      presentaciones: calculo.cantidadPresentaciones,
+      presentacion_base: calculo.insumo.presentacion_venta_base,
       comprador: comprador || null,
-      nota: nota || null,
+      nota,
       fecha,
       usuario_id: (usuarioActual && usuarioActual.id) || null,
     }).select().single();
@@ -8289,7 +8464,7 @@
     if(errorMov){
       alert(`La venta se registró (folio ${venta.folio}), pero no se pudo descontar del stock: ` + errorMov.message);
     } else {
-      mostrarToast(`Venta registrada: folio ${venta.folio}, -${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)} de ${calculo.insumo.nombre}.`);
+      mostrarToast(`Venta registrada: folio ${venta.folio}, ${calculo.cantidadPresentaciones} × ${etiquetaPresentacionDe(calculo.insumo)} (-${formatCantidadBase(calculo.cantidadBase, calculo.insumo.unidad_base)}) de ${calculo.insumo.nombre}.`);
     }
 
     document.getElementById('ventaMostradorCantidad').value = '';
@@ -8297,6 +8472,7 @@
     document.getElementById('ventaMostradorComprador').value = '';
     document.getElementById('ventaMostradorNota').value = '';
     document.getElementById('ventaMostradorPreview').textContent = '';
+    document.getElementById('ventaMostradorAvisoMinimo').classList.add('hidden');
     await cargarVentasMostrador();
   });
 
