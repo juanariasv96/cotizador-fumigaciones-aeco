@@ -938,6 +938,23 @@
     .seguimiento-recordatorio .recordatorio-form input[type="text"]{flex:1 1 100%;max-width:none;}
   }
 
+  .badge.prioritario{background:#f3e8ff;color:#6b21a8;}
+  .seguimiento-card.prioritario{box-shadow:inset 0 0 0 1px #c084fc;}
+  .seguimiento-frecuencia{
+    margin-top:10px;padding:10px 12px;
+    background:#faf5ff;border:1px dashed #d8b4fe;border-radius:8px;
+  }
+  .seguimiento-frecuencia .frecuencia-titulo{font-size:12.5px;font-weight:700;color:#6b21a8;}
+  .seguimiento-frecuencia .frecuencia-meta{font-size:11.5px;color:#888;margin-top:4px;}
+  .seguimiento-frecuencia .frecuencia-form{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;
+  }
+  .seguimiento-frecuencia .frecuencia-form input[type="text"]{flex:1 1 180px;}
+  @media (max-width:480px){
+    .seguimiento-frecuencia .frecuencia-form select,
+    .seguimiento-frecuencia .frecuencia-form input[type="text"]{flex:1 1 100%;}
+  }
+
   /* ---------- Empleados / Personal ---------- */
   .empleado-card{
     border:1px solid var(--gris-borde);border-radius:8px;padding:14px;
@@ -3820,6 +3837,10 @@
       proxima_llamada_nota: fila.proxima_llamada_nota || null,
       proxima_llamada_actualizada_por: fila.proxima_llamada_actualizada_por || null,
       proxima_llamada_actualizada_en: fila.proxima_llamada_actualizada_en || null,
+      seguimiento_frecuencia_dias: fila.seguimiento_frecuencia_dias || null,
+      seguimiento_frecuencia_nota: fila.seguimiento_frecuencia_nota || null,
+      seguimiento_frecuencia_actualizada_por: fila.seguimiento_frecuencia_actualizada_por || null,
+      seguimiento_frecuencia_actualizada_en: fila.seguimiento_frecuencia_actualizada_en || null,
       vencida_por_2meses: !!fila.vencida_por_2meses,
       fechaCreacion: fechaCreacionCompleta.slice(0,10),
       fechaActualizacion: fechaActualizacion,
@@ -5881,8 +5902,10 @@
     const etapaElegida = document.getElementById('reabrirEtapaSelect').value;
     // Si se reabre desde "Enviada" es como arrancar de nuevo: primera
     // llamada a 3 dias. Cualquier otra etapa ya sigue la cadencia normal
-    // de 14 dias.
-    const diasHastaProximaLlamada = etapaElegida === 'Enviada' ? 3 : 14;
+    // de 14 dias. Si el cliente tiene frecuencia prioritaria fijada por
+    // oficina, esta manda como tope maximo (nunca deja el intervalo mas largo).
+    const cotAReabrir = getCotizaciones().find(c => c.id === reabrirCotizacionActualId);
+    const diasHastaProximaLlamada = diasSeguimientoEfectivo(cotAReabrir, etapaElegida === 'Enviada' ? 3 : 14);
     const { error } = await supabaseClient
       .from('cotizaciones')
       .update({
@@ -11846,6 +11869,21 @@
     return c.proxima_llamada < fechaALocalISO(new Date());
   }
 
+  // Frecuencia prioritaria (fijada por dueño/oficina): manda como tope
+  // maximo del intervalo, nunca lo alarga. Si el cliente no tiene frecuencia
+  // fijada, o la fijada es mas floja que la cadencia normal, se usa la normal.
+  const OPCIONES_FRECUENCIA_SEGUIMIENTO = [
+    { valor: '', etiqueta: 'Normal (sin prioridad)' },
+    { valor: '3', etiqueta: 'Cada 3 días' },
+    { valor: '7', etiqueta: 'Semanal (cada 7 días)' },
+    { valor: '15', etiqueta: 'Quincenal (cada 15 días)' },
+  ];
+
+  function diasSeguimientoEfectivo(cot, diasNormal){
+    if(!cot || !cot.seguimiento_frecuencia_dias) return diasNormal;
+    return Math.min(diasNormal, cot.seguimiento_frecuencia_dias);
+  }
+
   // "Hoy" es un estado aparte de "atrasada": justo el dia en que toca
   // llamar, no antes de tiempo ni ya vencido.
   function cotizacionEsHoy(c){
@@ -11924,15 +11962,17 @@
     cont.innerHTML = visibles.map(c => {
       const atrasada = cotizacionAtrasada(c);
       const esHoy = !atrasada && cotizacionEsHoy(c);
+      const tienePrioridad = !!c.seguimiento_frecuencia_dias;
       const tituloRecordatorio = !c.proxima_llamada
         ? 'Sin próximo seguimiento programado'
         : `${atrasada ? '⏰ ' : (esHoy ? '🔔 ' : '')}Próximo seguimiento: ${formatDate(c.proxima_llamada)}${atrasada ? ' (vencido)' : (esHoy ? ' (hoy)' : '')}`;
       return `
-        <div class="seguimiento-card ${atrasada ? 'atrasada' : (esHoy ? 'hoy' : '')}" data-id="${c.id}">
+        <div class="seguimiento-card ${atrasada ? 'atrasada' : (esHoy ? 'hoy' : '')}${tienePrioridad ? ' prioritario' : ''}" data-id="${c.id}">
           <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <div>
               <strong>${escapeHtml(c.cliente.nombre)}</strong>
               <span class="badge ${claseEtapa(c.etapa_seguimiento)}">${escapeHtml(c.etapa_seguimiento || 'Enviada')}</span>
+              ${tienePrioridad ? `<span class="badge prioritario" title="${c.seguimiento_frecuencia_nota ? escapeHtml(c.seguimiento_frecuencia_nota) : 'Seguimiento prioritario fijado por oficina'}">⚡ Prioritario · cada ${c.seguimiento_frecuencia_dias} días</span>` : ''}
             </div>
             <div>${formatMoney(montoTotalConIva(c))}</div>
           </div>
@@ -11953,6 +11993,20 @@
             </div>
           </div>
 
+          ${esOficinaActual() ? `
+            <div class="seguimiento-frecuencia">
+              <div class="frecuencia-titulo">Frecuencia de seguimiento prioritario (oficina)</div>
+              <div class="frecuencia-meta" id="frecuenciaMeta_${c.id}">${c.seguimiento_frecuencia_actualizada_en ? 'Cargando...' : ''}</div>
+              <div class="frecuencia-form">
+                <select class="frecuencia-select" data-id="${c.id}">
+                  ${OPCIONES_FRECUENCIA_SEGUIMIENTO.map(o => `<option value="${o.valor}" ${String(c.seguimiento_frecuencia_dias || '') === o.valor ? 'selected' : ''}>${escapeHtml(o.etiqueta)}</option>`).join('')}
+                </select>
+                <input type="text" class="frecuencia-nota-input" data-id="${c.id}" placeholder="Motivo (opcional)" value="${escapeHtml(c.seguimiento_frecuencia_nota || '')}">
+                <button type="button" class="btn secondary small" data-action="guardar-frecuencia" data-id="${c.id}">Guardar</button>
+              </div>
+            </div>
+          ` : ''}
+
           <div class="actions-row" style="margin-top:10px;">
             <button type="button" class="btn secondary small" data-action="ver-cotizacion" data-id="${c.id}">Ver cotización</button>
             <button type="button" class="btn small" data-action="registrar" data-id="${c.id}">Bitácora / Registrar seguimiento</button>
@@ -11971,6 +12025,15 @@
       const nombre = await obtenerNombreUsuario(c.proxima_llamada_actualizada_por);
       el.textContent = `Ajustado por ${nombre || 'alguien del equipo'} el ${formatFechaHora(c.proxima_llamada_actualizada_en)}`;
     });
+
+    if(esOficinaActual()){
+      visibles.filter(c => c.seguimiento_frecuencia_actualizada_en).forEach(async c => {
+        const el = document.getElementById('frecuenciaMeta_' + c.id);
+        if(!el) return;
+        const nombre = await obtenerNombreUsuario(c.seguimiento_frecuencia_actualizada_por);
+        el.textContent = `Definido por ${nombre || 'alguien de oficina'} el ${formatFechaHora(c.seguimiento_frecuencia_actualizada_en)}`;
+      });
+    }
   }
 
   document.getElementById('seguimientoFiltros').addEventListener('click', (e) => {
@@ -12050,7 +12113,8 @@
     }
 
     const nuevaEtapa = siguienteEtapaSeguimiento(cot.etapa_seguimiento || 'Enviada');
-    const nuevaProximaLlamada = fechaALocalISO(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
+    const diasProximaLlamada = diasSeguimientoEfectivo(cot, 14);
+    const nuevaProximaLlamada = fechaALocalISO(new Date(Date.now() + diasProximaLlamada * 24 * 60 * 60 * 1000));
     const { error: errUpdate } = await supabaseClient
       .from('cotizaciones')
       .update({ etapa_seguimiento: nuevaEtapa, proxima_llamada: nuevaProximaLlamada })
@@ -12095,6 +12159,18 @@
       const cot = getCotizaciones().find(c => c.id === id);
       if(!cot) return;
 
+      // El vendedor puede seguir eligiendo cualquier fecha, pero si el
+      // cliente tiene frecuencia prioritaria fijada por oficina y la fecha
+      // elegida se pasa de ese tope, se le avisa antes de guardar (la
+      // frecuencia "manda como objetivo", no bloquea).
+      if(cot.seguimiento_frecuencia_dias && nuevaFecha){
+        const limite = fechaALocalISO(new Date(Date.now() + cot.seguimiento_frecuencia_dias * 24 * 60 * 60 * 1000));
+        if(nuevaFecha > limite){
+          const continuar = confirm(`Este cliente tiene seguimiento prioritario cada ${cot.seguimiento_frecuencia_dias} días (fijado por oficina). Lo esperado sería contactarlo antes del ${formatDate(limite)}.\n\n¿Guardar de todos modos esta fecha más lejana?`);
+          if(!continuar) return;
+        }
+      }
+
       btn.disabled = true;
       const ahora = new Date().toISOString();
       const { error } = await supabaseClient.from('cotizaciones').update({
@@ -12114,6 +12190,38 @@
       cot.proxima_llamada_actualizada_por = (usuarioActual && usuarioActual.id) || null;
       cot.proxima_llamada_actualizada_en = ahora;
       mostrarToast('Próximo seguimiento actualizado.');
+      renderSeguimientoLista();
+    } else if(accion === 'guardar-frecuencia'){
+      // Solo oficina ve este control (bloque gateado con esOficinaActual()
+      // en el render), pero la escritura real de estas columnas queda
+      // protegida ademas en la base de datos (trigger + es_dueno()/es_asistente()).
+      const card = btn.closest('.seguimiento-card');
+      const select = card.querySelector('.frecuencia-select');
+      const notaInput = card.querySelector('.frecuencia-nota-input');
+      const nuevaFrecuencia = select.value ? parseInt(select.value, 10) : null;
+      const nuevaNota = notaInput.value.trim() || null;
+      const cot = getCotizaciones().find(c => c.id === id);
+      if(!cot) return;
+
+      btn.disabled = true;
+      const ahora = new Date().toISOString();
+      const { error } = await supabaseClient.from('cotizaciones').update({
+        seguimiento_frecuencia_dias: nuevaFrecuencia,
+        seguimiento_frecuencia_nota: nuevaNota,
+        seguimiento_frecuencia_actualizada_por: (usuarioActual && usuarioActual.id) || null,
+        seguimiento_frecuencia_actualizada_en: ahora,
+      }).eq('id', id);
+      btn.disabled = false;
+
+      if(error){
+        alert('No se pudo guardar la frecuencia de seguimiento: ' + error.message);
+        return;
+      }
+      cot.seguimiento_frecuencia_dias = nuevaFrecuencia;
+      cot.seguimiento_frecuencia_nota = nuevaNota;
+      cot.seguimiento_frecuencia_actualizada_por = (usuarioActual && usuarioActual.id) || null;
+      cot.seguimiento_frecuencia_actualizada_en = ahora;
+      mostrarToast(nuevaFrecuencia ? 'Seguimiento prioritario activado.' : 'Seguimiento prioritario desactivado.');
       renderSeguimientoLista();
     }
   });
