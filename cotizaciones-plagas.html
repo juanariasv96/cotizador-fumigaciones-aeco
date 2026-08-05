@@ -818,6 +818,25 @@
     background:#b3261e;color:#fff;font-size:11px;font-weight:700;
     padding:3px 9px;border-radius:999px;white-space:nowrap;
   }
+  .proveedor-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:10px 14px;
+    border:1px solid var(--gris-borde);
+    border-radius:8px;
+    margin-bottom:8px;
+    background:var(--blanco);
+    cursor:pointer;
+  }
+  .proveedor-row:hover{border-color:var(--verde-claro);}
+  .proveedor-row.seleccionado{border-color:var(--verde-oscuro);background:var(--verde-suave);}
+  .proveedor-row .proveedor-nombre{font-weight:700;color:var(--verde-oscuro);}
+  .proveedor-row .proveedor-meta{font-size:12px;color:#666;margin-top:2px;}
+  .proveedor-row .proveedor-total{font-weight:700;font-size:15px;color:#333;white-space:nowrap;}
+  .proveedor-compra-fila{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border:1px solid var(--gris-borde);border-radius:8px;
+    margin-bottom:6px;font-size:13px;background:var(--blanco);
+  }
   #reporteConsumosGuardadosLista .consumo-fila,
   #reporteConsumosPendientesLista .consumo-fila{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -2310,6 +2329,18 @@
 
       <h3 style="margin-top:28px;">Niveles en vivo</h3>
       <div id="stockLista"></div>
+
+      <h3 style="margin-top:28px;">Compras por proveedor</h3>
+      <p style="font-size:12px;color:#777;margin-top:0;">Cuánto se ha comprado con cada proveedor, sumando insumos de todo tipo (químicos, insumos, lámparas, etc.).</p>
+      <div class="field" style="max-width:200px;">
+        <label for="comprasProveedorRango">Periodo</label>
+        <select id="comprasProveedorRango">
+          <option value="mes">Mes actual</option>
+          <option value="todo">Todo</option>
+        </select>
+      </div>
+      <div id="comprasProveedorLista"></div>
+      <div id="comprasProveedorDetalle" class="hidden" style="margin-top:14px;"></div>
     </div>
   </section>
 
@@ -7274,6 +7305,8 @@
   let insumosCache = [];       // catalogo completo (activos e inactivos), para la pestaña Almacen
   let stockInsumosCache = [];  // filas de la vista stock_insumos
   let insumoEditandoId = null; // si no es null, el formulario de catalogo esta en modo "editar"
+  let comprasProveedorCache = [];      // filas crudas de la vista almacen_compras_detalle
+  let comprasProveedorSeleccionado = undefined; // clave (proveedor_normalizado, o null = "Sin proveedor") del grupo abierto en el detalle
 
   function formatCantidadBase(cantidad, unidadBase){
     const n = Number(cantidad) || 0;
@@ -7285,7 +7318,7 @@
   async function cargarAlmacen(){
     const hoyInput = document.getElementById('compraFecha');
     if(hoyInput && !hoyInput.value) hoyInput.value = new Date().toISOString().slice(0, 10);
-    await Promise.all([cargarInsumos(), cargarStockInsumos()]);
+    await Promise.all([cargarInsumos(), cargarStockInsumos(), cargarComprasPorProveedor()]);
   }
 
   // ---------- Catálogo ----------
@@ -7491,6 +7524,7 @@
     document.getElementById('compraProveedor').value = '';
     document.getElementById('compraPreview').textContent = '';
     await cargarStockInsumos();
+    await cargarComprasPorProveedor();
   });
 
   // ---------- Niveles en vivo ----------
@@ -7534,6 +7568,110 @@
       </div>
     `).join('');
   }
+
+  // ---------- Compras por proveedor ----------
+  // Lee la vista almacen_compras_detalle (solo compras, tipo='entrada'; ya
+  // filtrada a dueño/asistente por la propia vista) y agrupa en el
+  // navegador por proveedor_normalizado, que la vista ya normaliza
+  // (mayúsculas + espacios colapsados) para que un mismo proveedor
+  // capturado a mano y traído por XML no salga partido en dos filas.
+  async function cargarComprasPorProveedor(){
+    const cont = document.getElementById('comprasProveedorLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    let query = supabaseClient
+      .from('almacen_compras_detalle')
+      .select('id, fecha, precio_total, proveedor_original, proveedor_normalizado, insumo_nombre, insumo_categoria')
+      .order('fecha', { ascending: false });
+    if(document.getElementById('comprasProveedorRango').value === 'mes'){
+      const hoy = new Date();
+      const primerDia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`;
+      query = query.gte('fecha', primerDia);
+    }
+    const { data, error } = await query;
+    if(error){
+      console.error('No se pudieron cargar las compras por proveedor:', error);
+      cont.innerHTML = `<div class="empty-msg">No se pudo cargar: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    comprasProveedorCache = data || [];
+    renderComprasProveedorLista();
+    // Si el proveedor abierto en el detalle ya no aparece con el filtro
+    // nuevo (o cambió de periodo), se cierra el detalle en vez de dejarlo
+    // mostrando datos que ya no corresponden a la lista de arriba.
+    if(comprasProveedorSeleccionado !== undefined &&
+       !comprasProveedorCache.some(c => (c.proveedor_normalizado || null) === comprasProveedorSeleccionado)){
+      comprasProveedorSeleccionado = undefined;
+      document.getElementById('comprasProveedorDetalle').classList.add('hidden');
+    } else if(comprasProveedorSeleccionado !== undefined){
+      renderComprasProveedorDetalle();
+    }
+  }
+
+  function agruparComprasPorProveedor(){
+    const grupos = new Map();
+    comprasProveedorCache.forEach(c => {
+      const clave = c.proveedor_normalizado || null;
+      if(!grupos.has(clave)){
+        grupos.set(clave, { clave, nombre: c.proveedor_original || 'Sin proveedor especificado', total: 0, cantidad: 0 });
+      }
+      const g = grupos.get(clave);
+      g.total += Number(c.precio_total) || 0;
+      g.cantidad += 1;
+    });
+    return [...grupos.values()].sort((a, b) => b.total - a.total);
+  }
+
+  function renderComprasProveedorLista(){
+    const cont = document.getElementById('comprasProveedorLista');
+    const grupos = agruparComprasPorProveedor();
+    if(grupos.length === 0){
+      cont.innerHTML = `<div class="empty-msg">No hay compras registradas en este periodo.</div>`;
+      return;
+    }
+    cont.innerHTML = grupos.map(g => `
+      <div class="proveedor-row ${comprasProveedorSeleccionado === g.clave ? 'seleccionado' : ''}" data-proveedor-clave="${g.clave === null ? '' : escapeHtml(g.clave)}">
+        <div>
+          <div class="proveedor-nombre">${escapeHtml(g.nombre)}</div>
+          <div class="proveedor-meta">${g.cantidad} compra${g.cantidad === 1 ? '' : 's'}</div>
+        </div>
+        <div class="proveedor-total">${formatMoney(g.total)}</div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('comprasProveedorLista').addEventListener('click', (e) => {
+    const fila = e.target.closest('[data-proveedor-clave]');
+    if(!fila) return;
+    const clave = fila.dataset.proveedorClave || null;
+    comprasProveedorSeleccionado = (comprasProveedorSeleccionado === clave) ? undefined : clave;
+    renderComprasProveedorLista();
+    if(comprasProveedorSeleccionado === undefined){
+      document.getElementById('comprasProveedorDetalle').classList.add('hidden');
+    } else {
+      renderComprasProveedorDetalle();
+    }
+  });
+
+  function renderComprasProveedorDetalle(){
+    const cont = document.getElementById('comprasProveedorDetalle');
+    cont.classList.remove('hidden');
+    const clave = comprasProveedorSeleccionado;
+    const filas = comprasProveedorCache
+      .filter(c => (c.proveedor_normalizado || null) === clave)
+      .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+    const nombre = filas.length ? (filas[0].proveedor_original || 'Sin proveedor especificado') : '';
+    cont.innerHTML = `
+      <h4 style="margin:0 0 8px;">Compras con ${escapeHtml(nombre)}</h4>
+      ${filas.map(f => `
+        <div class="proveedor-compra-fila">
+          <span>${escapeHtml(formatDate(f.fecha))} — ${escapeHtml(f.insumo_nombre)} <span style="color:#888;">(${CATEGORIA_INSUMO_LABEL[f.insumo_categoria] || f.insumo_categoria || 'Sin categoría'})</span></span>
+          <strong>${formatMoney(f.precio_total)}</strong>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  document.getElementById('comprasProveedorRango').addEventListener('change', cargarComprasPorProveedor);
 
   // ---------- Registrar compra desde factura (XML CFDI 4.0) ----------
   // Parseo 100% en el navegador (DOMParser), sin backend. Los namespaces
@@ -7895,6 +8033,7 @@
     document.getElementById('compraXmlEstado').textContent = '';
     resetCompraXml();
     await cargarStockInsumos();
+    await cargarComprasPorProveedor();
   });
 
   // ---------- Calendario de visitas ----------
