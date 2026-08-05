@@ -2598,7 +2598,7 @@
     <p style="font-size:12px;color:#777;margin-top:0;">Fechas sugeridas para las visitas del año. Puedes ajustar cada fecha, cambiar los ingredientes activos, y agregar o quitar filas antes de confirmar. Aquí no se asigna técnico — eso se hace después, desde cada visita en el Calendario.</p>
     <table>
       <thead>
-        <tr><th>Servicio</th><th>Fecha</th><th>Ingrediente Activo Insecticida</th><th>Ingrediente Activo Rodenticida</th><th></th></tr>
+        <tr><th>Servicio</th><th>Fecha</th><th id="planThInsecticida">Ingrediente Activo Insecticida</th><th id="planThRodenticida">Ingrediente Activo Rodenticida</th><th></th></tr>
       </thead>
       <tbody id="planTablaBody"></tbody>
     </table>
@@ -7151,23 +7151,50 @@
   let planTipoServicioActual = '';
   let planFilasActuales = [];
   let planIdsOriginales = [];
+  // Qué columnas de ingrediente activo aplican para el plan abierto,
+  // según el texto libre de tipo_servicio (ej. "Rastrero", "Rastrero y
+  // roedor", "Rastrero, roedor y volador"). Fallback si el texto no
+  // menciona ninguna de las dos familias (vacío o valor no reconocido):
+  // se muestran ambas columnas, como antes de este cambio.
+  let planMostrarInsecticidaActual = true;
+  let planMostrarRodenticidaActual = true;
+
+  function planTipoIncluyeInsecto(tipoServicioTexto){
+    const t = (tipoServicioTexto || '').toUpperCase();
+    return t.includes('RASTRERO') || t.includes('VOLADOR');
+  }
+  function planTipoIncluyeRoedor(tipoServicioTexto){
+    const t = (tipoServicioTexto || '').toUpperCase();
+    return t.includes('ROEDOR');
+  }
 
   const planOverlay = document.getElementById('planOverlay');
   const planTablaBody = document.getElementById('planTablaBody');
   const planPrintOverlay = document.getElementById('planPrintOverlay');
   const planDocContent = document.getElementById('planDocContent');
 
+  // Aplica a la cabecera qué columnas de ingrediente activo se ven,
+  // según el tipo de servicio del plan actualmente abierto.
+  function actualizarColumnasPlanSegunTipoServicio(){
+    const thInsecticida = document.getElementById('planThInsecticida');
+    const thRodenticida = document.getElementById('planThRodenticida');
+    if(thInsecticida) thInsecticida.style.display = planMostrarInsecticidaActual ? '' : 'none';
+    if(thRodenticida) thRodenticida.style.display = planMostrarRodenticidaActual ? '' : 'none';
+  }
+
   function renderFilasPlan(){
+    actualizarColumnasPlanSegunTipoServicio();
+    const totalColumnas = 2 + (planMostrarInsecticidaActual ? 1 : 0) + (planMostrarRodenticidaActual ? 1 : 0) + 1;
     if(planFilasActuales.length === 0){
-      planTablaBody.innerHTML = `<tr><td colspan="5"><div class="empty-msg">Sin visitas todavía. Usa "+ Agregar visita".</div></td></tr>`;
+      planTablaBody.innerHTML = `<tr><td colspan="${totalColumnas}"><div class="empty-msg">Sin visitas todavía. Usa "+ Agregar visita".</div></td></tr>`;
       return;
     }
     planTablaBody.innerHTML = planFilasActuales.map((f, i) => `
       <tr data-id="${f.id || ''}">
         <td>${i + 1}</td>
         <td><input type="date" class="plan-fecha" value="${f.fecha || ''}"></td>
-        <td><input type="text" class="plan-insecticida" value="${escapeHtml(f.insecticida || '')}"></td>
-        <td><input type="text" class="plan-rodenticida" value="${escapeHtml(f.rodenticida || '')}"></td>
+        ${planMostrarInsecticidaActual ? `<td><input type="text" class="plan-insecticida" value="${escapeHtml(f.insecticida || '')}"></td>` : ''}
+        ${planMostrarRodenticidaActual ? `<td><input type="text" class="plan-rodenticida" value="${escapeHtml(f.rodenticida || '')}"></td>` : ''}
         <td><button type="button" class="btn danger small" data-action="quitar-fila">Quitar</button></td>
       </tr>
     `).join('');
@@ -7179,11 +7206,13 @@
   function sincronizarFilasPlanDesdeDom(){
     const filas = [];
     planTablaBody.querySelectorAll('tr[data-id]').forEach(tr => {
+      const inputInsecticida = tr.querySelector('.plan-insecticida');
+      const inputRodenticida = tr.querySelector('.plan-rodenticida');
       filas.push({
         id: tr.dataset.id || null,
         fecha: tr.querySelector('.plan-fecha').value,
-        insecticida: tr.querySelector('.plan-insecticida').value.trim(),
-        rodenticida: tr.querySelector('.plan-rodenticida').value.trim(),
+        insecticida: inputInsecticida ? inputInsecticida.value.trim() : '',
+        rodenticida: inputRodenticida ? inputRodenticida.value.trim() : '',
       });
     });
     planFilasActuales = filas;
@@ -7210,6 +7239,15 @@
     planClienteNombreActual = clienteNombre;
     planTipoServicioActual = tipoServicio;
 
+    const incluyeInsecto = planTipoIncluyeInsecto(tipoServicio);
+    const incluyeRoedor = planTipoIncluyeRoedor(tipoServicio);
+    // Fallback: si el texto de tipo_servicio no permite reconocer ninguna
+    // de las dos familias (vacío, o valor inesperado), se muestran ambas
+    // columnas — mismo comportamiento que había antes de este cambio.
+    const tipoReconocido = incluyeInsecto || incluyeRoedor;
+    planMostrarInsecticidaActual = tipoReconocido ? incluyeInsecto : true;
+    planMostrarRodenticidaActual = tipoReconocido ? incluyeRoedor : true;
+
     const { data, error } = await supabaseClient
       .from('visitas_programadas')
       .select('id, fecha_programada, ingrediente_insecticida, ingrediente_rodenticida')
@@ -7224,16 +7262,16 @@
       planFilasActuales = data.map(v => ({
         id: v.id,
         fecha: v.fecha_programada,
-        insecticida: v.ingrediente_insecticida || '',
-        rodenticida: v.ingrediente_rodenticida || '',
+        insecticida: planMostrarInsecticidaActual ? (v.ingrediente_insecticida || '') : '',
+        rodenticida: planMostrarRodenticidaActual ? (v.ingrediente_rodenticida || '') : '',
       }));
     } else if(fechaInicio && frecuenciaCat){
       const fechas = calcularFechasVisita(fechaInicio, frecuenciaCat);
       planFilasActuales = fechas.map((f, i) => ({
         id: null,
         fecha: fechaALocalISO(f),
-        insecticida: INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length],
-        rodenticida: RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length],
+        insecticida: planMostrarInsecticidaActual ? INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length] : '',
+        rodenticida: planMostrarRodenticidaActual ? RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length] : '',
       }));
     } else {
       planFilasActuales = [];
@@ -7251,8 +7289,8 @@
     planFilasActuales.push({
       id: null,
       fecha: '',
-      insecticida: INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length],
-      rodenticida: RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length],
+      insecticida: planMostrarInsecticidaActual ? INSECTICIDAS_ROTACION[i % INSECTICIDAS_ROTACION.length] : '',
+      rodenticida: planMostrarRodenticidaActual ? RODENTICIDAS_ROTACION[i % RODENTICIDAS_ROTACION.length] : '',
     });
     renderFilasPlan();
   });
@@ -7339,8 +7377,8 @@
       <tr>
         <td>${i + 1}</td>
         <td>${formatDate(f.fecha)}</td>
-        <td>${escapeHtml(f.insecticida || '-')}</td>
-        <td>${escapeHtml(f.rodenticida || '-')}</td>
+        ${planMostrarInsecticidaActual ? `<td>${escapeHtml(f.insecticida || '-')}</td>` : ''}
+        ${planMostrarRodenticidaActual ? `<td>${escapeHtml(f.rodenticida || '-')}</td>` : ''}
       </tr>
     `).join('');
     planDocContent.innerHTML = `
@@ -7360,7 +7398,7 @@
       </div>
       <table style="margin-top:16px;">
         <thead>
-          <tr><th>Servicio</th><th>Fecha</th><th>Ingrediente Activo Insecticida</th><th>Ingrediente Activo Rodenticida</th></tr>
+          <tr><th>Servicio</th><th>Fecha</th>${planMostrarInsecticidaActual ? '<th>Ingrediente Activo Insecticida</th>' : ''}${planMostrarRodenticidaActual ? '<th>Ingrediente Activo Rodenticida</th>' : ''}</tr>
         </thead>
         <tbody>${filasHtml}</tbody>
       </table>
