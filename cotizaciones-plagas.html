@@ -1771,6 +1771,13 @@
         <button type="button" class="seguimiento-filtro-chip activo" data-filtro="todos" id="seguimientoFiltro_todos">Todos <span class="conteo">0</span></button>
         <button type="button" class="seguimiento-filtro-chip vencido" data-filtro="vencidos" id="seguimientoFiltro_vencidos">🔴 Vencidos <span class="conteo">0</span></button>
         <button type="button" class="seguimiento-filtro-chip hoy" data-filtro="hoy" id="seguimientoFiltro_hoy">🟠 Pendientes hoy <span class="conteo">0</span></button>
+        <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12.5px;color:#666;">
+          Ordenar por
+          <select id="seguimientoOrden" class="input" style="padding:4px 8px;font-size:12.5px;width:auto;">
+            <option value="monto">Monto (mayor primero)</option>
+            <option value="urgencia">Próxima llamada (más urgente primero)</option>
+          </select>
+        </label>
       </div>
 
       <div id="seguimientoLista"></div>
@@ -12631,19 +12638,32 @@
   }
 
   let seguimientoFiltroActivo = 'todos';
+  // Default: monto mayor primero, para que el vendedor priorice las
+  // cotizaciones de mayor valor. 'urgencia' respeta el orden previo
+  // (atrasadas primero, luego por próxima llamada más cercana).
+  let seguimientoOrdenActivo = 'monto';
+
+  function compararPorUrgencia(a, b){
+    const aAtr = cotizacionAtrasada(a) ? 0 : 1;
+    const bAtr = cotizacionAtrasada(b) ? 0 : 1;
+    if(aAtr !== bAtr) return aAtr - bAtr;
+    const fa = a.proxima_llamada || '9999-99-99';
+    const fb = b.proxima_llamada || '9999-99-99';
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  }
+
+  function compararPorMonto(a, b){
+    const ma = montoTotalConIva(a) || 0;
+    const mb = montoTotalConIva(b) || 0;
+    if(ma !== mb) return mb - ma;
+    return compararPorUrgencia(a, b);
+  }
 
   function pendientesOrdenadasPorUrgencia(){
     return getCotizaciones()
       .filter(c => estadoDe(c) === 'Pendiente')
       .slice()
-      .sort((a, b) => {
-        const aAtr = cotizacionAtrasada(a) ? 0 : 1;
-        const bAtr = cotizacionAtrasada(b) ? 0 : 1;
-        if(aAtr !== bAtr) return aAtr - bAtr;
-        const fa = a.proxima_llamada || '9999-99-99';
-        const fb = b.proxima_llamada || '9999-99-99';
-        return fa < fb ? -1 : (fa > fb ? 1 : 0);
-      });
+      .sort(seguimientoOrdenActivo === 'urgencia' ? compararPorUrgencia : compararPorMonto);
   }
 
   function renderSeguimientoResumen(pendientes){
@@ -12780,6 +12800,11 @@
     if(!btn) return;
     seguimientoFiltroActivo = btn.dataset.filtro;
     document.querySelectorAll('#seguimientoFiltros .seguimiento-filtro-chip').forEach(b => b.classList.toggle('activo', b === btn));
+    renderSeguimientoLista();
+  });
+
+  document.getElementById('seguimientoOrden').addEventListener('change', (e) => {
+    seguimientoOrdenActivo = e.target.value;
     renderSeguimientoLista();
   });
 
