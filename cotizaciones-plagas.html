@@ -2165,8 +2165,50 @@
             <input type="text" id="servicioFrecuencia" placeholder="Ej. Mensual">
           </div>
           <div class="field">
-            <label for="servicioVigencia">Vigencia de póliza</label>
-            <input type="text" id="servicioVigencia" placeholder="Ej. Ene2026-Dic2026">
+            <label for="servicioVigenciaDesdeMes">Vigencia de póliza — Desde</label>
+            <div style="display:flex;gap:6px;">
+              <select id="servicioVigenciaDesdeMes" style="flex:1;">
+                <option value="">Mes...</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+              <select id="servicioVigenciaDesdeAnio" style="max-width:100px;">
+                <option value="">Año...</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="servicioVigenciaHastaMes">Vigencia de póliza — Hasta</label>
+            <div style="display:flex;gap:6px;">
+              <select id="servicioVigenciaHastaMes" style="flex:1;">
+                <option value="">Mes...</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+              <select id="servicioVigenciaHastaAnio" style="max-width:100px;">
+                <option value="">Año...</option>
+              </select>
+            </div>
           </div>
           <div class="field" style="max-width:160px;">
             <label for="servicioCostoSinIva">Costo s/IVA</label>
@@ -6892,6 +6934,141 @@
   let serviciosClienteActualId = '';
   let serviciosCache = [];
   let servicioEditandoId = null;
+  // Texto libre de vigencia_poliza de un servicio ya guardado que no se
+  // pudo reconocer con parseVigenciaTexto (formato distinto a los dos que
+  // entendemos). Se conserva aquí para no perderlo si el usuario guarda
+  // cambios sin tocar los selectores de vigencia.
+  let servicioVigenciaTextoOriginal = null;
+
+  const MESES_NOMBRE_VIGENCIA = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const MESES_ABREV_LEGADO = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,set:9,oct:10,nov:11,dic:12};
+  const MESES_DURACION_POLIZA = {Trimestral:3, Semestral:6, Anual:12};
+
+  function poblarAniosVigencia(){
+    const anioActual = new Date().getFullYear();
+    const opciones = ['<option value="">Año...</option>'];
+    for(let a = anioActual - 1; a <= anioActual + 3; a++){
+      opciones.push(`<option value="${a}">${a}</option>`);
+    }
+    const html = opciones.join('');
+    document.getElementById('servicioVigenciaDesdeAnio').innerHTML = html;
+    document.getElementById('servicioVigenciaHastaAnio').innerHTML = html;
+  }
+  poblarAniosVigencia();
+
+  function limpiarVigenciaSelects(){
+    document.getElementById('servicioVigenciaDesdeMes').value = '';
+    document.getElementById('servicioVigenciaDesdeAnio').value = '';
+    document.getElementById('servicioVigenciaHastaMes').value = '';
+    document.getElementById('servicioVigenciaHastaAnio').value = '';
+  }
+
+  function establecerVigenciaSelects(desdeMes, desdeAnio, hastaMes, hastaAnio){
+    document.getElementById('servicioVigenciaDesdeMes').value = desdeMes || '';
+    document.getElementById('servicioVigenciaDesdeAnio').value = desdeAnio || '';
+    document.getElementById('servicioVigenciaHastaMes').value = hastaMes || '';
+    document.getElementById('servicioVigenciaHastaAnio').value = hastaAnio || '';
+  }
+
+  // Arma el texto de vigencia ("agosto 2026 a octubre 2026") a partir de
+  // los 4 selectores. Devuelve null si falta algún selector por elegir.
+  function armarVigenciaTexto(){
+    const dm = document.getElementById('servicioVigenciaDesdeMes').value;
+    const da = document.getElementById('servicioVigenciaDesdeAnio').value;
+    const hm = document.getElementById('servicioVigenciaHastaMes').value;
+    const ha = document.getElementById('servicioVigenciaHastaAnio').value;
+    if(dm && da && hm && ha){
+      return `${MESES_NOMBRE_VIGENCIA[Number(dm)-1]} ${da} a ${MESES_NOMBRE_VIGENCIA[Number(hm)-1]} ${ha}`;
+    }
+    return null;
+  }
+
+  // Reconoce el texto libre de vigencia_poliza guardado antes de este
+  // cambio, para prellenar los selectores al editar un servicio existente.
+  // Entiende el formato nuevo ("agosto 2026 a octubre 2026") y el formato
+  // libre anterior tipo "Ene2026-Dic2026". Si no lo reconoce, devuelve null
+  // (el texto original se conserva aparte, ver servicioVigenciaTextoOriginal).
+  function parseVigenciaTexto(texto){
+    if(!texto) return null;
+    const t = texto.trim();
+    let m = t.match(/^([a-zñ]+)\s+(\d{4})\s+a\s+([a-zñ]+)\s+(\d{4})$/i);
+    if(m){
+      const desdeMes = MESES_NOMBRE_VIGENCIA.indexOf(m[1].toLowerCase()) + 1;
+      const hastaMes = MESES_NOMBRE_VIGENCIA.indexOf(m[3].toLowerCase()) + 1;
+      if(desdeMes && hastaMes){
+        return { desdeMes, desdeAnio: Number(m[2]), hastaMes, hastaAnio: Number(m[4]) };
+      }
+      return null;
+    }
+    m = t.match(/^([a-zñ]{3,9})\.?\s*(\d{4})\s*-\s*([a-zñ]{3,9})\.?\s*(\d{4})$/i);
+    if(m){
+      const desdeMes = MESES_ABREV_LEGADO[m[1].slice(0,3).toLowerCase()];
+      const hastaMes = MESES_ABREV_LEGADO[m[3].slice(0,3).toLowerCase()];
+      if(desdeMes && hastaMes){
+        return { desdeMes, desdeAnio: Number(m[2]), hastaMes, hastaAnio: Number(m[4]) };
+      }
+    }
+    return null;
+  }
+
+  // ---------- Autollenado del alta de servicio desde la cotización del cliente ----------
+  // Elige la cotización más reciente del cliente, prefiriendo una Ganada
+  // (estado 'Cerrada') si existe alguna; si no hay ninguna Ganada, usa la
+  // más reciente sin importar estado.
+  function obtenerMejorCotizacionParaCliente(clienteId){
+    const cots = getCotizaciones().filter(c => c.cliente_id === clienteId);
+    if(cots.length === 0) return null;
+    const porFechaDesc = (a, b) => new Date(b.fechaCreacion || 0) - new Date(a.fechaCreacion || 0);
+    const ganadas = cots.filter(c => c.estado === 'Cerrada').sort(porFechaDesc);
+    if(ganadas.length) return ganadas[0];
+    return cots.slice().sort(porFechaDesc)[0];
+  }
+
+  function tipoServicioDesdeCotizacion(cot){
+    const plagas = normalizarPlagas(cot) || [];
+    const nombres = plagas.map(p => p.tipoPlaga).filter(Boolean);
+    if(nombres.length === 0) return '';
+    if(nombres.length === 1) return nombres[0];
+    return nombres.slice(0, -1).join(', ') + ' y ' + nombres[nombres.length - 1];
+  }
+
+  // Deriva "Desde"/"Hasta" de la vigencia de póliza a partir de la fecha de
+  // creación de la cotización + la duración de póliza elegida ahí
+  // (Trimestral/Semestral/Anual). Si la cotización fue de servicio único
+  // (sin póliza) no hay duración que proyectar y no se prellena vigencia.
+  function vigenciaDesdeCotizacion(cot){
+    const meses = MESES_DURACION_POLIZA[cot.duracionPoliza];
+    if(!meses || !cot.fechaCreacion) return null;
+    const [y, m] = cot.fechaCreacion.split('-').map(Number);
+    if(!y || !m) return null;
+    const desde = new Date(y, m - 1, 1);
+    const hasta = new Date(y, m - 1 + meses, 1);
+    return {
+      desdeMes: desde.getMonth() + 1, desdeAnio: desde.getFullYear(),
+      hastaMes: hasta.getMonth() + 1, hastaAnio: hasta.getFullYear(),
+    };
+  }
+
+  // Prellena Tipo de servicio, Costo s/IVA, Costo c/IVA y Vigencia con los
+  // datos de la cotización del cliente (si tiene alguna). Todo queda en
+  // los mismos inputs/selects normales, así que sigue siendo editable.
+  function prellenarServicioDesdeCotizacion(clienteId){
+    const cot = obtenerMejorCotizacionParaCliente(clienteId);
+    if(!cot) return;
+
+    const tipoServicio = tipoServicioDesdeCotizacion(cot);
+    if(tipoServicio) document.getElementById('servicioTipo').value = tipoServicio;
+
+    let sinIva = cot.subtotal != null ? Number(cot.subtotal) : null;
+    let conIva = cot.total != null ? Number(cot.total) : null;
+    if(sinIva == null && conIva != null) sinIva = conIva / (1 + IVA_TASA);
+    if(conIva == null && sinIva != null) conIva = sinIva * (1 + IVA_TASA);
+    if(sinIva != null) document.getElementById('servicioCostoSinIva').value = sinIva.toFixed(2);
+    if(conIva != null) document.getElementById('servicioCostoConIva').value = conIva.toFixed(2);
+
+    const vig = vigenciaDesdeCotizacion(cot);
+    if(vig) establecerVigenciaSelects(vig.desdeMes, vig.desdeAnio, vig.hastaMes, vig.hastaAnio);
+  }
 
   const serviciosClienteSelect = document.getElementById('serviciosClienteSelect');
   const serviciosClienteBuscar = document.getElementById('serviciosClienteBuscar');
@@ -6940,7 +7117,8 @@
     servicioEditandoId = null;
     document.getElementById('servicioTipo').value = '';
     document.getElementById('servicioFrecuencia').value = '';
-    document.getElementById('servicioVigencia').value = '';
+    limpiarVigenciaSelects();
+    servicioVigenciaTextoOriginal = null;
     document.getElementById('servicioCostoSinIva').value = '';
     document.getElementById('servicioCostoConIva').value = '';
     document.getElementById('servicioEstatus').value = '';
@@ -6997,11 +7175,31 @@
     }
     serviciosClienteVacio.classList.add('hidden');
     serviciosContenido.classList.remove('hidden');
+    prellenarServicioDesdeCotizacion(serviciosClienteActualId);
     serviciosListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
     await cargarServiciosDeCliente(serviciosClienteActualId);
     renderServiciosLista();
     await cargarAvisosDeCliente(serviciosClienteActualId);
     renderAvisosLista();
+  });
+
+  // Costo automático: si al salir de un campo el otro está vacío, lo
+  // calcula con IVA 16% (c/IVA = s/IVA * 1.16). Ambos siguen editables.
+  document.getElementById('servicioCostoSinIva').addEventListener('change', ()=>{
+    const sinIvaInput = document.getElementById('servicioCostoSinIva');
+    const conIvaInput = document.getElementById('servicioCostoConIva');
+    const sinIva = parseFloat(sinIvaInput.value);
+    if(!isNaN(sinIva) && conIvaInput.value.trim() === ''){
+      conIvaInput.value = (sinIva * (1 + IVA_TASA)).toFixed(2);
+    }
+  });
+  document.getElementById('servicioCostoConIva').addEventListener('change', ()=>{
+    const sinIvaInput = document.getElementById('servicioCostoSinIva');
+    const conIvaInput = document.getElementById('servicioCostoConIva');
+    const conIva = parseFloat(conIvaInput.value);
+    if(!isNaN(conIva) && sinIvaInput.value.trim() === ''){
+      sinIvaInput.value = (conIva / (1 + IVA_TASA)).toFixed(2);
+    }
   });
 
   document.getElementById('btnGuardarServicio').addEventListener('click', async ()=>{
@@ -7018,7 +7216,7 @@
       cliente_id: serviciosClienteActualId,
       tipo_servicio: document.getElementById('servicioTipo').value.trim() || null,
       frecuencia: document.getElementById('servicioFrecuencia').value.trim() || null,
-      vigencia_poliza: document.getElementById('servicioVigencia').value.trim() || null,
+      vigencia_poliza: armarVigenciaTexto() || servicioVigenciaTextoOriginal || null,
       costo_sin_iva: costoSinIvaVal === '' ? null : Number(costoSinIvaVal),
       costo_con_iva: costoConIvaVal === '' ? null : Number(costoConIvaVal),
       estatus: document.getElementById('servicioEstatus').value.trim() || null,
@@ -7069,7 +7267,14 @@
       servicioEditandoId = servicio.id;
       document.getElementById('servicioTipo').value = servicio.tipo_servicio || '';
       document.getElementById('servicioFrecuencia').value = servicio.frecuencia || '';
-      document.getElementById('servicioVigencia').value = servicio.vigencia_poliza || '';
+      const vigenciaParseada = parseVigenciaTexto(servicio.vigencia_poliza);
+      if(vigenciaParseada){
+        establecerVigenciaSelects(vigenciaParseada.desdeMes, vigenciaParseada.desdeAnio, vigenciaParseada.hastaMes, vigenciaParseada.hastaAnio);
+        servicioVigenciaTextoOriginal = null;
+      } else {
+        limpiarVigenciaSelects();
+        servicioVigenciaTextoOriginal = servicio.vigencia_poliza || null;
+      }
       document.getElementById('servicioCostoSinIva').value = servicio.costo_sin_iva ?? '';
       document.getElementById('servicioCostoConIva').value = servicio.costo_con_iva ?? '';
       document.getElementById('servicioEstatus').value = servicio.estatus || '';
@@ -7249,13 +7454,53 @@
   let planMostrarInsecticidaActual = true;
   let planMostrarRodenticidaActual = true;
 
+  // Distancia de edición (Levenshtein) para tolerar erratas de captura en
+  // tipo_servicio (texto libre), p.ej. "rasteror" en vez de "rastrero".
+  function distanciaLevenshtein(a, b){
+    const m = a.length, n = b.length;
+    if(!m) return n;
+    if(!n) return m;
+    const dp = [];
+    for(let i = 0; i <= m; i++) dp.push([i]);
+    for(let j = 1; j <= n; j++) dp[0][j] = j;
+    for(let i = 1; i <= m; i++){
+      for(let j = 1; j <= n; j++){
+        dp[i][j] = a[i-1] === b[j-1]
+          ? dp[i-1][j-1]
+          : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+      }
+    }
+    return dp[m][n];
+  }
+
+  function normalizarTextoPlan(s){
+    return (s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  // Revisa palabra por palabra (no substring completo) si alguna coincide,
+  // exacta o con hasta 1-2 erratas, con alguna de las palabras clave.
+  function textoMencionaAlguna(tipoServicioTexto, palabrasClave){
+    const t = normalizarTextoPlan(tipoServicioTexto);
+    if(!t) return false;
+    const palabras = t.split(/[^A-ZÑ]+/).filter(Boolean);
+    return palabras.some(palabra => palabrasClave.some(clave => {
+      if(palabra.length < 4) return palabra === clave;
+      const distanciaMax = clave.length >= 8 ? 2 : 1;
+      return distanciaLevenshtein(palabra, clave) <= distanciaMax;
+    }));
+  }
+
+  const PALABRAS_INSECTO = ['INSECTO','INSECTOS','RASTRERO','RASTREROS','VOLADOR','VOLADORES','MOSCA','MOSCAS','CUCARACHA','CUCARACHAS'];
+  const PALABRAS_ROEDOR = ['ROEDOR','ROEDORES','RATON','RATONES','RATA','RATAS'];
+
+  // Detección robusta por palabra (no substring), tolerante a erratas
+  // (p.ej. tipo_servicio = "insecto rasteror y roedor" reconoce ambas
+  // familias aunque "rastrero" esté mal escrito como "rasteror").
   function planTipoIncluyeInsecto(tipoServicioTexto){
-    const t = (tipoServicioTexto || '').toUpperCase();
-    return t.includes('RASTRERO') || t.includes('VOLADOR');
+    return textoMencionaAlguna(tipoServicioTexto, PALABRAS_INSECTO);
   }
   function planTipoIncluyeRoedor(tipoServicioTexto){
-    const t = (tipoServicioTexto || '').toUpperCase();
-    return t.includes('ROEDOR');
+    return textoMencionaAlguna(tipoServicioTexto, PALABRAS_ROEDOR);
   }
 
   const planOverlay = document.getElementById('planOverlay');
