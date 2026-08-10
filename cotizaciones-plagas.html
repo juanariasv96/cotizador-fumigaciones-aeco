@@ -2155,6 +2155,13 @@
       <div id="serviciosClienteVacio" class="empty-msg">Selecciona un cliente para ver o agregar sus servicios contratados.</div>
 
       <div id="serviciosContenido" class="hidden">
+        <div class="field" id="servicioCotizacionOrigenWrap" style="margin-top:16px;max-width:520px;">
+          <label for="servicioCotizacionOrigen">Autollenar desde cotización</label>
+          <select id="servicioCotizacionOrigen">
+            <option value="">Selecciona una cotización...</option>
+          </select>
+          <div class="hint">Elige la cotización del cliente para prellenar Tipo de servicio, Costo s/IVA, Costo c/IVA y Vigencia (queda todo editable).</div>
+        </div>
         <div class="grid" id="servicioForm" style="margin-top:16px;align-items:end;">
           <div class="field">
             <label for="servicioTipo">Tipo de servicio</label>
@@ -7012,16 +7019,34 @@
   }
 
   // ---------- Autollenado del alta de servicio desde la cotización del cliente ----------
-  // Elige la cotización más reciente del cliente, prefiriendo una Ganada
-  // (estado 'Cerrada') si existe alguna; si no hay ninguna Ganada, usa la
-  // más reciente sin importar estado.
-  function obtenerMejorCotizacionParaCliente(clienteId){
-    const cots = getCotizaciones().filter(c => c.cliente_id === clienteId);
-    if(cots.length === 0) return null;
-    const porFechaDesc = (a, b) => new Date(b.fechaCreacion || 0) - new Date(a.fechaCreacion || 0);
-    const ganadas = cots.filter(c => c.estado === 'Cerrada').sort(porFechaDesc);
-    if(ganadas.length) return ganadas[0];
-    return cots.slice().sort(porFechaDesc)[0];
+  // La elección de qué cotización usar es manual: se listan todas las del
+  // cliente (más reciente primero) en servicioCotizacionOrigen y el
+  // autollenado solo ocurre cuando el usuario elige una explícitamente.
+  const porFechaCotizacionDesc = (a, b) => new Date(b.fechaCreacion || 0) - new Date(a.fechaCreacion || 0);
+
+  function cotizacionesDeCliente(clienteId){
+    return getCotizaciones().filter(c => c.cliente_id === clienteId).sort(porFechaCotizacionDesc);
+  }
+
+  function etiquetaCotizacionParaSelector(cot){
+    const folio = cot.folio ? ('#' + String(cot.folio).padStart(5, '0')) : ('#' + String(cot.id || '').slice(0, 8));
+    const fecha = cot.fechaCreacion ? formatDate(cot.fechaCreacion) : '-';
+    const monto = formatMoney(montoTotalConIva(cot));
+    const estadoTexto = cot.estado === 'Cerrada' ? 'Ganada' : (cot.estado === 'Perdida' ? 'Perdida' : 'Pendiente');
+    return `${folio} · ${fecha} · ${monto} · ${estadoTexto}`;
+  }
+
+  function poblarSelectorCotizacionesCliente(clienteId){
+    const select = document.getElementById('servicioCotizacionOrigen');
+    const cots = cotizacionesDeCliente(clienteId);
+    if(cots.length === 0){
+      select.innerHTML = '<option value="">Este cliente no tiene cotizaciones guardadas</option>';
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    select.innerHTML = '<option value="">Selecciona una cotización...</option>' +
+      cots.map(c => `<option value="${c.id}">${escapeHtml(etiquetaCotizacionParaSelector(c))}</option>`).join('');
   }
 
   function tipoServicioDesdeCotizacion(cot){
@@ -7050,10 +7075,10 @@
   }
 
   // Prellena Tipo de servicio, Costo s/IVA, Costo c/IVA y Vigencia con los
-  // datos de la cotización del cliente (si tiene alguna). Todo queda en
-  // los mismos inputs/selects normales, así que sigue siendo editable.
-  function prellenarServicioDesdeCotizacion(clienteId){
-    const cot = obtenerMejorCotizacionParaCliente(clienteId);
+  // datos de la cotización elegida a mano en servicioCotizacionOrigen.
+  // Todo queda en los mismos inputs/selects normales, así que sigue
+  // siendo editable.
+  function prellenarServicioDesdeCotizacion(cot){
     if(!cot) return;
 
     const tipoServicio = tipoServicioDesdeCotizacion(cot);
@@ -7115,6 +7140,7 @@
 
   function limpiarFormularioServicio(){
     servicioEditandoId = null;
+    document.getElementById('servicioCotizacionOrigen').value = '';
     document.getElementById('servicioTipo').value = '';
     document.getElementById('servicioFrecuencia').value = '';
     limpiarVigenciaSelects();
@@ -7175,12 +7201,21 @@
     }
     serviciosClienteVacio.classList.add('hidden');
     serviciosContenido.classList.remove('hidden');
-    prellenarServicioDesdeCotizacion(serviciosClienteActualId);
+    poblarSelectorCotizacionesCliente(serviciosClienteActualId);
     serviciosListaEl.innerHTML = `<div class="empty-msg">Cargando...</div>`;
     await cargarServiciosDeCliente(serviciosClienteActualId);
     renderServiciosLista();
     await cargarAvisosDeCliente(serviciosClienteActualId);
     renderAvisosLista();
+  });
+
+  // El autollenado solo se dispara cuando el usuario elige a mano una
+  // cotización del cliente en este selector (nunca automáticamente).
+  document.getElementById('servicioCotizacionOrigen').addEventListener('change', (e)=>{
+    const id = e.target.value;
+    if(!id) return;
+    const cot = getCotizaciones().find(c => String(c.id) === id);
+    prellenarServicioDesdeCotizacion(cot);
   });
 
   // Costo automático: si al salir de un campo el otro está vacío, lo
