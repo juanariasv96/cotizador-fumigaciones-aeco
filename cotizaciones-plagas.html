@@ -1232,8 +1232,12 @@
     display:flex;align-items:flex-start;justify-content:center;
     padding:30px 15px;overflow:auto;z-index:999;
   }
+  /* 960px (no 800px como Certificado/otros docs): esta hoja lleva la
+     tabla de estaciones (8 columnas), que respira mejor en pantalla con
+     mas ancho. Solo afecta la vista previa - al imprimir @media print
+     igual fuerza width:100%, sin importar este max-width. */
   #reportePrintSheet{
-    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    background:var(--blanco);width:100%;max-width:960px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
   .firma-doc-img{max-width:220px;max-height:90px;display:block;}
@@ -1267,8 +1271,10 @@
     display:flex;align-items:flex-start;justify-content:center;
     padding:30px 15px;overflow:auto;z-index:999;
   }
+  /* 960px por la misma razon que #reportePrintSheet: tabla de varias
+     columnas que respira mejor en la vista previa en pantalla. */
   #lamparasUVPrintSheet{
-    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    background:var(--blanco);width:100%;max-width:960px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
 
@@ -2914,7 +2920,7 @@
   <div id="reportePrintSheet">
     <div class="print-toolbar">
       <button class="btn secondary" id="btnCerrarReportePreview">Cerrar</button>
-      <button class="btn" id="btnImprimirReporteDoc">Imprimir</button>
+      <button class="btn" id="btnImprimirReporteDoc">Imprimir / Guardar PDF</button>
     </div>
     <div class="doc" id="reporteDocContent"><!-- contenido generado por JS --></div>
   </div>
@@ -2937,7 +2943,7 @@
   <div id="lamparasUVPrintSheet">
     <div class="print-toolbar">
       <button class="btn secondary" id="btnCerrarLamparasUVPreview">Cerrar</button>
-      <button class="btn" id="btnImprimirLamparasUVDoc">Imprimir</button>
+      <button class="btn" id="btnImprimirLamparasUVDoc">Imprimir / Guardar PDF</button>
     </div>
     <div class="doc" id="lamparasUVDocContent"><!-- contenido generado por JS --></div>
   </div>
