@@ -671,20 +671,37 @@
       margin:12mm;
     }
     body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#lamparasUVPrintOverlay):not(#ventaMostradorPrintOverlay){display:none !important;}
-    #printOverlay{position:static;display:block;padding:0;background:none;}
-    #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
-    #qrPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #planPrintOverlay{position:static;display:block;padding:0;background:none;}
-    #planPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #reportePrintOverlay{position:static;display:block;padding:0;background:none;}
-    #reportePrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #certificadoPrintOverlay{position:static;display:block;padding:0;background:none;}
-    #certificadoPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #lamparasUVPrintOverlay{position:static;display:block;padding:0;background:none;}
-    #lamparasUVPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
-    #ventaMostradorPrintOverlay{position:static;display:block;padding:0;background:none;}
-    #ventaMostradorPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+
+    /* Todos los overlays de impresion (Cotizacion, QRs, Plan, Comprobante
+       de mantenimiento, Certificado, Lamparas UV, Nota de venta) comparten
+       el mismo modal en pantalla: position:fixed, fondo gris semitransparente
+       y overflow:auto con altura acotada a la ventana (para poder hacer
+       scroll si el documento no cabe completo en el alto visible). Si al
+       imprimir solo se resetean position/display/padding/background pero
+       se deja overflow:auto y sin forzar height/max-height, ese contenedor
+       puede seguir comportandose como una caja recortada con su propio
+       scroll "fantasma": con documentos cortos (Certificado) no se nota
+       porque el contenido entra igual, pero con documentos largos que
+       necesitan varias hojas (comprobante de mantenimiento con muchas
+       estaciones, Lamparas UV) el navegador imprime esa banda gris con
+       scrollbar en vez de dejar que el contenido fluya libre entre paginas.
+       Por eso aqui se resetea overflow/height/max-height explicitamente
+       para los 7 overlays por igual, no solo position/display/background. */
+    #printOverlay,#qrPrintOverlay,#planPrintOverlay,#reportePrintOverlay,
+    #certificadoPrintOverlay,#lamparasUVPrintOverlay,#ventaMostradorPrintOverlay{
+      position:static;display:block;padding:0;margin:0;
+      background:none;overflow:visible;height:auto;max-height:none;
+    }
+    #printSheet,#qrPrintSheet,#planPrintSheet,#reportePrintSheet,
+    #certificadoPrintSheet,#lamparasUVPrintSheet,#ventaMostradorPrintSheet{
+      position:static;width:100%;max-width:none;margin:0;
+      box-shadow:none;background:var(--blanco);overflow:visible;height:auto;max-height:none;
+    }
+    /* El body se queda visible (es ancestro de los overlays), pero su
+       fondo gris de la app nunca debe imprimirse: si algun hueco entre
+       el overlay y la hoja blanca del .doc queda sin cubrir, que se vea
+       blanco/transparente y no gris. */
+    body{background:none;}
     .print-toolbar{display:none;}
 
     .doc{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
