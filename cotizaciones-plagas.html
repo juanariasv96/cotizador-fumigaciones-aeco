@@ -633,12 +633,44 @@
     font-size:11px;color:#777;display:flex;justify-content:space-between;
   }
 
+  /* Encabezados de sección dentro de un .doc (ej. "Estaciones revisadas",
+     "Firmas") sin envolver en .doc-section: a diferencia de .doc-section,
+     esto NO fuerza el bloque completo a evitar salto de página, para que
+     una tabla larga (muchas estaciones) pueda paginar con normalidad en
+     vez de saltar entera a la siguiente hoja. Solo el encabezado se
+     protege de quedar huérfano al final de una página. */
+  .doc-heading{
+    font-size:13px;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--verde-oscuro);border-bottom:1px solid var(--gris-borde);
+    padding-bottom:4px;margin:18px 0 8px 0;
+    page-break-after:avoid;break-after:avoid;
+  }
+  .doc-heading:first-child{margin-top:0;}
+
+  /* Tabla de reportes de campo (Estaciones revisadas, Lámparas UV):
+     encabezado de columnas repetido en cada hoja y filas que nunca se
+     cortan a la mitad entre páginas. */
+  .doc-report-table{
+    width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed;
+  }
+  .doc-report-table thead{display:table-header-group;}
+  .doc-report-table th,.doc-report-table td{
+    border:1px solid var(--gris-borde);padding:6px 7px;
+    text-align:left;vertical-align:top;word-break:break-word;
+  }
+  .doc-report-table th{
+    background:var(--verde-suave);color:var(--verde-oscuro);
+    font-size:10px;text-transform:uppercase;letter-spacing:.3px;
+  }
+  .doc-report-table tbody tr:nth-child(even) td{background:#fafffb;}
+  .doc-report-table tr{page-break-inside:avoid;break-inside:avoid;}
+
   @media print{
     @page{
       size:letter;
       margin:12mm;
     }
-    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#ventaMostradorPrintOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#lamparasUVPrintOverlay):not(#ventaMostradorPrintOverlay){display:none !important;}
     #printOverlay{position:static;display:block;padding:0;background:none;}
     #printSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #qrPrintOverlay{position:static;display:block;padding:0;background:none;}
@@ -649,16 +681,20 @@
     #reportePrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #certificadoPrintOverlay{position:static;display:block;padding:0;background:none;}
     #certificadoPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
+    #lamparasUVPrintOverlay{position:static;display:block;padding:0;background:none;}
+    #lamparasUVPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     #ventaMostradorPrintOverlay{position:static;display:block;padding:0;background:none;}
     #ventaMostradorPrintSheet{position:static;width:100%;max-width:none;box-shadow:none;margin:0;}
     .print-toolbar{display:none;}
 
-    .doc{padding:0;}
+    .doc{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     .doc-header{margin-bottom:12px;padding-bottom:10px;}
     .doc-title{margin:6px 0 12px 0;}
     .doc-section{margin-bottom:10px;}
+    .doc-heading{margin:12px 0 6px 0;}
     .doc-grid{gap:4px 24px;}
     .doc-price-table th,.doc-price-table td{padding:5px 8px;}
+    .doc-report-table th,.doc-report-table td{padding:4px 6px;font-size:10.5px;}
     .doc-seals{margin-top:14px;padding-top:10px;}
     .doc-seals .seal img{height:42px;}
     .doc-footer{margin-top:8px;padding-top:8px;}
@@ -9728,18 +9764,26 @@
     const estacionPorId = {};
     reporteEstacionesCache.forEach(e => { estacionPorId[e.id] = e; });
 
-    const filasHtml = filasEstaciones.map(f => {
-      const e = estacionPorId[f.estacion_id] || {};
+    // Solo se imprimen estaciones con datos reales de ESTA visita (la
+    // estacion existe y al menos un campo fue registrado): una estacion
+    // del cliente que no se toco en esta visita no debe generar un
+    // renglon colgando sin datos al final de la tabla.
+    const filasConDatos = filasEstaciones.filter(f =>
+      estacionPorId[f.estacion_id] && (f.condicion || f.actividad || f.accion || (f.notas && f.notas.trim()))
+    );
+
+    const filasHtml = filasConDatos.map(f => {
+      const e = estacionPorId[f.estacion_id];
       return `
         <tr>
-          <td>${e.numero || '-'}</td>
+          <td>${e.numero != null ? e.numero : '-'}</td>
           <td>${escapeHtml(e.ubicacion || '-')}</td>
           <td>${escapeHtml(e.tipo_estacion || '-')}</td>
           <td>${escapeHtml(e.tipo_fauna || 'Roedores')}</td>
           <td>${formatCodigosMultiples(f.condicion)}</td>
           <td>${formatCodigosMultiples(f.actividad)}</td>
           <td>${formatCodigosMultiples(f.accion)}</td>
-          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '')}</td>
+          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '-')}</td>
         </tr>
       `;
     }).join('');
@@ -9757,24 +9801,41 @@
       </div>
       <div class="doc-title">
         <h1>Comprobante de servicio — ${escapeHtml(tipoVisita)}</h1>
-        <div class="folio">Cliente: ${escapeHtml(clienteNombre)}${tipoServicio ? ' — ' + escapeHtml(tipoServicio) : ''}</div>
-        <div class="folio">Dirección: ${escapeHtml(clienteDireccion || '-')} &nbsp;|&nbsp; Fecha de visita: ${fechaVisita}</div>
+      </div>
+      <div class="doc-cliente-folio">
+        <div class="cliente-bloque">
+          <p><strong>Cliente:</strong> ${escapeHtml(clienteNombre)}${tipoServicio ? ' — ' + escapeHtml(tipoServicio) : ''}</p>
+          <p>${escapeHtml(clienteDireccion || '-')}</p>
+        </div>
+        <div class="folio-bloque">
+          <p><strong>Fecha de visita:</strong> ${fechaVisita}</p>
+        </div>
       </div>
 
-      <h3>Estaciones revisadas</h3>
-      <table>
+      <h3 class="doc-heading">Estaciones revisadas</h3>
+      <table class="doc-report-table">
+        <colgroup>
+          <col style="width:5%"><col style="width:18%"><col style="width:10%">
+          <col style="width:9%"><col style="width:10%"><col style="width:10%">
+          <col style="width:10%"><col style="width:28%">
+        </colgroup>
         <thead><tr><th>#</th><th>Ubicación</th><th>Tipo</th><th>Fauna</th><th>Condición</th><th>Actividad</th><th>Acción</th><th>Notas</th></tr></thead>
-        <tbody>${filasHtml || '<tr><td colspan="8">Sin estaciones registradas.</td></tr>'}</tbody>
+        <tbody>${filasHtml || '<tr><td colspan="8">Sin estaciones registradas en esta visita.</td></tr>'}</tbody>
       </table>
 
-      ${payloadReporte.observaciones ? `<h3>Observaciones</h3><p style="white-space:pre-wrap;">${escapeHtml(payloadReporte.observaciones)}</p>` : ''}
+      ${payloadReporte.observaciones ? `<h3 class="doc-heading">Observaciones</h3><p style="white-space:pre-wrap;font-size:13px;">${escapeHtml(payloadReporte.observaciones)}</p>` : ''}
 
-      ${avisosResueltosDescripciones.length ? `<h3>Avisos atendidos en esta visita</h3><ul>${avisosResueltosDescripciones.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
+      ${avisosResueltosDescripciones.length ? `<h3 class="doc-heading">Avisos atendidos en esta visita</h3><ul style="font-size:13px;margin:0;padding-left:18px;">${avisosResueltosDescripciones.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
 
-      <h3>Firmas</h3>
+      <h3 class="doc-heading">Firmas</h3>
       <div class="grid">
         <div>${firmaHtml(payloadReporte.firma_cliente_imagen, payloadReporte.firma_cliente_nombre, 'Firma del cliente')}</div>
         <div>${firmaHtml(payloadReporte.firma_tecnico_imagen, payloadReporte.firma_tecnico_nombre, 'Firma del técnico')}</div>
+      </div>
+
+      <div class="doc-footer">
+        <span>${escapeHtml(emp.telefono || '-')}${emp.email ? ' · ' + escapeHtml(emp.email) : ''}</span>
+        <span>Comprobante de servicio${fechaVisita ? ' · ' + fechaVisita : ''}</span>
       </div>
     `;
     reportePrintOverlay.classList.remove('hidden');
@@ -10415,12 +10476,12 @@
       const e = lamparaPorId[f.estacion_id] || {};
       return `
         <tr>
-          <td>${e.numero || '-'}</td>
+          <td>${e.numero != null ? e.numero : '-'}</td>
           <td>${escapeHtml(e.ubicacion || '-')}</td>
           <td>${f.conteo_insectos != null ? f.conteo_insectos : '-'}</td>
           <td>${escapeHtml(f.estado_tubo || '-')}</td>
           <td>${f.tubo_cambiado ? 'Sí' : 'No'}</td>
-          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '')}</td>
+          <td style="white-space:pre-wrap;">${escapeHtml(f.notas || '-')}</td>
         </tr>
       `;
     }).join('');
@@ -10448,18 +10509,27 @@
         </div>
       </div>
 
-      <h3>Lámparas revisadas</h3>
-      <table>
+      <h3 class="doc-heading">Lámparas revisadas</h3>
+      <table class="doc-report-table">
+        <colgroup>
+          <col style="width:6%"><col style="width:22%"><col style="width:15%">
+          <col style="width:17%"><col style="width:12%"><col style="width:28%">
+        </colgroup>
         <thead><tr><th>#</th><th>Ubicación</th><th>Conteo insectos</th><th>Estado tubo/foco</th><th>¿Cambiado?</th><th>Notas</th></tr></thead>
         <tbody>${filasHtml || '<tr><td colspan="6">Sin lámparas registradas.</td></tr>'}</tbody>
       </table>
 
-      ${reporte.observaciones ? `<h3>Observaciones</h3><p style="white-space:pre-wrap;">${escapeHtml(reporte.observaciones)}</p>` : ''}
+      ${reporte.observaciones ? `<h3 class="doc-heading">Observaciones</h3><p style="white-space:pre-wrap;font-size:13px;">${escapeHtml(reporte.observaciones)}</p>` : ''}
 
-      <h3>Firmas</h3>
+      <h3 class="doc-heading">Firmas</h3>
       <div class="grid">
         <div>${firmaHtml(reporte.firma_cliente_imagen, reporte.firma_cliente_nombre, 'Firma del cliente')}</div>
         <div>${firmaHtml(reporte.firma_tecnico_imagen, reporte.firma_tecnico_nombre, 'Firma del técnico')}</div>
+      </div>
+
+      <div class="doc-footer">
+        <span>${escapeHtml(emp.telefono || '-')}${emp.email ? ' · ' + escapeHtml(emp.email) : ''}</span>
+        <span>Folio ${reporte.folio}</span>
       </div>
     `;
     lamparasUVPrintOverlay.classList.remove('hidden');
