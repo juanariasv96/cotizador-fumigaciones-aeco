@@ -9764,13 +9764,12 @@
     const estacionPorId = {};
     reporteEstacionesCache.forEach(e => { estacionPorId[e.id] = e; });
 
-    // Solo se imprimen estaciones con datos reales de ESTA visita (la
-    // estacion existe y al menos un campo fue registrado): una estacion
-    // del cliente que no se toco en esta visita no debe generar un
-    // renglon colgando sin datos al final de la tabla.
-    const filasConDatos = filasEstaciones.filter(f =>
-      estacionPorId[f.estacion_id] && (f.condicion || f.actividad || f.accion || (f.notas && f.notas.trim()))
-    );
+    // Se imprime toda estacion REAL (existe en "estaciones"), aunque
+    // condicion/actividad/accion/notas hayan quedado vacios esta visita
+    // (esos se muestran como "-" en su celda). Lo unico que se descarta
+    // es un renglon de relleno sin estacion real detras (ej. un detalle
+    // guardado que apunta a una estacion ya eliminada).
+    const filasConDatos = filasEstaciones.filter(f => estacionPorId[f.estacion_id]);
 
     const filasHtml = filasConDatos.map(f => {
       const e = estacionPorId[f.estacion_id];
@@ -10472,8 +10471,11 @@
     const lamparaPorId = {};
     lamparasUVCache.forEach(e => { lamparaPorId[e.id] = e; });
 
-    const filasHtml = filasLamparas.map(f => {
-      const e = lamparaPorId[f.estacion_id] || {};
+    // Se imprime toda lampara UV REAL del cliente, aunque conteo/estado
+    // hayan quedado vacios esta visita; solo se descartan detalles que
+    // apuntan a una lampara ya eliminada (sin registro real detras).
+    const filasHtml = filasLamparas.filter(f => lamparaPorId[f.estacion_id]).map(f => {
+      const e = lamparaPorId[f.estacion_id];
       return `
         <tr>
           <td>${e.numero != null ? e.numero : '-'}</td>
