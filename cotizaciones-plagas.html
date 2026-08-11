@@ -6925,8 +6925,20 @@
       return;
     }
     const cliente = clientesCache.find(c => c.id === estacionesClienteActualId);
+    const emp = getEmpresa();
     qrDocContent.innerHTML = `
-      <h2 style="margin-top:0;">Estaciones — ${escapeHtml(cliente ? cliente.nombre : '')}</h2>
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(emp.nombre || "Nombre de tu empresa")}</h2>
+          <p>${escapeHtml(emp.direccion || "Dirección de la empresa")}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || "-")} ${emp.email ? " | " + escapeHtml(emp.email) : ""}</p>
+        </div>
+        <div class="doc-logo">${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}</div>
+      </div>
+      <div class="doc-title">
+        <h1>Códigos QR de Estaciones</h1>
+        <div class="folio">Cliente: ${escapeHtml(cliente ? cliente.nombre : '')} &nbsp;|&nbsp; Fecha: ${formatDate(fechaALocalISO(new Date()))}</div>
+      </div>
       <div class="qr-grid">
         ${activas.map(e => `
           <div class="qr-item">
@@ -7784,7 +7796,7 @@
         <h1>Calendario de trabajo</h1>
         <div class="folio">Cliente: ${escapeHtml(planClienteNombreActual)}${planTipoServicioActual ? ' — ' + escapeHtml(planTipoServicioActual) : ''}</div>
       </div>
-      <table style="margin-top:16px;">
+      <table class="doc-report-table" style="margin-top:16px;font-size:13px;">
         <thead>
           <tr><th>Servicio</th><th>Fecha</th>${planMostrarInsecticidaActual ? '<th>Ingrediente Activo Insecticida</th>' : ''}${planMostrarRodenticidaActual ? '<th>Ingrediente Activo Rodenticida</th>' : ''}</tr>
         </thead>
