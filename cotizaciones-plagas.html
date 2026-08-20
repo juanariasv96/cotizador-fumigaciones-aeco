@@ -1007,6 +1007,7 @@
   .badge.doc-reporte{background:#e7f0fd;color:#1d4ed8;}
   .badge.doc-certificado{background:#e3f5e1;color:#016937;}
   .badge.doc-lamparas{background:#fdf1d8;color:#8a5a00;}
+  .badge.doc-contrato{background:#efe4fb;color:#5b21b6;}
 
   /* ---------- Resumen del día (oficina) ---------- */
   .resumen-tecnico-card{
@@ -2752,7 +2753,7 @@
   <section id="tab-documentacion" class="hidden">
     <div class="panel">
       <h2>Documentación</h2>
-      <p style="font-size:12px;color:#777;margin-top:0;">Reportes de visita y certificados generados por los técnicos en campo. Consulta y reimprime lo ya generado; visible solo para dueño y asistente.</p>
+      <p style="font-size:12px;color:#777;margin-top:0;">Reportes de visita y certificados generados por los técnicos en campo, más los contratos generados desde el plan de trabajo. Consulta y reimprime lo ya generado; visible solo para dueño y asistente.</p>
 
       <div class="panel" id="tarifasExtrasPanel" style="margin:14px 0;">
         <h4 style="margin-top:0;">Tarifas de extras por técnico (noche / domingo)</h4>
@@ -3780,7 +3781,11 @@
         <div class="field" style="max-width:160px;">
           <button type="button" class="btn small" id="btnAgregarCarga" style="width:100%;">Agregar carga</button>
         </div>
+        <div class="field hidden" style="max-width:160px;" id="cargaCancelarEdicionCampo">
+          <button type="button" class="btn secondary small" id="btnCancelarEdicionCarga" style="width:100%;">Cancelar edición</button>
+        </div>
       </div>
+      <p id="cargaEditandoAviso" class="hint hidden" style="margin:0 0 8px 0;color:var(--verde-oscuro);"></p>
       <div id="vehiculoCargasLista" style="margin-top:10px;"></div>
     </div>
 
@@ -12060,6 +12065,7 @@
       { data: reportesLamparasUV, error: errLampUV },
       { data: perfiles, error: errPerf },
       { data: extras, error: errExtras },
+      { data: contratosDoc, error: errContratos },
     ] = await Promise.all([
       supabaseClient.from('clientes').select('id, nombre, telefono, direccion').order('nombre'),
       supabaseClient.from('reportes_visita')
@@ -12070,6 +12076,8 @@
         .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
       supabaseClient.from('perfiles_usuario').select('id, nombre'),
       supabaseClient.from('extras_fuera_horario').select('*'),
+      supabaseClient.from('contratos')
+        .select('id, folio, cliente_id, fecha_contrato, vigencia_inicio, vigencia_fin, num_servicios, monto_total_sin_iva, estatus, datos, clientes(nombre)'),
     ]);
 
     if(errClientes) console.error('No se pudieron cargar los clientes para Documentación:', errClientes);
@@ -12078,6 +12086,7 @@
     if(errLampUV) console.error('No se pudieron cargar los reportes de lámparas UV:', errLampUV);
     if(errPerf) console.error('No se pudieron cargar los perfiles de usuario (nombres de técnico):', errPerf);
     if(errExtras) console.error('No se pudieron cargar los extras fuera de horario:', errExtras);
+    if(errContratos) console.error('No se pudieron cargar los contratos:', errContratos);
 
     documentacionClientesCache = clientesData || [];
     filtrarSelectClientes(docFiltroCliente, documentacionClientesCache, docFiltroClienteBuscar.value, 'Todos');
@@ -12134,7 +12143,31 @@
       };
     });
 
-    documentacionCache = [...itemsReporte, ...itemsCertificado, ...itemsLamparasUV]
+    // Los contratos no nacen de una visita de campo como los otros tres
+    // documentos: nacen del plan de trabajo. Por eso no traen tecnico ni
+    // visitaId, y en su lugar la tarjeta muestra vigencia, servicios y
+    // monto. Se reimprimen desde el snapshot guardado en "datos", igual
+    // que en la pestaña Servicios.
+    const itemsContrato = (contratosDoc || []).map(c => ({
+      tipo: 'contrato',
+      contratoId: c.id,
+      visitaId: null,
+      clienteId: c.cliente_id,
+      clienteNombre: (c.clientes && c.clientes.nombre) || '(cliente no encontrado)',
+      fecha: c.fecha_contrato,
+      sede: (c.datos && c.datos.sede) || '',
+      vigenciaInicio: c.vigencia_inicio,
+      vigenciaFin: c.vigencia_fin,
+      numServicios: c.num_servicios,
+      montoTotal: c.monto_total_sin_iva,
+      estatus: c.estatus || 'Vigente',
+      tipoVisita: 'Contrato',
+      tecnicoNombre: '-',
+      folio: c.folio,
+      datos: c.datos,
+    }));
+
+    documentacionCache = [...itemsReporte, ...itemsCertificado, ...itemsLamparasUV, ...itemsContrato]
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   }
 
@@ -12194,8 +12227,25 @@
     `;
   }
 
-  const DOC_TIPO_LABEL = { reporte: 'Reporte de visita', certificado: 'Certificado', lamparas_uv: 'Reporte de Lámparas UV' };
-  const DOC_TIPO_BADGE_CLASS = { reporte: 'doc-reporte', certificado: 'doc-certificado', lamparas_uv: 'doc-lamparas' };
+  const DOC_TIPO_LABEL = { reporte: 'Reporte de visita', certificado: 'Certificado', lamparas_uv: 'Reporte de Lámparas UV', contrato: 'Contrato' };
+  const DOC_TIPO_BADGE_CLASS = { reporte: 'doc-reporte', certificado: 'doc-certificado', lamparas_uv: 'doc-lamparas', contrato: 'doc-contrato' };
+
+  // Linea de detalle de cada tarjeta. Un contrato no tiene tecnico ni
+  // tipo de visita, asi que muestra lo suyo: vigencia, servicios y monto.
+  function documentacionMetaHtml(d){
+    if(d.tipo === 'contrato'){
+      const partes = [
+        `Folio ${d.folio}`,
+        d.sede ? escapeHtml(d.sede) : null,
+        `Vigencia ${formatDate(d.vigenciaInicio)} — ${formatDate(d.vigenciaFin)}`,
+        d.numServicios != null ? `${d.numServicios} servicios` : null,
+        d.montoTotal != null ? `${formatMoney(d.montoTotal)} s/IVA` : null,
+        escapeHtml(d.estatus),
+      ].filter(Boolean);
+      return partes.join(' · ');
+    }
+    return `${formatDate(d.fecha)} · ${escapeHtml(d.tipoVisita)} · Técnico: ${escapeHtml(d.tecnicoNombre)}${d.folio ? ' · Folio: ' + d.folio : ''}`;
+  }
 
   function renderDocumentacionLista(){
     const clienteFiltro = docFiltroCliente.value;
@@ -12209,7 +12259,7 @@
 
     const cont = document.getElementById('documentacionLista');
     if(filtrados.length === 0){
-      cont.innerHTML = `<div class="empty-msg">No hay reportes ni certificados con estos filtros.</div>`;
+      cont.innerHTML = `<div class="empty-msg">No hay reportes, certificados ni contratos con estos filtros.</div>`;
       return;
     }
 
@@ -12221,10 +12271,10 @@
             <span class="badge ${DOC_TIPO_BADGE_CLASS[d.tipo] || 'doc-reporte'}">${DOC_TIPO_LABEL[d.tipo] || d.tipo}</span>
           </div>
           <div class="documentacion-meta">
-            ${formatDate(d.fecha)} · ${escapeHtml(d.tipoVisita)} · Técnico: ${escapeHtml(d.tecnicoNombre)}${d.folio ? ' · Folio: ' + d.folio : ''}
+            ${documentacionMetaHtml(d)}
           </div>
         </div>
-        <button type="button" class="btn secondary small" data-ver-doc="${d.tipo}" data-visita-id="${d.visitaId}">Ver / Reimprimir</button>
+        <button type="button" class="btn secondary small" data-ver-doc="${d.tipo}" data-visita-id="${d.visitaId || ''}" data-contrato-id="${d.contratoId || ''}">Ver / Reimprimir</button>
         ${extrasFueraHorarioHtml(d)}
       </div>
     `).join('');
@@ -12233,6 +12283,13 @@
   document.getElementById('documentacionLista').addEventListener('click', async (e) => {
     const btnVer = e.target.closest('[data-ver-doc]');
     if(btnVer){
+      // El contrato se reimprime desde su snapshot; no pasa por el cache
+      // de visitas porque no nace de una visita de campo.
+      if(btnVer.dataset.verDoc === 'contrato'){
+        const contrato = documentacionCache.find(d => d.tipo === 'contrato' && d.contratoId === btnVer.dataset.contratoId);
+        if(contrato) mostrarContrato(contrato.datos, contrato.folio);
+        return;
+      }
       btnVer.disabled = true;
       await asegurarVisitaEnCache(btnVer.dataset.visitaId);
       if(btnVer.dataset.verDoc === 'reporte'){
@@ -13304,9 +13361,10 @@
 
   async function abrirVehiculoDetalle(id){
     vehiculoDetalleActualId = id;
-    cargaTicketFotoActual = null;
+    // Deja el formulario de gasolina limpio y fuera de modo edición: si
+    // se venía editando una carga de otro vehículo, no debe arrastrarse.
+    limpiarFormularioCarga();
     mantenimientoFacturaFotoActual = null;
-    renderCargaTicketPreview();
     renderMantenimientoFacturaPreview();
     await cargarVehiculoRegistros(id);
     renderVehiculoDetalle();
@@ -13412,7 +13470,7 @@
     if(esTecnico){
       renderVehiculoCargasRecientesTecnico();
     } else {
-      renderVehiculoCargasLista(dueno, esTecnico);
+      renderVehiculoCargasLista(dueno, esTecnico, oficina);
       renderVehiculoMantenimientosLista(dueno, esTecnico);
       renderVehiculoMultasLista(dueno, oficina, esTecnico);
     }
@@ -13442,7 +13500,7 @@
     `;
   }
 
-  function renderVehiculoCargasLista(dueno, esTecnico){
+  function renderVehiculoCargasLista(dueno, esTecnico, oficina){
     const cont = document.getElementById('vehiculoCargasLista');
     if(!vehiculoCargasCache.length){
       cont.innerHTML = `<div class="empty-msg">Sin cargas registradas.</div>`;
@@ -13458,7 +13516,10 @@
             ${c.nota ? `<div class="hint">${escapeHtml(c.nota)}</div>` : ''}
           </div>
         </div>
-        ${dueno ? `<button type="button" class="btn danger small" data-action="eliminar-carga" data-id="${c.id}">Eliminar</button>` : ''}
+        <div style="display:flex;gap:6px;align-items:flex-start;">
+          ${oficina ? `<button type="button" class="btn secondary small" data-action="editar-carga" data-id="${c.id}">Editar</button>` : ''}
+          ${dueno ? `<button type="button" class="btn danger small" data-action="eliminar-carga" data-id="${c.id}">Eliminar</button>` : ''}
+        </div>
       </div>
     `).join('');
   }
@@ -13542,6 +13603,45 @@
     }
   });
 
+  // ---- Edición de una carga ya registrada (oficina: dueño y asistente) ----
+  // El técnico captura la carga desde la calle y a veces se equivoca en el
+  // monto, los litros o el odómetro. Oficina puede corregirlo aquí sin
+  // tener que borrar y volver a capturar (la RLS ya permitía el update a
+  // dueño y asistente; lo que faltaba era el botón).
+  let cargaEditandoId = null;
+
+  function limpiarFormularioCarga(){
+    ['cargaFecha','cargaLitros','cargaMonto','cargaOdometro','cargaGasolinera','cargaTipoCombustible','cargaNota']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    cargaTicketFotoActual = null;
+    renderCargaTicketPreview();
+    cargaEditandoId = null;
+    document.getElementById('btnAgregarCarga').textContent = 'Agregar carga';
+    document.getElementById('cargaCancelarEdicionCampo').classList.add('hidden');
+    document.getElementById('cargaEditandoAviso').classList.add('hidden');
+  }
+
+  function cargarFormularioCargaParaEditar(carga){
+    document.getElementById('cargaFecha').value = carga.fecha || '';
+    document.getElementById('cargaLitros').value = carga.litros != null ? carga.litros : '';
+    document.getElementById('cargaMonto').value = carga.monto != null ? carga.monto : '';
+    document.getElementById('cargaOdometro').value = carga.odometro != null ? carga.odometro : '';
+    document.getElementById('cargaGasolinera').value = carga.gasolinera || '';
+    document.getElementById('cargaTipoCombustible').value = carga.tipo_combustible || '';
+    document.getElementById('cargaNota').value = carga.nota || '';
+    cargaTicketFotoActual = carga.ticket_foto || null;
+    renderCargaTicketPreview();
+    cargaEditandoId = carga.id;
+    document.getElementById('btnAgregarCarga').textContent = 'Guardar cambios';
+    document.getElementById('cargaCancelarEdicionCampo').classList.remove('hidden');
+    const aviso = document.getElementById('cargaEditandoAviso');
+    aviso.textContent = `Editando la carga del ${formatDate(carga.fecha)}. Ajusta lo que esté mal y presiona "Guardar cambios".`;
+    aviso.classList.remove('hidden');
+    document.getElementById('cargaFecha').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  document.getElementById('btnCancelarEdicionCarga').addEventListener('click', limpiarFormularioCarga);
+
   document.getElementById('btnAgregarCarga').addEventListener('click', async () => {
     const fecha = document.getElementById('cargaFecha').value;
     if(!fecha){ alert('Elige una fecha.'); return; }
@@ -13550,28 +13650,31 @@
     const odometro = document.getElementById('cargaOdometro').value ? Number(document.getElementById('cargaOdometro').value) : null;
     const precioLitro = (litros && monto && litros > 0) ? Number((monto / litros).toFixed(3)) : null;
 
+    const campos = {
+      fecha, litros, monto, precio_litro: precioLitro, odometro,
+      gasolinera: document.getElementById('cargaGasolinera').value.trim() || null,
+      tipo_combustible: document.getElementById('cargaTipoCombustible').value || null,
+      ticket_foto: cargaTicketFotoActual,
+      nota: document.getElementById('cargaNota').value.trim() || null,
+    };
+
     const btn = document.getElementById('btnAgregarCarga');
     btn.disabled = true;
     try{
-      const { error } = await supabaseClient.from('vehiculo_cargas').insert({
-        vehiculo_id: vehiculoDetalleActualId,
-        fecha, litros, monto, precio_litro: precioLitro, odometro,
-        gasolinera: document.getElementById('cargaGasolinera').value.trim() || null,
-        tipo_combustible: document.getElementById('cargaTipoCombustible').value || null,
-        ticket_foto: cargaTicketFotoActual,
-        nota: document.getElementById('cargaNota').value.trim() || null,
-        creado_por: (usuarioActual && usuarioActual.id) || null,
-      });
-      if(error){ alert('No se pudo registrar la carga: ' + error.message); return; }
-      document.getElementById('cargaFecha').value = '';
-      document.getElementById('cargaLitros').value = '';
-      document.getElementById('cargaMonto').value = '';
-      document.getElementById('cargaOdometro').value = '';
-      document.getElementById('cargaGasolinera').value = '';
-      document.getElementById('cargaTipoCombustible').value = '';
-      document.getElementById('cargaNota').value = '';
-      cargaTicketFotoActual = null;
-      renderCargaTicketPreview();
+      let error;
+      if(cargaEditandoId){
+        ({ error } = await supabaseClient.from('vehiculo_cargas').update(campos).eq('id', cargaEditandoId));
+        if(error){ alert('No se pudo guardar el cambio: ' + error.message); return; }
+        mostrarToast('Carga corregida.');
+      } else {
+        ({ error } = await supabaseClient.from('vehiculo_cargas').insert({
+          ...campos,
+          vehiculo_id: vehiculoDetalleActualId,
+          creado_por: (usuarioActual && usuarioActual.id) || null,
+        }));
+        if(error){ alert('No se pudo registrar la carga: ' + error.message); return; }
+      }
+      limpiarFormularioCarga();
       await cargarVehiculoRegistros(vehiculoDetalleActualId);
       await refrescarVehiculoEnCache(vehiculoDetalleActualId);
       renderVehiculoDetalle();
@@ -13677,6 +13780,12 @@
     if(imgBtn){
       document.getElementById('vehiculoImagenGrande').src = imgBtn.dataset.src;
       document.getElementById('vehiculoImagenOverlay').classList.remove('hidden');
+      return;
+    }
+    const editCarga = e.target.closest('[data-action="editar-carga"]');
+    if(editCarga){
+      const carga = vehiculoCargasCache.find(c => c.id === editCarga.dataset.id);
+      if(carga) cargarFormularioCargaParaEditar(carga);
       return;
     }
     const elimCarga = e.target.closest('[data-action="eliminar-carga"]');
