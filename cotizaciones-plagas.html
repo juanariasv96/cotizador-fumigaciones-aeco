@@ -2405,6 +2405,11 @@
             <input type="number" id="servicioCostoConIva" step="0.01" min="0" placeholder="0.00">
           </div>
           <div class="field">
+            <label for="servicioSede">Sede / Sucursal (opcional)</label>
+            <input type="text" id="servicioSede" placeholder="Ej. Primaria, Planta Norte, Sucursal Centro" list="sedesUsadas">
+            <datalist id="sedesUsadas"></datalist>
+          </div>
+          <div class="field">
             <label for="servicioEstatus">Estatus (opcional)</label>
             <input type="text" id="servicioEstatus" placeholder="Ej. Confirmado">
           </div>
@@ -2434,9 +2439,12 @@
             <label for="servicioFrecuenciaCat">Frecuencia (catálogo)</label>
             <select id="servicioFrecuenciaCat">
               <option value="">Sin generar calendario</option>
+              <option value="Semanal">Semanal</option>
+              <option value="Quincenal">Quincenal</option>
               <option value="Mensual">Mensual</option>
               <option value="Bimestral">Bimestral</option>
               <option value="Trimestral">Trimestral</option>
+              <option value="Cuatrimestral">Cuatrimestral</option>
               <option value="Semestral">Semestral</option>
               <option value="Anual">Anual</option>
             </select>
@@ -4506,16 +4514,23 @@
     const nombre = (cliente.nombre || "").trim();
     const telefono = (cliente.telefono || "").trim();
 
-    if(nombre && telefono){
+    // Busqueda del cliente existente por NOMBRE NORMALIZADO (sin acentos,
+    // sin espacios ni signos, todo en mayusculas). Antes se exigia que
+    // coincidieran nombre Y telefono exacto: por eso "Edificio MITT" sin
+    // telefono, "EDIFICIO MITT" y "Edificio MITT " terminaban como tres
+    // clientes distintos, cada uno con su propio plan, y el calendario
+    // los mostraba como visitas repetidas. La columna nombre_norm la
+    // calcula la base (ver clientes_dedup_setup.sql) con la misma regla.
+    if(nombre){
       const { data: existentes, error: errBusqueda } = await supabaseClient
         .from('clientes')
         .select('id')
-        .ilike('nombre', nombre)
-        .eq('telefono', telefono)
+        .eq('nombre_norm', normalizarNombreCliente(nombre))
         .limit(1);
       if(!errBusqueda && existentes && existentes.length){
         const id = existentes[0].id;
         await supabaseClient.from('clientes').update({
+          telefono: telefono || undefined,
           email: cliente.email || null,
           direccion: cliente.direccion || null,
           contacto: cliente.contacto || null,
@@ -4541,6 +4556,15 @@
       .select('id')
       .single();
     if(errInsert){
+      // 23505 = choque con el indice unico de nombre_norm: alguien mas
+      // acaba de dar de alta al mismo cliente entre la busqueda de arriba
+      // y este insert. No es un error para el usuario: se reusa el que ya
+      // quedo grabado, que es justo lo que se queria evitar duplicar.
+      if(errInsert.code === '23505'){
+        const { data: yaExiste } = await supabaseClient
+          .from('clientes').select('id').eq('nombre_norm', normalizarNombreCliente(nombre)).limit(1);
+        if(yaExiste && yaExiste.length) return yaExiste[0].id;
+      }
       console.error('Error al guardar cliente:', errInsert);
       return null;
     }
@@ -4646,6 +4670,18 @@
     const [y,m,d] = iso.split("-");
     return `${d}/${m}/${y}`;
   }
+  // Clave para comparar nombres de cliente: mayusculas, sin acentos y sin
+  // espacios ni signos. Tiene que dar EXACTAMENTE lo mismo que la columna
+  // generada clientes.nombre_norm en la base, que es la que trae el
+  // indice unico que impide dar de alta dos veces al mismo cliente.
+  function normalizarNombreCliente(nombre){
+    return String(nombre || '')
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Z0-9]/g, '');
+  }
+
   function escapeHtml(str){
     return String(str||"").replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -5566,13 +5602,27 @@
   });
 
   // ---------- Tipo de contratación: Único vs Póliza (aplica a todas, excepto Cucaracha Alemana) ----------
+  // Frecuencias de una poliza. Las de mes se validan contra la duracion
+  // (solo aparecen las que dividen exacto: en 6 meses no tiene sentido
+  // "Cuatrimestral"). Semanal y Quincenal se miden en dias, asi que
+  // aplican a cualquier duracion y sus visitas se calculan aparte.
   const FRECUENCIAS_SERVICIO = [
+    { value:"Semanal", dias:7 },
+    { value:"Quincenal", dias:14 },
     { value:"Mensual", meses:1 },
     { value:"Bimestral", meses:2 },
     { value:"Trimestral", meses:3 },
     { value:"Cuatrimestral", meses:4 },
     { value:"Semestral", meses:6 },
   ];
+
+  const DIAS_POR_MES = 365.25 / 12;
+
+  // Cuantas visitas caben en una poliza de N meses con esta frecuencia.
+  function visitasDeFrecuencia(frec, mesesPoliza){
+    if(frec.dias) return Math.round((mesesPoliza * DIAS_POR_MES) / frec.dias);
+    return mesesPoliza / frec.meses;
+  }
 
   const radiosContratacion = document.querySelectorAll('input[name="tipoContratacion"]');
   const polizaFields = document.getElementById('polizaFields');
@@ -5597,10 +5647,13 @@
     frecuenciaServicio.disabled = false;
     frecuenciaServicio.innerHTML = '<option value="">Selecciona...</option>' +
       FRECUENCIAS_SERVICIO
-        .filter(f => f.meses !== meses && meses % f.meses === 0)
+        .filter(f => f.dias ? true : (f.meses !== meses && meses % f.meses === 0))
         .map(f => {
-          const visitas = meses / f.meses;
-          return `<option value="${f.value}" data-meses="${f.meses}" data-visitas="${visitas}">${f.value} (cada ${f.meses} ${f.meses===1?'mes':'meses'} - ${visitas} visitas)</option>`;
+          const visitas = visitasDeFrecuencia(f, meses);
+          const cada = f.dias
+            ? `cada ${f.dias} días`
+            : `cada ${f.meses} ${f.meses === 1 ? 'mes' : 'meses'}`;
+          return `<option value="${f.value}" data-meses="${f.meses || ''}" data-dias="${f.dias || ''}" data-visitas="${visitas}">${f.value} (${cada} - ${visitas} visitas)</option>`;
         }).join("");
   }
 
@@ -7564,6 +7617,7 @@
     servicioVigenciaTextoOriginal = null;
     document.getElementById('servicioCostoSinIva').value = '';
     document.getElementById('servicioCostoConIva').value = '';
+    document.getElementById('servicioSede').value = '';
     document.getElementById('servicioEstatus').value = '';
     document.getElementById('servicioNotas').value = '';
     document.getElementById('servicioActivo').value = 'true';
@@ -7581,6 +7635,7 @@
     const filas = serviciosCache.map(s => `
       <tr class="${s.activo ? '' : 'inactiva'}">
         <td>${escapeHtml(s.tipo_servicio || '-')}</td>
+        <td>${escapeHtml(s.sede || '—')}</td>
         <td>${escapeHtml(s.frecuencia || '-')}</td>
         <td>${escapeHtml(s.vigencia_poliza || '-')}</td>
         <td>${formatMoneyOrDash(s.costo_sin_iva)}</td>
@@ -7599,13 +7654,21 @@
       <table>
         <thead>
           <tr>
-            <th>Tipo de servicio</th><th>Frecuencia</th><th>Vigencia</th>
+            <th>Tipo de servicio</th><th>Sede</th><th>Frecuencia</th><th>Vigencia</th>
             <th>Costo s/IVA</th><th>Costo c/IVA</th><th>Estatus</th><th>Notas</th><th>Activo</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>
       </table>
     `;
+    // Sugerencias de sede: las que ya usa este cliente, para que se
+    // escriban igual en todos sus servicios y el aviso de duplicado
+    // pueda compararlas bien.
+    const datalist = document.getElementById('sedesUsadas');
+    if(datalist){
+      const sedes = [...new Set(serviciosCache.map(s => (s.sede || '').trim()).filter(Boolean))];
+      datalist.innerHTML = sedes.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
+    }
   }
 
   serviciosClienteSelect.addEventListener('change', async ()=>{
@@ -7673,12 +7736,39 @@
       vigencia_poliza: armarVigenciaTexto() || servicioVigenciaTextoOriginal || null,
       costo_sin_iva: costoSinIvaVal === '' ? null : Number(costoSinIvaVal),
       costo_con_iva: costoConIvaVal === '' ? null : Number(costoConIvaVal),
+      sede: document.getElementById('servicioSede').value.trim() || null,
       estatus: document.getElementById('servicioEstatus').value.trim() || null,
       notas: document.getElementById('servicioNotas').value.trim() || null,
       activo: activo,
       fecha_inicio: fechaInicio,
       frecuencia_cat: frecuenciaCat,
     };
+
+    // Aviso de servicio repetido: mismo cliente, mismo tipo y MISMA SEDE.
+    // La sede es lo que separa los casos legitimos (Cambridge tiene 5
+    // escuelas con el mismo tipo de servicio) de un alta duplicada por
+    // error, que es la que terminaba generando dos planes y dos juegos
+    // de visitas encimadas en el calendario.
+    if(!servicioEditandoId && activo){
+      const iguales = serviciosCache.filter(s =>
+        s.activo &&
+        normalizarTextoPlan(s.tipo_servicio) === normalizarTextoPlan(payload.tipo_servicio) &&
+        normalizarTextoPlan(s.sede) === normalizarTextoPlan(payload.sede)
+      );
+      if(iguales.length > 0){
+        const otro = iguales[0];
+        const dondeTexto = payload.sede ? ` en la sede "${payload.sede}"` : '';
+        const seguir = confirm(
+          `Este cliente ya tiene un servicio "${otro.tipo_servicio || 'sin tipo'}" activo${dondeTexto}` +
+          (otro.costo_sin_iva != null ? ` por ${formatMoney(otro.costo_sin_iva)} s/IVA` : '') + `.\n\n` +
+          (payload.sede
+            ? 'Si es otro contrato distinto de esa misma sede, continúa.'
+            : 'Si son sedes o sucursales diferentes, cancela y captura la Sede en cada uno para no encimar sus visitas en el calendario.') +
+          `\n\n¿Crear el servicio de todas formas?`
+        );
+        if(!seguir) return;
+      }
+    }
 
     const btn = document.getElementById('btnGuardarServicio');
     btn.disabled = true;
@@ -7731,6 +7821,7 @@
       }
       document.getElementById('servicioCostoSinIva').value = servicio.costo_sin_iva ?? '';
       document.getElementById('servicioCostoConIva').value = servicio.costo_con_iva ?? '';
+      document.getElementById('servicioSede').value = servicio.sede || '';
       document.getElementById('servicioEstatus').value = servicio.estatus || '';
       document.getElementById('servicioNotas').value = servicio.notas || '';
       document.getElementById('servicioActivo').value = servicio.activo ? 'true' : 'false';
@@ -7847,11 +7938,22 @@
 
 
   // ---------- Generación automática de visitas (fecha_inicio + frecuencia_cat) ----------
-  const INTERVALO_MESES = { Mensual: 1, Bimestral: 2, Trimestral: 3, Semestral: 6, Anual: 12 };
+  // Frecuencias que generan calendario. Las de mes avanzan mes con mes y
+  // luego se ajustan al mismo dia de la semana que la fecha de inicio;
+  // Semanal y Quincenal avanzan en dias, asi que ya caen solas en el
+  // mismo dia de la semana y no necesitan ajuste.
+  const INTERVALO_MESES = { Mensual: 1, Bimestral: 2, Trimestral: 3, Cuatrimestral: 4, Semestral: 6, Anual: 12 };
+  const INTERVALO_DIAS = { Semanal: 7, Quincenal: 14 };
   const ANIO_CALENDARIO = 2026;
 
   function sumarMeses(fecha, meses){
     return new Date(fecha.getFullYear(), fecha.getMonth() + meses, fecha.getDate());
+  }
+
+  function sumarDias(fecha, dias){
+    const d = new Date(fecha);
+    d.setDate(d.getDate() + dias);
+    return d;
   }
 
   function ajustarADiaSemana(fechaObjetivo, diaSemanaDeseado){
@@ -7874,15 +7976,19 @@
   // que caen dentro de ANIO_CALENDARIO.
   function calcularFechasVisita(fechaInicioStr, frecuenciaCat){
     const intervaloMeses = INTERVALO_MESES[frecuenciaCat];
-    if(!intervaloMeses) return [];
+    const intervaloDias = INTERVALO_DIAS[frecuenciaCat];
+    if(!intervaloMeses && !intervaloDias) return [];
     const [y, m, d] = fechaInicioStr.split('-').map(Number);
     const fechaInicio = new Date(y, m - 1, d);
     const diaSemana = fechaInicio.getDay();
     const fechas = [];
-    for(let k = 0; k < 60; k++){
-      const objetivo = sumarMeses(fechaInicio, k * intervaloMeses);
+    // Tope alto para que Semanal (hasta 53 visitas al año) quepa completo.
+    for(let k = 0; k < 400; k++){
+      const objetivo = intervaloDias
+        ? sumarDias(fechaInicio, k * intervaloDias)
+        : sumarMeses(fechaInicio, k * intervaloMeses);
       if(objetivo.getFullYear() > ANIO_CALENDARIO) break;
-      const ajustada = ajustarADiaSemana(objetivo, diaSemana);
+      const ajustada = intervaloDias ? objetivo : ajustarADiaSemana(objetivo, diaSemana);
       if(ajustada.getFullYear() === ANIO_CALENDARIO){
         fechas.push(ajustada);
       }
@@ -7898,6 +8004,7 @@
   let planClienteActualId = null;
   let planClienteNombreActual = '';
   let planTipoServicioActual = '';
+  let planSedeActual = '';
   let planFilasActuales = [];
   let planIdsOriginales = [];
   // Qué columnas de ingrediente activo aplican para el plan abierto,
@@ -8029,6 +8136,17 @@
     planClienteNombreActual = clienteNombre;
     planTipoServicioActual = tipoServicio;
 
+    // La sede se lee de la base y no del parametro, para que el plan la
+    // muestre igual venga de la pestaña Servicios o del Calendario.
+    const servicioDelPlan = serviciosCache.find(s => s.id === servicioId);
+    if(servicioDelPlan){
+      planSedeActual = servicioDelPlan.sede || '';
+    } else {
+      const { data: sedeData } = await supabaseClient
+        .from('servicios_cliente').select('sede').eq('id', servicioId).maybeSingle();
+      planSedeActual = (sedeData && sedeData.sede) || '';
+    }
+
     const incluyeInsecto = planTipoIncluyeInsecto(tipoServicio);
     const incluyeRoedor = planTipoIncluyeRoedor(tipoServicio);
     // Fallback: si el texto de tipo_servicio no permite reconocer ninguna
@@ -8068,7 +8186,8 @@
     }
 
     planIdsOriginales = planFilasActuales.filter(f => f.id).map(f => f.id);
-    document.getElementById('planPanelTitulo').textContent = `Plan de trabajo — ${clienteNombre}${tipoServicio ? ' — ' + tipoServicio : ''}`;
+    document.getElementById('planPanelTitulo').textContent =
+      `Plan de trabajo — ${clienteNombre}${planSedeActual ? ' (' + planSedeActual + ')' : ''}${tipoServicio ? ' — ' + tipoServicio : ''}`;
     renderFilasPlan();
     planOverlay.classList.remove('hidden');
   }
@@ -8196,7 +8315,7 @@
       </div>
       <div class="doc-title">
         <h1>Calendario de trabajo</h1>
-        <div class="folio">Cliente: ${escapeHtml(planClienteNombreActual)}${planTipoServicioActual ? ' — ' + escapeHtml(planTipoServicioActual) : ''}</div>
+        <div class="folio">Cliente: ${escapeHtml(planClienteNombreActual)}${planSedeActual ? ' — ' + escapeHtml(planSedeActual) : ''}${planTipoServicioActual ? ' — ' + escapeHtml(planTipoServicioActual) : ''}</div>
       </div>
       <table class="doc-report-table" style="margin-top:16px;font-size:13px;">
         <thead>
@@ -8243,8 +8362,11 @@
   // "El servicio se realizara MENSUALMENTE conforme al siguiente
   // calendario" - el adverbio correcto segun la frecuencia del servicio.
   const CONTRATO_ADVERBIO_FRECUENCIA = {
+    Semanal: 'semanalmente',
+    Quincenal: 'quincenalmente',
     Mensual: 'mensualmente',
     Bimestral: 'de forma bimestral',
+    Cuatrimestral: 'de forma cuatrimestral',
     Trimestral: 'de forma trimestral',
     Semestral: 'de forma semestral',
     Anual: 'de forma anual'
@@ -8379,7 +8501,7 @@
 
       <div class="doc-title">
         <h1>Contrato de prestación de servicios</h1>
-        <div class="folio">Contrato N° ${folio != null ? folio : '—'} &nbsp;|&nbsp; ${escapeHtml(c.razonSocial || '')}</div>
+        <div class="folio">Contrato N° ${folio != null ? folio : '—'} &nbsp;|&nbsp; ${escapeHtml(c.razonSocial || '')}${d.sede ? ' — ' + escapeHtml(d.sede) : ''}</div>
       </div>
 
       <p class="contrato-intro">CONTRATO DE PRESTACIÓN DE SERVICIOS DE CONTROL DE PLAGAS MEDIANTE FUMIGACIÓN QUE CELEBRAN POR UNA PARTE <strong>${escapeHtml(c.razonSocial || guion)}</strong> EN LO SUCESIVO “EL CLIENTE”, Y POR LA OTRA LA PERSONA FÍSICA <strong>${escapeHtml(p.representanteLegal || p.nombre || guion)}</strong>, A QUIEN EN LO SUCESIVO SE LE DENOMINARÁ “EL PRESTADOR”, AL TENOR DE LAS SIGUIENTES DECLARACIONES Y CLÁUSULAS:</p>
@@ -8420,7 +8542,7 @@
 
       <div class="contrato-clausula">
         <p><strong>TERCERA. LUGAR DE PRESTACIÓN DE LOS SERVICIOS.</strong></p>
-        <p>El servicio se brindará en las instalaciones de “EL CLIENTE”, ubicadas en: ${escapeHtml(contratoTerminarFrase(c.lugarServicio))}</p>
+        <p>El servicio se brindará en las instalaciones de “EL CLIENTE”${d.sede ? ` correspondientes a <strong>${escapeHtml(d.sede)}</strong>` : ''}, ubicadas en: ${escapeHtml(contratoTerminarFrase(c.lugarServicio))}</p>
       </div>
 
       <div class="contrato-clausula">
@@ -8502,9 +8624,9 @@
     }
 
     const [servicioRes, clienteRes, previosRes] = await Promise.all([
-      supabaseClient.from('servicios_cliente').select('id, tipo_servicio, frecuencia, frecuencia_cat, costo_sin_iva').eq('id', planServicioActualId).maybeSingle(),
+      supabaseClient.from('servicios_cliente').select('id, tipo_servicio, sede, frecuencia, frecuencia_cat, costo_sin_iva').eq('id', planServicioActualId).maybeSingle(),
       supabaseClient.from('clientes').select('id, nombre, direccion, contacto').eq('id', planClienteActualId).maybeSingle(),
-      supabaseClient.from('contratos').select('datos').eq('cliente_id', planClienteActualId).order('folio', { ascending: false }).limit(1)
+      supabaseClient.from('contratos').select('datos').eq('cliente_id', planClienteActualId).order('folio', { ascending: false }).limit(20)
     ]);
 
     if(servicioRes.error || clienteRes.error){
@@ -8518,14 +8640,25 @@
 
     const servicio = servicioRes.data || {};
     const cliente = clienteRes.data || {};
-    const previo = (previosRes.data && previosRes.data[0] && previosRes.data[0].datos && previosRes.data[0].datos.cliente) || null;
+    // Prellenado: se prefiere el último contrato de LA MISMA SEDE (un
+    // cliente con varias sucursales tiene un domicilio de servicio por
+    // cada una); si no hay, se usa el último contrato del cliente.
+    const previosLista = previosRes.data || [];
+    const previoMismaSede = previosLista.find(c => c.datos && (c.datos.sede || '') === (servicio.sede || ''));
+    const previoDoc = previoMismaSede || previosLista[0] || null;
+    const previo = (previoDoc && previoDoc.datos && previoDoc.datos.cliente) || null;
 
     contratoCtx = { filas, servicio, cliente };
 
-    document.getElementById('contratoPanelTitulo').textContent = `Generar contrato — ${cliente.nombre || planClienteNombreActual}`;
+    const sedeDelServicio = servicio.sede || planSedeActual || '';
+    document.getElementById('contratoPanelTitulo').textContent =
+      `Generar contrato — ${cliente.nombre || planClienteNombreActual}${sedeDelServicio ? ' (' + sedeDelServicio + ')' : ''}`;
     document.getElementById('contratoPanelResumen').textContent =
       `${filas.length} servicios programados, del ${formatDate(filas[0].fecha)} al ${formatDate(filas[filas.length - 1].fecha)}.` +
-      (previo ? ' Los datos legales se prellenaron con los del contrato anterior de este cliente.' : '');
+      (sedeDelServicio ? ` Sede: ${sedeDelServicio}.` : '') +
+      (previo ? (previoMismaSede
+        ? ' Los datos legales se prellenaron con los del contrato anterior de esta misma sede.'
+        : ' Los datos legales se prellenaron con los del contrato anterior de este cliente — revisa el domicilio del servicio.') : '');
 
     document.getElementById('contratoRazonSocial').value = (previo && previo.razonSocial) || cliente.nombre || '';
     document.getElementById('contratoDomicilioFiscal').value = (previo && previo.domicilioFiscal) || cliente.direccion || '';
@@ -8608,6 +8741,7 @@
         bancoClabe: emp.bancoClabe || ''
       },
       tipoServicio: servicio.tipo_servicio || planTipoServicioActual || '',
+      sede: servicio.sede || planSedeActual || '',
       frecuencia,
       visitas: filas.map(f => ({ fecha: f.fecha, insecticida: f.insecticida || '', rodenticida: f.rodenticida || '' })),
       vigenciaInicio: filas[0].fecha,
@@ -8679,6 +8813,7 @@
     const filas = contratosClienteCache.map(c => `
       <tr class="${c.estatus === 'Vigente' ? '' : 'inactiva'}">
         <td>${c.folio}</td>
+        <td>${escapeHtml((c.datos && c.datos.sede) || '—')}</td>
         <td>${formatDate(c.fecha_contrato)}</td>
         <td>${formatDate(c.vigencia_inicio)} — ${formatDate(c.vigencia_fin)}</td>
         <td>${c.num_servicios != null ? c.num_servicios : '-'}</td>
@@ -8690,7 +8825,7 @@
     contratosListaEl.innerHTML = `
       <table>
         <thead>
-          <tr><th>Folio</th><th>Fecha</th><th>Vigencia</th><th>Servicios</th><th>Monto s/IVA</th><th>Estatus</th><th></th></tr>
+          <tr><th>Folio</th><th>Sede</th><th>Fecha</th><th>Vigencia</th><th>Servicios</th><th>Monto s/IVA</th><th>Estatus</th><th></th></tr>
         </thead>
         <tbody>${filas}</tbody>
       </table>
@@ -10026,7 +10161,7 @@
     const fin = `${calAnioActual}-12-31`;
     const { data, error } = await supabaseClient
       .from('visitas_programadas')
-      .select('*, clientes(nombre, direccion, telefono, zona, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en), servicios_cliente(tipo_servicio)')
+      .select('*, clientes(nombre, direccion, telefono, zona, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en), servicios_cliente(tipo_servicio, sede)')
       .gte('fecha_programada', inicio)
       .lte('fecha_programada', fin)
       .order('fecha_programada');
@@ -10100,14 +10235,18 @@
       const chips = visitasDelDia.map(v => {
         const clienteNombre = (v.clientes && v.clientes.nombre) || '';
         const tipoServicio = (v.servicios_cliente && v.servicios_cliente.tipo_servicio) || '';
+        // La sede distingue en el calendario dos visitas del mismo cliente
+        // el mismo dia que en realidad son sucursales distintas (p.ej. las
+        // 5 escuelas de un mismo colegio), en vez de verse repetidas.
+        const sedeServicio = (v.servicios_cliente && v.servicios_cliente.sede) || '';
         const estatusClase = (v.estatus || 'Programada').toLowerCase();
         const esRefuerzo = v.tipo === 'Refuerzo';
         const nombresTecnicos = tecnicosDeVisita(v)
           .map(tecnicoId => (calTecnicosCache.find(t => t.id === tecnicoId) || {}).nombre)
           .filter(Boolean);
-        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre + (nombresTecnicos.length > 1 ? ' (2)' : '');
+        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre + (sedeServicio ? ' · ' + sedeServicio : '') + (nombresTecnicos.length > 1 ? ' (2)' : '');
         const tituloTecnicos = nombresTecnicos.length > 0 ? nombresTecnicos.join(' + ') : 'Sin asignar';
-        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')}) · Técnico(s): ${escapeHtml(tituloTecnicos)}">${escapeHtml(etiqueta)}</button>`;
+        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)}${sedeServicio ? ' — ' + escapeHtml(sedeServicio) : ''} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')}) · Técnico(s): ${escapeHtml(tituloTecnicos)}">${escapeHtml(etiqueta)}</button>`;
       }).join('');
 
       celdas += `
