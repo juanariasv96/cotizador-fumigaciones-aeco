@@ -670,7 +670,7 @@
       size:letter;
       margin:12mm;
     }
-    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#lamparasUVPrintOverlay):not(#ventaMostradorPrintOverlay):not(#hotelReportePrintOverlay){display:none !important;}
+    body > *:not(#printOverlay):not(#qrPrintOverlay):not(#planPrintOverlay):not(#reportePrintOverlay):not(#certificadoPrintOverlay):not(#lamparasUVPrintOverlay):not(#ventaMostradorPrintOverlay):not(#hotelReportePrintOverlay):not(#contratoPrintOverlay){display:none !important;}
 
     /* Todos los overlays de impresion (Cotizacion, QRs, Plan, Comprobante
        de mantenimiento, Certificado, Lamparas UV, Nota de venta) comparten
@@ -705,14 +705,14 @@
        pantalla de cada overlay. */
     #printOverlay,#qrPrintOverlay,#planPrintOverlay,#reportePrintOverlay,
     #certificadoPrintOverlay,#lamparasUVPrintOverlay,#ventaMostradorPrintOverlay,
-    #hotelReportePrintOverlay{
+    #hotelReportePrintOverlay,#contratoPrintOverlay{
       position:static !important;inset:auto !important;display:block !important;
       padding:0 !important;margin:0 !important;background:none !important;
       overflow:visible !important;height:auto !important;max-height:none !important;
     }
     #printSheet,#qrPrintSheet,#planPrintSheet,#reportePrintSheet,
     #certificadoPrintSheet,#lamparasUVPrintSheet,#ventaMostradorPrintSheet,
-    #hotelReportePrintSheet{
+    #hotelReportePrintSheet,#contratoPrintSheet{
       position:static !important;width:100% !important;max-width:none !important;
       margin:0 !important;box-shadow:none !important;background:var(--blanco) !important;
       overflow:visible !important;height:auto !important;max-height:none !important;
@@ -1219,6 +1219,57 @@
     background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
     padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
+
+  /* ---------- Contrato de prestacion de servicios ---------- */
+  #contratoOverlay, #contratoPrintOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 15px;overflow:auto;z-index:1000;
+  }
+  #contratoPanel{
+    background:var(--blanco);width:100%;max-width:680px;border-radius:6px;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;
+  }
+  #contratoPrintSheet{
+    background:var(--blanco);width:100%;max-width:800px;border-radius:6px;
+    padding:0;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+  /* Cuerpo del contrato: texto legal corrido, mas apretado que una
+     cotizacion y con las clausulas sin partirse entre dos hojas. */
+  .contrato-doc p{font-size:12.5px;line-height:1.55;text-align:justify;margin:0 0 9px 0;}
+  .contrato-doc h3{
+    font-size:12.5px;margin:16px 0 7px 0;color:var(--verde-oscuro);
+    text-transform:uppercase;letter-spacing:.3px;
+  }
+  .contrato-doc h3, .contrato-doc .contrato-clausula{page-break-inside:avoid;break-inside:avoid;}
+  .contrato-doc ul{margin:0 0 9px 0;padding-left:20px;}
+  .contrato-doc li{font-size:12.5px;line-height:1.5;margin-bottom:3px;text-align:justify;}
+  .contrato-doc .contrato-intro{margin-bottom:14px;}
+  .contrato-doc table.contrato-calendario{
+    width:100%;border-collapse:collapse;margin:8px 0 12px 0;font-size:12px;
+  }
+  .contrato-doc table.contrato-calendario th,
+  .contrato-doc table.contrato-calendario td{
+    border:1px solid #cfd8d2;padding:4px 8px;text-align:center;
+  }
+  .contrato-doc table.contrato-calendario th{
+    background:var(--verde-suave);color:var(--verde-oscuro);
+    font-size:10px;text-transform:uppercase;letter-spacing:.3px;
+  }
+  .contrato-doc table.contrato-calendario tr{page-break-inside:avoid;break-inside:avoid;}
+  /* Bloque de firmas: nunca se parte entre dos hojas, y se mantiene
+     pegado a la cláusula NOVENA para no acabar en una hoja suelta
+     firmada sin texto arriba (una "hoja de firmas" huérfana es mas
+     debil legalmente que la firma al calce del propio contrato). */
+  .contrato-firmas{
+    display:flex;gap:40px;justify-content:space-between;margin-top:30px;
+    page-break-inside:avoid;break-inside:avoid;
+  }
+  .contrato-firmas > div{flex:1 1 0;text-align:center;font-size:12px;}
+  .contrato-firmas .linea-firma{
+    border-top:1px solid #333;margin-top:46px;padding-top:5px;font-weight:600;
+  }
+  #contratosLista tr.inactiva{opacity:.55;}
 
   /* ---------- Reporte de visita (tecnico) ---------- */
   #reporteOverlay{
@@ -1983,6 +2034,56 @@
     </div>
 
     <div class="panel">
+      <h2>Datos para los contratos (EL PRESTADOR)</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Estos datos aparecen en las <strong>declaraciones</strong> y en la <strong>cláusula de pago</strong> de cada contrato que genere la app. Se capturan una sola vez. Nunca salen en la cotización al cliente, y no viven en el código de la app: se guardan en la base de datos privada.</p>
+      <div class="grid">
+        <div class="field">
+          <label for="empRepresentanteLegal">Representante legal (quien firma)</label>
+          <input type="text" id="empRepresentanteLegal" placeholder="Ej. Ing. Juan Francisco Arias Villalobos">
+        </div>
+        <div class="field">
+          <label for="empRfc">RFC</label>
+          <input type="text" id="empRfc" placeholder="RFC del prestador">
+        </div>
+        <div class="field">
+          <label for="empRegistroPatronalImss">Registro patronal IMSS</label>
+          <input type="text" id="empRegistroPatronalImss" placeholder="Ej. Y40-00000-00-0">
+        </div>
+        <div class="field">
+          <label for="empRegistroStps">Registro STPS (REPSE)</label>
+          <input type="text" id="empRegistroStps" placeholder="Ej. folio 000000 STPS/UTD/...">
+        </div>
+        <div class="field" style="flex:1 1 100%;">
+          <label for="empDomicilioLegal">Domicilio legal</label>
+          <input type="text" id="empDomicilioLegal" placeholder="Domicilio legal que aparece en el contrato">
+        </div>
+        <div class="field" style="flex:1 1 100%;">
+          <label for="empActividadPreponderante">Actividad preponderante (Constancia de Situación Fiscal)</label>
+          <input type="text" id="empActividadPreponderante" placeholder="Ej. SERVICIOS DE FUMIGACION Y CONTROL DE PLAGAS">
+        </div>
+        <div class="field">
+          <label for="empBancoCuenta">Número de cuenta bancaria</label>
+          <input type="text" id="empBancoCuenta" placeholder="Cuenta donde te pagan">
+        </div>
+        <div class="field">
+          <label for="empBancoClabe">Clave interbancaria (CLABE)</label>
+          <input type="text" id="empBancoClabe" placeholder="18 dígitos">
+        </div>
+        <div class="field">
+          <label for="empContratoGarantiaDias">Garantía del servicio (días)</label>
+          <input type="number" min="0" step="1" id="empContratoGarantiaDias" placeholder="30">
+        </div>
+        <div class="field">
+          <label for="empContratoCiudadFirma">Ciudad donde se firma</label>
+          <input type="text" id="empContratoCiudadFirma" placeholder="Ej. Monterrey, Nuevo León">
+        </div>
+      </div>
+      <div class="actions-row">
+        <button type="button" class="btn" id="btnGuardarDatosContrato">Guardar datos para contratos</button>
+      </div>
+    </div>
+
+    <div class="panel">
       <h2>Costos para la calculadora de "Precio sugerido"</h2>
       <p style="font-size:12px;color:#777;margin-top:0;">Estos valores alimentan el cálculo interno de costo real y precio sugerido. Nunca aparecen en la cotización impresa al cliente. Son compartidos por todo el equipo (mismos precios base para todos) y solo el rol "dueño" puede guardarlos.</p>
       <div class="grid">
@@ -2360,6 +2461,12 @@
             </div>
           </div>
           <div id="avisosLista" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin-top:0;">Contratos del cliente</h3>
+          <p style="font-size:12px;color:#777;margin-top:0;">Contratos generados desde el plan de trabajo. Se guardan tal como se imprimieron, así que puedes reimprimir cualquiera aunque después cambien precios o datos.</p>
+          <div id="contratosLista" style="margin-top:14px;"></div>
         </div>
       </div>
     </div>
@@ -2889,7 +2996,9 @@
     <div class="actions-row" style="margin-top:10px;">
       <button type="button" class="btn secondary small" id="btnAgregarFilaPlan">+ Agregar visita</button>
       <button type="button" class="btn secondary small" id="btnImprimirPlan">Imprimir plan de trabajo</button>
+      <button type="button" class="btn secondary small" id="btnContratoPlan">Generar contrato</button>
     </div>
+    <p id="planContratoHint" style="font-size:11px;color:#999;margin:6px 0 0 0;"></p>
     <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
       <button type="button" class="btn secondary small" id="btnCerrarPlanPanel">Cancelar</button>
       <button type="button" class="btn" id="btnConfirmarPlan">Confirmar plan</button>
@@ -2905,6 +3014,65 @@
       <button class="btn" id="btnImprimirPlanDoc">Imprimir</button>
     </div>
     <div class="doc" id="planDocContent"><!-- contenido generado por JS --></div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY: DATOS PARA EL CONTRATO =================
+     Formulario corto con los 4 datos legales del cliente que el CRM no
+     guarda en la ficha (razon social, domicilio fiscal, lugar donde se
+     da el servicio y representante legal que firma). Se piden cada vez
+     que se genera un contrato, pero si el cliente ya tuvo uno antes se
+     prellenan con los del contrato anterior para no recapturar. -->
+<div id="contratoOverlay" class="hidden">
+  <div id="contratoPanel">
+    <h3 style="margin-top:0;" id="contratoPanelTitulo">Generar contrato</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;" id="contratoPanelResumen"></p>
+
+    <div class="field">
+      <label for="contratoRazonSocial">Razón social del cliente (como aparece en el contrato)</label>
+      <input type="text" id="contratoRazonSocial" placeholder="Ej. EDIFICIO MITT AC">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label for="contratoDomicilioFiscal">Domicilio del cliente</label>
+      <input type="text" id="contratoDomicilioFiscal" placeholder="Domicilio fiscal / oficinas del cliente">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label for="contratoLugarServicio">Lugar donde se prestará el servicio</label>
+      <input type="text" id="contratoLugarServicio" placeholder="Dirección de las instalaciones a fumigar">
+      <p class="hint" style="margin:4px 0 0 0;">Puede ser distinto al domicilio del cliente. Si es el mismo, repítelo.</p>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label for="contratoRepresentanteCliente">Representante legal del cliente (quien firma)</label>
+      <input type="text" id="contratoRepresentanteCliente" placeholder="Ej. Dr. Héctor Sánchez Esquivel">
+    </div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="field">
+        <label for="contratoMontoTotal">Monto total del contrato (sin IVA)</label>
+        <input type="number" min="0" step="0.01" id="contratoMontoTotal">
+        <p class="hint" style="margin:4px 0 0 0;" id="contratoMontoHint"></p>
+      </div>
+      <div class="field">
+        <label for="contratoFechaFirma">Fecha de firma</label>
+        <input type="date" id="contratoFechaFirma">
+      </div>
+    </div>
+
+    <div class="actions-row" style="margin-top:16px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarContratoPanel">Cancelar</button>
+      <button type="button" class="btn" id="btnGenerarContrato">Generar y guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= OVERLAY DE IMPRESIÓN DEL CONTRATO ================= -->
+<div id="contratoPrintOverlay" class="hidden">
+  <div id="contratoPrintSheet">
+    <div class="print-toolbar">
+      <button class="btn secondary" id="btnCerrarContratoPreview">Cerrar</button>
+      <button class="btn" id="btnImprimirContratoDoc">Imprimir</button>
+    </div>
+    <div class="doc contrato-doc" id="contratoDocContent"><!-- contenido generado por JS --></div>
   </div>
 </div>
 
@@ -4132,6 +4300,21 @@
     costoManoObraMin: 1.20,
     costoAdministrativo: 64,
     costoPorKm: 1.50,
+    // ---- Datos del PRESTADOR que solo usa el contrato ----
+    // Van vacios a proposito: este archivo vive en un repositorio PUBLICO
+    // de GitHub, asi que el RFC, el registro patronal, la cuenta y la
+    // CLABE NO se escriben aqui. Se capturan una sola vez desde la
+    // pestaña "Empresa" y viven en la base de datos (que si es privada).
+    rfc: "",
+    registroPatronalImss: "",
+    registroStps: "",
+    domicilioLegal: "",
+    actividadPreponderante: "SERVICIOS DE FUMIGACION Y CONTROL DE PLAGAS",
+    representanteLegal: "",
+    bancoCuenta: "",
+    bancoClabe: "",
+    contratoGarantiaDias: 30,
+    contratoCiudadFirma: "Monterrey, Nuevo León",
     logo: "data:image/png;base64,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"
   };
 
@@ -4162,6 +4345,16 @@
       costoManoObraMin: num(fila && fila.costo_mano_obra_min, DEFAULT_EMPRESA.costoManoObraMin),
       costoAdministrativo: num(fila && fila.costo_administrativo, DEFAULT_EMPRESA.costoAdministrativo),
       costoPorKm: num(fila && fila.costo_por_km, DEFAULT_EMPRESA.costoPorKm),
+      rfc: (fila && fila.rfc) || DEFAULT_EMPRESA.rfc,
+      registroPatronalImss: (fila && fila.registro_patronal_imss) || DEFAULT_EMPRESA.registroPatronalImss,
+      registroStps: (fila && fila.registro_stps) || DEFAULT_EMPRESA.registroStps,
+      domicilioLegal: (fila && fila.domicilio_legal) || DEFAULT_EMPRESA.domicilioLegal,
+      actividadPreponderante: (fila && fila.actividad_preponderante) || DEFAULT_EMPRESA.actividadPreponderante,
+      representanteLegal: (fila && fila.representante_legal) || DEFAULT_EMPRESA.representanteLegal,
+      bancoCuenta: (fila && fila.banco_cuenta) || DEFAULT_EMPRESA.bancoCuenta,
+      bancoClabe: (fila && fila.banco_clabe) || DEFAULT_EMPRESA.bancoClabe,
+      contratoGarantiaDias: num(fila && fila.contrato_garantia_dias, DEFAULT_EMPRESA.contratoGarantiaDias),
+      contratoCiudadFirma: (fila && fila.contrato_ciudad_firma) || DEFAULT_EMPRESA.contratoCiudadFirma,
     };
   }
 
@@ -4209,6 +4402,16 @@
         costo_mano_obra_min: nueva.costoManoObraMin,
         costo_administrativo: nueva.costoAdministrativo,
         costo_por_km: nueva.costoPorKm,
+        rfc: nueva.rfc,
+        registro_patronal_imss: nueva.registroPatronalImss,
+        registro_stps: nueva.registroStps,
+        domicilio_legal: nueva.domicilioLegal,
+        actividad_preponderante: nueva.actividadPreponderante,
+        representante_legal: nueva.representanteLegal,
+        banco_cuenta: nueva.bancoCuenta,
+        banco_clabe: nueva.bancoClabe,
+        contrato_garantia_dias: nueva.contratoGarantiaDias,
+        contrato_ciudad_firma: nueva.contratoCiudadFirma,
         actualizado_por: (usuarioActual && usuarioActual.id) || null,
       });
     if(error){
@@ -5490,6 +5693,16 @@
   const empCostoPorKm = document.getElementById('empCostoPorKm');
   const logoInput = document.getElementById('logoInput');
   const logoPreview = document.getElementById('logoPreview');
+  const empRepresentanteLegal = document.getElementById('empRepresentanteLegal');
+  const empRfc = document.getElementById('empRfc');
+  const empRegistroPatronalImss = document.getElementById('empRegistroPatronalImss');
+  const empRegistroStps = document.getElementById('empRegistroStps');
+  const empDomicilioLegal = document.getElementById('empDomicilioLegal');
+  const empActividadPreponderante = document.getElementById('empActividadPreponderante');
+  const empBancoCuenta = document.getElementById('empBancoCuenta');
+  const empBancoClabe = document.getElementById('empBancoClabe');
+  const empContratoGarantiaDias = document.getElementById('empContratoGarantiaDias');
+  const empContratoCiudadFirma = document.getElementById('empContratoCiudadFirma');
   let logoDataUrl = "";
 
   function loadEmpresaForm(){
@@ -5511,6 +5724,16 @@
     empCostoManoObraMin.value = emp.costoManoObraMin != null ? emp.costoManoObraMin : 1.20;
     empCostoAdministrativo.value = emp.costoAdministrativo != null ? emp.costoAdministrativo : 64;
     empCostoPorKm.value = emp.costoPorKm != null ? emp.costoPorKm : 1.50;
+    empRepresentanteLegal.value = emp.representanteLegal || "";
+    empRfc.value = emp.rfc || "";
+    empRegistroPatronalImss.value = emp.registroPatronalImss || "";
+    empRegistroStps.value = emp.registroStps || "";
+    empDomicilioLegal.value = emp.domicilioLegal || "";
+    empActividadPreponderante.value = emp.actividadPreponderante || "";
+    empBancoCuenta.value = emp.bancoCuenta || "";
+    empBancoClabe.value = emp.bancoClabe || "";
+    empContratoGarantiaDias.value = emp.contratoGarantiaDias != null ? emp.contratoGarantiaDias : 30;
+    empContratoCiudadFirma.value = emp.contratoCiudadFirma || "";
     logoDataUrl = emp.logo || "";
     renderLogoPreview();
   }
@@ -5554,6 +5777,28 @@
       alert("Datos de la empresa guardados. Todo el equipo verá este cambio.");
     }
   });
+  document.getElementById('btnGuardarDatosContrato').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btnGuardarDatosContrato');
+    btn.disabled = true;
+    const ok = await guardarEmpresaRemota({
+      representanteLegal: empRepresentanteLegal.value.trim(),
+      rfc: empRfc.value.trim(),
+      registroPatronalImss: empRegistroPatronalImss.value.trim(),
+      registroStps: empRegistroStps.value.trim(),
+      domicilioLegal: empDomicilioLegal.value.trim(),
+      actividadPreponderante: empActividadPreponderante.value.trim(),
+      bancoCuenta: empBancoCuenta.value.trim(),
+      bancoClabe: empBancoClabe.value.trim(),
+      contratoGarantiaDias: Number(empContratoGarantiaDias.value) || 30,
+      contratoCiudadFirma: empContratoCiudadFirma.value.trim(),
+    });
+    btn.disabled = false;
+    if(ok){
+      loadEmpresaForm();
+      alert("Datos para contratos guardados. Todo el equipo verá este cambio.");
+    }
+  });
+
   document.getElementById('btnGuardarCostos').addEventListener('click', async ()=>{
     const btn = document.getElementById('btnGuardarCostos');
     btn.disabled = true;
@@ -7379,6 +7624,8 @@
     renderServiciosLista();
     await cargarAvisosDeCliente(serviciosClienteActualId);
     renderAvisosLista();
+    await cargarContratosDeCliente(serviciosClienteActualId);
+    renderContratosLista();
   });
 
   // El autollenado solo se dispara cuando el usuario elige a mano una
@@ -7726,6 +7973,7 @@
 
   function renderFilasPlan(){
     actualizarColumnasPlanSegunTipoServicio();
+    actualizarBotonContrato();
     const totalColumnas = 2 + (planMostrarInsecticidaActual ? 1 : 0) + (planMostrarRodenticidaActual ? 1 : 0) + 1;
     if(planFilasActuales.length === 0){
       planTablaBody.innerHTML = `<tr><td colspan="${totalColumnas}"><div class="empty-msg">Sin visitas todavía. Usa "+ Agregar visita".</div></td></tr>`;
@@ -7910,6 +8158,18 @@
       await cargarVisitasDelAnio();
       renderCalendarioMes();
     }
+
+    // Contrato automatico: un plan con mas de 3 servicios programados ya
+    // es una poliza anual, no una visita suelta, asi que la app ofrece
+    // generar el contrato del cliente en ese mismo momento.
+    const totalServicios = planFilasActuales.filter(f => f.fecha).length;
+    if(totalServicios > CONTRATO_MINIMO_SERVICIOS){
+      const generar = confirm(
+        `Este plan quedó con ${totalServicios} servicios programados.\n\n` +
+        `¿Generar el contrato de ${planClienteNombreActual} con este calendario?`
+      );
+      if(generar) await abrirFormularioContrato();
+    }
   });
 
   document.getElementById('btnImprimirPlan').addEventListener('click', ()=>{
@@ -7955,6 +8215,497 @@
   document.getElementById('btnImprimirPlanDoc').addEventListener('click', ()=>{
     window.print();
   });
+
+
+  // =====================================================================
+  // CONTRATO DE PRESTACION DE SERVICIOS
+  //
+  // Se dispara desde el plan de trabajo: en cuanto un plan queda armado
+  // con MAS DE 3 fechas de servicio, la app ofrece generar el contrato
+  // del cliente ya con su calendario, su vigencia y sus montos.
+  //
+  // El contrato terminado se guarda en public.contratos con su folio, y
+  // el snapshot completo (lo que se imprimio) queda congelado en la
+  // columna "datos": asi un contrato ya firmado se reimprime IGUAL
+  // aunque despues cambien precios, datos del cliente o del prestador.
+  // =====================================================================
+  const CONTRATO_MINIMO_SERVICIOS = 3; // "mas de 3" => se necesitan 4 o mas
+
+  const contratoOverlay = document.getElementById('contratoOverlay');
+  const contratoPrintOverlay = document.getElementById('contratoPrintOverlay');
+  const contratoDocContent = document.getElementById('contratoDocContent');
+
+  let contratoCtx = null;        // datos del plan desde el que se genera
+  let contratosClienteCache = [];// contratos del cliente abierto en la pestaña Servicios
+
+  const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // "El servicio se realizara MENSUALMENTE conforme al siguiente
+  // calendario" - el adverbio correcto segun la frecuencia del servicio.
+  const CONTRATO_ADVERBIO_FRECUENCIA = {
+    Mensual: 'mensualmente',
+    Bimestral: 'de forma bimestral',
+    Trimestral: 'de forma trimestral',
+    Semestral: 'de forma semestral',
+    Anual: 'de forma anual'
+  };
+
+  // Numero con letra para la clausula de garantia: "30 (treinta) dias".
+  const CONTRATO_NUM_LETRA = {
+    7:'siete', 10:'diez', 15:'quince', 20:'veinte', 30:'treinta',
+    45:'cuarenta y cinco', 60:'sesenta', 90:'noventa', 180:'ciento ochenta', 365:'trescientos sesenta y cinco'
+  };
+
+  // Evita el punto doble cuando el dato capturado ya termina en punto
+  // (ej. "...Monterrey, N.L." + "." => "...Monterrey, N.L..").
+  function contratoTerminarFrase(texto){
+    const t = (texto || '').trim();
+    if(!t) return '________.';
+    return /[.!?]$/.test(t) ? t : t + '.';
+  }
+
+  // "02 de septiembre del 2026" (como esta escrito en el contrato modelo)
+  function contratoFechaLarga(iso){
+    if(!iso) return '________';
+    const [y, m, d] = iso.split('-');
+    return `${d} de ${MESES_ES[Number(m) - 1].toLowerCase()} del ${y}`;
+  }
+
+  // Fechas del plan que hay en pantalla ahora mismo, limpias y ordenadas.
+  function contratoFechasDelPlanActual(){
+    sincronizarFilasPlanDesdeDom();
+    return planFilasActuales
+      .filter(f => f.fecha)
+      .slice()
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
+  // Habilita/inhabilita el boton "Generar contrato" segun cuantas fechas
+  // tenga el plan en pantalla, y explica por que cuando no se puede.
+  function actualizarBotonContrato(){
+    const btn = document.getElementById('btnContratoPlan');
+    const hint = document.getElementById('planContratoHint');
+    if(!btn) return;
+    const total = planFilasActuales.filter(f => f.fecha).length;
+    const alcanza = total > CONTRATO_MINIMO_SERVICIOS;
+    btn.disabled = !alcanza;
+    if(hint){
+      hint.textContent = alcanza
+        ? `Este plan tiene ${total} servicios programados: se puede generar contrato.`
+        : `El contrato automático se habilita con más de ${CONTRATO_MINIMO_SERVICIOS} fechas de servicio (llevas ${total}).`;
+    }
+  }
+
+  // Productos y definicion de servicios que van en la Clausula Primera.
+  // Los ingredientes activos salen del plan de trabajo real del cliente,
+  // no de una lista fija: el contrato describe lo que de verdad se va a
+  // aplicar en sus visitas.
+  function contratoProductosYServicios(filas, tipoServicio){
+    const hayInsecticida = filas.some(f => (f.insecticida || '').trim());
+    const hayRodenticida = filas.some(f => (f.rodenticida || '').trim());
+    const incluyeInsecto = hayInsecticida || planTipoIncluyeInsecto(tipoServicio);
+    const incluyeRoedor = hayRodenticida || planTipoIncluyeRoedor(tipoServicio);
+
+    const productos = [];
+    if(incluyeInsecto) productos.push('Insecticidas orgánicos e inorgánicos para insectos rastreros y voladores.');
+    if(incluyeRoedor) productos.push('Anticoagulantes (cebos y hojuelas) y trampas con pegamento para desratización.');
+
+    const ingredientes = [];
+    filas.forEach(f => {
+      [f.insecticida, f.rodenticida].forEach(v => {
+        const t = (v || '').trim();
+        if(t && !ingredientes.some(x => x.toLowerCase() === t.toLowerCase())) ingredientes.push(t);
+      });
+    });
+    ingredientes.forEach(i => productos.push(`${i}: ingrediente activo aplicado conforme al calendario de esta cláusula.`));
+    if(productos.length === 0){
+      productos.push('Productos autorizados para el control de plagas, aplicados conforme al calendario de esta cláusula.');
+    }
+
+    const servicios = [];
+    if(incluyeInsecto){
+      servicios.push({
+        titulo: 'Aspersión perimetral',
+        texto: 'Aplicación de insecticidas orgánicos e inorgánicos alrededor de las áreas previamente identificadas como puntos críticos para el control de insectos rastreros. Esta aplicación se realiza con equipos de aspersión especializados que aseguran una distribución uniforme y efectiva del producto.'
+      });
+    }
+    if(incluyeRoedor){
+      servicios.push({
+        titulo: 'Control de roedores',
+        texto: 'Colocación estratégica de rodenticidas (cebos y hojuelas) en las zonas propensas a infestaciones dentro de las instalaciones. Además, se implementan trampas con pegamento en puntos específicos para maximizar la eficacia del control.'
+      });
+    }
+    servicios.push({
+      titulo: 'Revisión y seguimiento',
+      texto: 'Inspecciones periódicas para evaluar la efectividad de las medidas implementadas, asegurando el cumplimiento de los objetivos y ajustando las estrategias en caso de ser necesario.'
+    });
+
+    return { productos, servicios };
+  }
+
+  // Arma el documento imprimible a partir del snapshot guardado. Es una
+  // funcion pura (snapshot + folio -> html): la usan tanto el contrato
+  // recien generado como la reimpresion de uno viejo.
+  function construirContratoHtml(d, folio){
+    const emp = getEmpresa();
+    const p = d.prestador || {};
+    const c = d.cliente || {};
+    const visitas = d.visitas || [];
+    const guion = '________';
+
+    const filasCalendario = visitas.map((v, i) => {
+      const [y, m, dd] = (v.fecha || '').split('-');
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${m ? MESES_ES[Number(m) - 1] : '-'}</td>
+        <td>${dd || '-'}</td>
+        <td>${y || '-'}</td>
+      </tr>`;
+    }).join('');
+
+    const textoPago = d.frecuencia === 'Mensual'
+      ? `en pagos mensuales de ${formatMoney(d.montoPorServicio)} MXN más IVA`
+      : `en ${visitas.length} pagos de ${formatMoney(d.montoPorServicio)} MXN más IVA, uno por cada servicio realizado`;
+
+    return `
+      <div class="doc-header">
+        <div class="empresa-info">
+          <h2>${escapeHtml(p.nombre || emp.nombre || '')}</h2>
+          <p>${escapeHtml(p.domicilioLegal || emp.direccion || '')}</p>
+          <p>Tel: ${escapeHtml(emp.telefono || '-')}${emp.email ? ' | ' + escapeHtml(emp.email) : ''}</p>
+        </div>
+        <div class="doc-logo">${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : ''}</div>
+      </div>
+
+      <div class="doc-title">
+        <h1>Contrato de prestación de servicios</h1>
+        <div class="folio">Contrato N° ${folio != null ? folio : '—'} &nbsp;|&nbsp; ${escapeHtml(c.razonSocial || '')}</div>
+      </div>
+
+      <p class="contrato-intro">CONTRATO DE PRESTACIÓN DE SERVICIOS DE CONTROL DE PLAGAS MEDIANTE FUMIGACIÓN QUE CELEBRAN POR UNA PARTE <strong>${escapeHtml(c.razonSocial || guion)}</strong> EN LO SUCESIVO “EL CLIENTE”, Y POR LA OTRA LA PERSONA FÍSICA <strong>${escapeHtml(p.representanteLegal || p.nombre || guion)}</strong>, A QUIEN EN LO SUCESIVO SE LE DENOMINARÁ “EL PRESTADOR”, AL TENOR DE LAS SIGUIENTES DECLARACIONES Y CLÁUSULAS:</p>
+
+      <h3>Declaraciones</h3>
+      <p>I.- Declara “EL PRESTADOR” que:</p>
+      <p>A) Es una persona física, prestadora de servicios especializados y que se encuentra debidamente inscrito en el Registro Federal de Contribuyentes bajo la clave <strong>${escapeHtml(p.rfc || guion)}</strong>.</p>
+      <p>B) Su Registro Patronal ante el Instituto Mexicano del Seguro Social es el <strong>${escapeHtml(p.registroPatronalImss || guion)}</strong>; cuenta con el registro en el padrón público de la Secretaría de Trabajo y Previsión Social, como EMPRESA PROVEEDORA DE SERVICIOS ESPECIALIZADOS con número ${escapeHtml(p.registroStps || guion)}, de conformidad con el Artículo 15 de la Ley Federal de Trabajo.</p>
+      <p>C) Tiene como domicilio legal ${escapeHtml(contratoTerminarFrase(p.domicilioLegal))}</p>
+      <p>D) Su actividad comercial preponderante según su Constancia de Situación Fiscal es la de ${escapeHtml(contratoTerminarFrase(p.actividadPreponderante))}</p>
+      <p>E) Que se encuentra al corriente en el cumplimiento de sus obligaciones fiscales.</p>
+      <p>F) Que cuenta con los recursos humanos propios e idóneos para llevar a cabo los trabajos requeridos para la implementación y desarrollo del proyecto objeto de este contrato, en todas sus etapas.</p>
+
+      <p>II.- Declara “EL CLIENTE” que:</p>
+      <p>A) Su razón social es: <strong>${escapeHtml(c.razonSocial || guion)}</strong></p>
+      <p>B) Su domicilio es: ${escapeHtml(c.domicilioFiscal || guion)}</p>
+
+      <h3>Cláusulas</h3>
+
+      <div class="contrato-clausula">
+        <p><strong>PRIMERA. OBJETO DEL CONTRATO.</strong></p>
+        <p>“EL CLIENTE” encomienda a “EL PRESTADOR” y éste se obliga a prestar los servicios especializados de <strong>control de plagas mediante fumigación</strong>, bajo las siguientes especificaciones:</p>
+        <p><strong>1. Productos a emplear:</strong></p>
+        <ul>${(d.productos || []).map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>
+        <p><strong>2. Definición de servicios:</strong> El servicio de control de plagas mediante fumigación incluye:</p>
+        <ul>${(d.servicios || []).map(s => `<li><strong>${escapeHtml(s.titulo)}:</strong> ${escapeHtml(s.texto)}</li>`).join('')}</ul>
+        <p><strong>3. Frecuencia:</strong> El servicio se realizará ${escapeHtml(CONTRATO_ADVERBIO_FRECUENCIA[d.frecuencia] || 'en las fechas acordadas')} conforme al siguiente calendario:</p>
+        <table class="contrato-calendario">
+          <thead><tr><th>No.</th><th>Mes</th><th>Día</th><th>Año</th></tr></thead>
+          <tbody>${filasCalendario}</tbody>
+        </table>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>SEGUNDA. VIGENCIA DEL CONTRATO.</strong></p>
+        <p>“EL PRESTADOR” se obliga a desempeñar los servicios descritos en la cláusula anterior de forma independiente. Dichos servicios serán ejecutados exclusivamente por su equipo especializado, el cual está capacitado para llevar a cabo las actividades de fumigación descritas, utilizando herramientas y productos adecuados conforme a lo establecido en este contrato. <strong>La vigencia del contrato será del ${contratoFechaLarga(d.vigenciaInicio)} al ${contratoFechaLarga(d.vigenciaFin)}.</strong></p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>TERCERA. LUGAR DE PRESTACIÓN DE LOS SERVICIOS.</strong></p>
+        <p>El servicio se brindará en las instalaciones de “EL CLIENTE”, ubicadas en: ${escapeHtml(contratoTerminarFrase(c.lugarServicio))}</p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>CUARTA. PAGO DE LOS SERVICIOS.</strong></p>
+        <p>“EL CLIENTE” se obliga a pagar a “EL PRESTADOR” la cantidad de <strong>${formatMoney(d.montoTotal)} MXN más IVA</strong> ${textoPago}. Dichos pagos serán realizados como contraprestación por los <strong>trabajos especializados</strong> detallados en este contrato.</p>
+        <p>El pago se efectuará mediante transferencia bancaria a la siguiente cuenta bancaria:</p>
+        <p><strong>Número de cuenta:</strong> ${escapeHtml(p.bancoCuenta || guion)} &nbsp;&nbsp;&nbsp; <strong>Clave interbancaria:</strong> ${escapeHtml(p.bancoClabe || guion)}</p>
+        <p>El pago se realizará posterior a la ejecución de cada servicio.</p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>QUINTA. OBLIGACIONES DE LAS PARTES.</strong></p>
+        <p>“EL PRESTADOR” se obliga a:</p>
+        <ul>
+          <li>Realizar el servicio conforme al calendario establecido.</li>
+          <li>Utilizar los productos especificados en la Cláusula Primera.</li>
+          <li>Atender reportes de “EL CLIENTE” sobre anomalías en el servicio.</li>
+        </ul>
+        <p>“EL CLIENTE” se obliga a:</p>
+        <ul>
+          <li>Permitir el acceso al personal de “EL PRESTADOR” debidamente identificado.</li>
+          <li>Informar de cualquier situación anormal observada en las instalaciones.</li>
+          <li>Pagar los servicios en los términos establecidos.</li>
+        </ul>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>SEXTA. GARANTÍA.</strong></p>
+        <p>“EL PRESTADOR” otorga una garantía de ${d.garantiaDias}${CONTRATO_NUM_LETRA[d.garantiaDias] ? ` (${CONTRATO_NUM_LETRA[d.garantiaDias]})` : ''} días naturales contados a partir de la fecha de aplicación del servicio de fumigación programado. Durante este periodo, “EL CLIENTE” podrá comunicarse con “EL PRESTADOR” para notificar cualquier problema relacionado con las plagas cubiertas por este contrato. En caso de confirmarse la presencia de dichas plagas, se programará un refuerzo del servicio sin costo adicional, a fin de garantizar la eficacia de las medidas implementadas.</p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>SÉPTIMA. RESCISIÓN.</strong></p>
+        <p>Ambas partes acuerdan que el incumplimiento parcial o total de cualquiera de las obligaciones contenidas en este contrato será causa de rescisión inmediata, previa notificación escrita.</p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>OCTAVA. "EXCLUSIÓN DE RELACIÓN LABORAL Y RESPONSABILIDAD".</strong></p>
+        <p>Las partes convienen en que no existirá entre ellas y/o el personal de la otra parte relación de carácter laboral, con motivo del presente contrato o la prestación de “Los Servicios Especializados”, por lo que en el supuesto de que cualquiera de ellas llegue a recibir cualquier tipo de reclamación o demanda por este concepto, por parte de la otra parte y/o sus empleados y/o dependientes, la otra parte se obliga a sacarla en paz y a salvo de cualquier responsabilidad y daño y, a reembolsarle, en su caso, las erogaciones que hubiere tenido que efectuar con tal motivo.</p>
+      </div>
+
+      <div class="contrato-clausula">
+        <p><strong>NOVENA. FIRMAS.</strong></p>
+        <p>Se firma en duplicado, quedando un ejemplar en poder de cada parte.</p>
+        <p>Quedando un ejemplar en poder de “EL PRESTADOR” y el otro en poder de “EL CLIENTE”, en la ciudad de ${escapeHtml(d.ciudadFirma || guion)}, el día ${contratoFechaLarga(d.fechaFirma)}.</p>
+
+      <div class="contrato-firmas">
+        <div>
+          <strong>Por “EL PRESTADOR”.</strong>
+          <div class="linea-firma">Representante legal</div>
+          <div>${escapeHtml(p.representanteLegal || p.nombre || '')}</div>
+        </div>
+        <div>
+          <strong>Por “EL CLIENTE”</strong>
+          <div class="linea-firma">Representante Legal</div>
+          <div>${escapeHtml(c.representanteLegal || '')}</div>
+        </div>
+      </div>
+      </div>
+    `;
+  }
+
+  function mostrarContrato(datos, folio){
+    contratoDocContent.innerHTML = construirContratoHtml(datos, folio);
+    contratoPrintOverlay.classList.remove('hidden');
+  }
+
+  // Abre el formulario corto de datos legales del cliente. Si el cliente
+  // ya tuvo contratos, prellena con los del ultimo para no recapturar.
+  async function abrirFormularioContrato(){
+    const filas = contratoFechasDelPlanActual();
+    if(filas.length <= CONTRATO_MINIMO_SERVICIOS){
+      alert(`El contrato automático necesita más de ${CONTRATO_MINIMO_SERVICIOS} fechas de servicio programadas. Este plan tiene ${filas.length}.`);
+      return;
+    }
+    if(!planServicioActualId || !planClienteActualId){
+      alert('No se pudo identificar el servicio o el cliente de este plan.');
+      return;
+    }
+
+    const [servicioRes, clienteRes, previosRes] = await Promise.all([
+      supabaseClient.from('servicios_cliente').select('id, tipo_servicio, frecuencia, frecuencia_cat, costo_sin_iva').eq('id', planServicioActualId).maybeSingle(),
+      supabaseClient.from('clientes').select('id, nombre, direccion, contacto').eq('id', planClienteActualId).maybeSingle(),
+      supabaseClient.from('contratos').select('datos').eq('cliente_id', planClienteActualId).order('folio', { ascending: false }).limit(1)
+    ]);
+
+    if(servicioRes.error || clienteRes.error){
+      alert('No se pudieron leer los datos del cliente o del servicio: ' + ((servicioRes.error || clienteRes.error).message));
+      return;
+    }
+    if(previosRes.error && previosRes.error.message && previosRes.error.message.includes('contratos')){
+      alert('La tabla de contratos todavía no existe en la base de datos. Corre el script contratos_setup.sql en Supabase y vuelve a intentar.');
+      return;
+    }
+
+    const servicio = servicioRes.data || {};
+    const cliente = clienteRes.data || {};
+    const previo = (previosRes.data && previosRes.data[0] && previosRes.data[0].datos && previosRes.data[0].datos.cliente) || null;
+
+    contratoCtx = { filas, servicio, cliente };
+
+    document.getElementById('contratoPanelTitulo').textContent = `Generar contrato — ${cliente.nombre || planClienteNombreActual}`;
+    document.getElementById('contratoPanelResumen').textContent =
+      `${filas.length} servicios programados, del ${formatDate(filas[0].fecha)} al ${formatDate(filas[filas.length - 1].fecha)}.` +
+      (previo ? ' Los datos legales se prellenaron con los del contrato anterior de este cliente.' : '');
+
+    document.getElementById('contratoRazonSocial').value = (previo && previo.razonSocial) || cliente.nombre || '';
+    document.getElementById('contratoDomicilioFiscal').value = (previo && previo.domicilioFiscal) || cliente.direccion || '';
+    document.getElementById('contratoLugarServicio').value = (previo && previo.lugarServicio) || cliente.direccion || '';
+    document.getElementById('contratoRepresentanteCliente').value = (previo && previo.representanteLegal) || cliente.contacto || '';
+
+    const total = servicio.costo_sin_iva != null ? Number(servicio.costo_sin_iva) : 0;
+    document.getElementById('contratoMontoTotal').value = total ? total.toFixed(2) : '';
+    document.getElementById('contratoFechaFirma').value = new Date().toISOString().slice(0, 10);
+    actualizarHintMontoContrato();
+
+    planOverlay.classList.add('hidden');
+    contratoOverlay.classList.remove('hidden');
+  }
+
+  function actualizarHintMontoContrato(){
+    const hint = document.getElementById('contratoMontoHint');
+    if(!hint || !contratoCtx) return;
+    const total = parseFloat(document.getElementById('contratoMontoTotal').value) || 0;
+    const n = contratoCtx.filas.length;
+    hint.textContent = total
+      ? `Se dividirá en ${n} pagos de ${formatMoney(total / n)} más IVA (uno por servicio).`
+      : `Es el total del año. Se dividirá entre los ${n} servicios programados.`;
+  }
+  document.getElementById('contratoMontoTotal').addEventListener('input', actualizarHintMontoContrato);
+
+  document.getElementById('btnContratoPlan').addEventListener('click', abrirFormularioContrato);
+  document.getElementById('btnCerrarContratoPanel').addEventListener('click', ()=>{
+    contratoOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnCerrarContratoPreview').addEventListener('click', ()=>{
+    contratoPrintOverlay.classList.add('hidden');
+  });
+  document.getElementById('btnImprimirContratoDoc').addEventListener('click', ()=>{
+    window.print();
+  });
+
+  document.getElementById('btnGenerarContrato').addEventListener('click', async ()=>{
+    if(!contratoCtx) return;
+    const razonSocial = document.getElementById('contratoRazonSocial').value.trim();
+    const domicilioFiscal = document.getElementById('contratoDomicilioFiscal').value.trim();
+    const lugarServicio = document.getElementById('contratoLugarServicio').value.trim();
+    const representanteCliente = document.getElementById('contratoRepresentanteCliente').value.trim();
+    const montoTotal = parseFloat(document.getElementById('contratoMontoTotal').value) || 0;
+    const fechaFirma = document.getElementById('contratoFechaFirma').value;
+
+    if(!razonSocial || !lugarServicio){
+      alert('La razón social del cliente y el lugar donde se presta el servicio son obligatorios.');
+      return;
+    }
+    if(!montoTotal){
+      alert('Captura el monto total del contrato (sin IVA).');
+      return;
+    }
+    if(!fechaFirma){
+      alert('Captura la fecha de firma del contrato.');
+      return;
+    }
+
+    const emp = getEmpresa();
+    if(!emp.rfc || !emp.bancoCuenta){
+      if(!confirm('Faltan datos del prestador (RFC y/o cuenta bancaria) en la pestaña Empresa. El contrato saldrá con guiones en esos lugares. ¿Generarlo de todas formas?')) return;
+    }
+
+    const { filas, servicio } = contratoCtx;
+    const frecuencia = servicio.frecuencia_cat || servicio.frecuencia || '';
+    const { productos, servicios } = contratoProductosYServicios(filas, servicio.tipo_servicio || planTipoServicioActual);
+
+    const datos = {
+      cliente: { razonSocial, domicilioFiscal, lugarServicio, representanteLegal: representanteCliente },
+      prestador: {
+        nombre: emp.nombre || '',
+        representanteLegal: emp.representanteLegal || '',
+        rfc: emp.rfc || '',
+        registroPatronalImss: emp.registroPatronalImss || '',
+        registroStps: emp.registroStps || '',
+        domicilioLegal: emp.domicilioLegal || emp.direccion || '',
+        actividadPreponderante: emp.actividadPreponderante || '',
+        bancoCuenta: emp.bancoCuenta || '',
+        bancoClabe: emp.bancoClabe || ''
+      },
+      tipoServicio: servicio.tipo_servicio || planTipoServicioActual || '',
+      frecuencia,
+      visitas: filas.map(f => ({ fecha: f.fecha, insecticida: f.insecticida || '', rodenticida: f.rodenticida || '' })),
+      vigenciaInicio: filas[0].fecha,
+      vigenciaFin: filas[filas.length - 1].fecha,
+      montoTotal,
+      montoPorServicio: montoTotal / filas.length,
+      productos,
+      servicios,
+      garantiaDias: emp.contratoGarantiaDias != null ? emp.contratoGarantiaDias : 30,
+      ciudadFirma: emp.contratoCiudadFirma || '',
+      fechaFirma
+    };
+
+    const btn = document.getElementById('btnGenerarContrato');
+    btn.disabled = true;
+    const { data, error } = await supabaseClient.from('contratos').insert({
+      cliente_id: planClienteActualId,
+      servicio_id: planServicioActualId,
+      fecha_contrato: fechaFirma,
+      vigencia_inicio: datos.vigenciaInicio,
+      vigencia_fin: datos.vigenciaFin,
+      num_servicios: filas.length,
+      monto_total_sin_iva: montoTotal,
+      monto_mensual_sin_iva: datos.montoPorServicio,
+      datos,
+      creado_por: (usuarioActual && usuarioActual.id) || null
+    }).select('folio').maybeSingle();
+    btn.disabled = false;
+
+    if(error){
+      alert('No se pudo guardar el contrato: ' + error.message);
+      return;
+    }
+
+    const folio = data ? data.folio : null;
+    contratoOverlay.classList.add('hidden');
+    mostrarToast(`Contrato N° ${folio} guardado.`);
+    mostrarContrato(datos, folio);
+    if(serviciosClienteActualId === planClienteActualId){
+      await cargarContratosDeCliente(planClienteActualId);
+      renderContratosLista();
+    }
+  });
+
+  // ---------- Historial de contratos por cliente (pestaña Servicios) ----------
+  const contratosListaEl = document.getElementById('contratosLista');
+
+  async function cargarContratosDeCliente(clienteId){
+    const { data, error } = await supabaseClient
+      .from('contratos')
+      .select('id, folio, fecha_contrato, vigencia_inicio, vigencia_fin, num_servicios, monto_total_sin_iva, estatus, datos')
+      .eq('cliente_id', clienteId)
+      .order('folio', { ascending: false });
+    if(error){
+      contratosClienteCache = [];
+      // La tabla puede no existir todavia si no se ha corrido el script.
+      console.error('No se pudieron cargar los contratos:', error);
+      return;
+    }
+    contratosClienteCache = data || [];
+  }
+
+  function renderContratosLista(){
+    if(!contratosListaEl) return;
+    if(contratosClienteCache.length === 0){
+      contratosListaEl.innerHTML = `<div class="empty-msg">Este cliente todavía no tiene contratos generados. Se crean desde el plan de trabajo, cuando hay más de ${CONTRATO_MINIMO_SERVICIOS} fechas programadas.</div>`;
+      return;
+    }
+    const filas = contratosClienteCache.map(c => `
+      <tr class="${c.estatus === 'Vigente' ? '' : 'inactiva'}">
+        <td>${c.folio}</td>
+        <td>${formatDate(c.fecha_contrato)}</td>
+        <td>${formatDate(c.vigencia_inicio)} — ${formatDate(c.vigencia_fin)}</td>
+        <td>${c.num_servicios != null ? c.num_servicios : '-'}</td>
+        <td>${formatMoneyOrDash(c.monto_total_sin_iva)}</td>
+        <td>${escapeHtml(c.estatus || '-')}</td>
+        <td><button class="btn secondary small" data-action="ver-contrato" data-id="${c.id}">Ver / Imprimir</button></td>
+      </tr>
+    `).join('');
+    contratosListaEl.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Folio</th><th>Fecha</th><th>Vigencia</th><th>Servicios</th><th>Monto s/IVA</th><th>Estatus</th><th></th></tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    `;
+  }
+
+  if(contratosListaEl){
+    contratosListaEl.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-action="ver-contrato"]');
+      if(!btn) return;
+      const contrato = contratosClienteCache.find(c => c.id === btn.dataset.id);
+      if(!contrato) return;
+      mostrarContrato(contrato.datos, contrato.folio);
+    });
+  }
 
 
   // =====================================================================
