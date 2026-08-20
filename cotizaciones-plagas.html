@@ -770,6 +770,33 @@
   #serviciosLista tr.inactiva{opacity:.55;}
   #avisosLista tr.inactiva{opacity:.55;}
 
+  /* ---------- Contador rojo en la pestaña Pendientes ---------- */
+  .tab-contador{
+    display:inline-block;min-width:18px;padding:1px 6px;margin-left:5px;
+    border-radius:9px;background:#b3261e;color:#fff;
+    font-size:11px;font-weight:700;line-height:16px;text-align:center;
+  }
+
+  /* ---------- Servicios vencidos sin reporte (pestaña Pendientes) ---------- */
+  .pendiente-card{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    border:1px solid var(--gris-borde);border-left-width:4px;border-radius:6px;
+    padding:10px 12px;margin-bottom:8px;background:var(--blanco);
+  }
+  .pendiente-card.estado-norealizado{border-left-color:#b3261e;}
+  .pendiente-card.estado-sinreporte{border-left-color:#b5540a;}
+  .pendiente-card.estado-reprogramada{border-left-color:#8a6d00;}
+  .pendiente-info{flex:1 1 auto;min-width:0;}
+  .pendiente-info strong{font-size:14.5px;color:var(--verde-oscuro);}
+  .pendiente-meta{font-size:12.5px;color:#666;margin-top:3px;}
+  .pendiente-retraso{font-weight:600;color:#b3261e;}
+  .badge.pend-norealizado{background:#fdecea;color:#b3261e;}
+  .badge.pend-sinreporte{background:#fff1e0;color:#b5540a;}
+  .badge.pend-reprogramada{background:#fff8db;color:#8a6d00;}
+  @media(max-width:620px){
+    .pendiente-card{flex-direction:column;align-items:flex-start;}
+  }
+
   /* ---------- Semaforo de estado del cliente ---------- */
   .semaforo-pills{display:flex;flex-wrap:wrap;gap:8px;}
   .semaforo-pill{
@@ -1575,6 +1602,7 @@
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
+  <button class="tab-btn hidden" data-tab="pendientes" id="tabBtnPendientes">Pendientes <span class="tab-contador hidden" id="tabPendientesContador">0</span></button>
   <button class="tab-btn hidden" data-tab="semaforo" id="tabBtnSemaforo">Semáforo</button>
   <button class="tab-btn hidden" data-tab="almacen" id="tabBtnAlmacen">Almacén</button>
   <button class="tab-btn hidden" data-tab="documentacion" id="tabBtnDocumentacion">Documentación</button>
@@ -2518,6 +2546,39 @@
     </div>
   </section>
 
+  <!-- ================= TAB: PENDIENTES (dueño, ventas y administradora) =================
+       Servicios cuya fecha programada ya pasó y de los que el técnico
+       nunca subió reporte. Es una vista de vigilancia: aquí no se edita
+       nada, solo se detecta. Quien tiene permiso (oficina) puede saltar
+       a la visita para reprogramarla o cancelarla. -->
+  <section id="tab-pendientes" class="hidden">
+    <div class="panel">
+      <h2>Servicios sin reporte</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">Visitas cuya fecha ya pasó y de las que no hay reporte del técnico. Se toma un día de gracia: una visita de hoy no aparece aquí hasta mañana. En cuanto el técnico sube su reporte, la visita desaparece de esta lista sola.</p>
+
+      <div id="pendientesResumen" class="semaforo-filtros"></div>
+
+      <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:260px;">
+          <label for="pendientesFiltroTecnico">Filtrar por técnico</label>
+          <select id="pendientesFiltroTecnico"><option value="">Todos</option></select>
+        </div>
+        <div class="field" style="max-width:180px;">
+          <label for="pendientesFiltroMes">Mes</label>
+          <input type="month" id="pendientesFiltroMes">
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn secondary small" id="btnPendientesLimpiarFiltros" style="width:100%;">Quitar filtros</button>
+        </div>
+        <div class="field" style="max-width:160px;">
+          <button type="button" class="btn secondary small" id="btnPendientesRecargar" style="width:100%;">Actualizar</button>
+        </div>
+      </div>
+
+      <div id="pendientesLista" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
   <!-- ================= TAB: SEMÁFORO DE CLIENTES (oficina: dueño y asistente) ================= -->
   <section id="tab-semaforo" class="hidden">
     <div class="panel">
@@ -3117,7 +3178,8 @@
     </div>
 
     <div class="panel" id="reporteSemaforoPanel" style="margin:14px 0;">
-      <h4 style="margin-top:0;">Semáforo de estado</h4>
+      <h4 style="margin-top:0;">Semáforo de estado <span style="color:#b3261e;">*</span></h4>
+      <p class="hint" style="margin:0 0 8px 0;">Obligatorio para cerrar el reporte: escribe el motivo y toca el color que le corresponde hoy a este cliente.</p>
       <div class="semaforo-pills" id="reporteSemaforoPills">
         <button type="button" class="semaforo-pill semaforo-rojo" data-semaforo="rojo">🔴 Urgente</button>
         <button type="button" class="semaforo-pill semaforo-naranja" data-semaforo="naranja">🟠 Urgente (menos)</button>
@@ -3951,6 +4013,12 @@
     document.getElementById('tabBtnDispositivos').classList.toggle('hidden', usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnEstaciones').classList.toggle('hidden',
       !['dueño', 'tecnico', 'asistente'].includes(usuarioActual.rol));
+    // Pendientes: es la vista de vigilancia de servicios sin reporte.
+    // La ven dueño, ventas y la administradora (asistente); el técnico no,
+    // porque para él la señal es su propio calendario.
+    const veePendientes = ['dueño', 'vendedor', 'asistente'].includes(usuarioActual.rol);
+    document.getElementById('tabBtnPendientes').classList.toggle('hidden', !veePendientes);
+    if(veePendientes) refrescarContadorPendientes();
     document.getElementById('tabBtnSemaforo').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
@@ -4787,6 +4855,7 @@
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
+    pendientes: document.getElementById('tab-pendientes'),
     semaforo: document.getElementById('tab-semaforo'),
     almacen: document.getElementById('tab-almacen'),
     ventaMostrador: document.getElementById('tab-ventaMostrador'),
@@ -4814,6 +4883,7 @@
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
+    if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'semaforo') cargarSemaforoResumen();
     if(nombre === 'almacen') cargarAlmacen();
     if(nombre === 'ventaMostrador') cargarVentaMostradorModulo();
@@ -6731,7 +6801,9 @@
         infoEl.textContent = 'Cargando...';
         const nombre = await obtenerNombreUsuario(cliente.semaforo_actualizado_por);
         const info = SEMAFORO_INFO[cliente.semaforo] || { emoji: '', label: cliente.semaforo };
-        const fecha = formatDate((cliente.semaforo_actualizado_en || '').slice(0, 10));
+        // Fecha LOCAL del timestamp (viene en UTC): sin esto, un semáforo
+        // puesto de noche se mostraba con la fecha del día siguiente.
+        const fecha = formatDate(fechaALocalISO(new Date(cliente.semaforo_actualizado_en)));
         // Registros de antes de que el motivo fuera obligatorio pueden no
         // tener semaforo_nota: se avisa en vez de dejar un ": " colgado.
         const motivo = cliente.semaforo_nota ? `: ${cliente.semaforo_nota}` : ' (sin motivo registrado)';
@@ -6781,6 +6853,216 @@
       await renderSemaforoPanel(prefix, cliente);
     });
   }
+
+  // =====================================================================
+  // PENDIENTES: servicios agendados que ya pasaron y siguen sin reporte
+  //
+  // Un servicio "no realizado" es una visita cuya fecha programada ya
+  // quedo atras y de la que ningun tecnico subio reporte. Se da UN DIA de
+  // gracia (la visita de hoy no aparece aqui hasta manana) para no marcar
+  // en rojo un servicio que todavia se esta haciendo.
+  //
+  // Cuenta como reporte tanto reportes_visita como reportes_lamparas_uv:
+  // hay servicios cuyo entregable de campo es el de lamparas, no el de
+  // estaciones, y marcarlos como omitidos seria una falsa alarma.
+  // =====================================================================
+  const PENDIENTE_ESTADOS = {
+    norealizado:  { label: 'No realizado',            badge: 'pend-norealizado',  clase: 'estado-norealizado',  emoji: '🔴' },
+    sinreporte:   { label: 'Sin reporte',             badge: 'pend-sinreporte',   clase: 'estado-sinreporte',   emoji: '🟠' },
+    reprogramada: { label: 'Reprogramada sin reporte',badge: 'pend-reprogramada', clase: 'estado-reprogramada', emoji: '🟡' },
+  };
+
+  let pendientesCache = [];
+  let pendientesTecnicosCache = [];
+
+  // Trae las visitas vencidas sin reporte. Se usa tanto para pintar la
+  // pestaña como para el contador rojo del tab (por eso devuelve la lista
+  // en vez de renderizar directo).
+  async function obtenerPendientes(){
+    const hoy = fechaALocalISO(new Date());
+
+    const [
+      { data: visitas, error: errVis },
+      { data: reportes, error: errRep },
+      { data: lamparas, error: errLamp },
+      { data: asignaciones, error: errAsig },
+      { data: perfiles, error: errPerf },
+    ] = await Promise.all([
+      supabaseClient.from('visitas_programadas')
+        .select('id, fecha_programada, hora, estatus, tecnico_asignado, cliente_id, clientes(nombre), servicios_cliente(tipo_servicio, sede)')
+        .lt('fecha_programada', hoy)
+        .in('estatus', ['Programada', 'Realizada', 'Reprogramada'])
+        .order('fecha_programada'),
+      supabaseClient.from('reportes_visita').select('visita_id'),
+      supabaseClient.from('reportes_lamparas_uv').select('visita_id'),
+      supabaseClient.from('visita_tecnicos').select('visita_id, tecnico_id'),
+      supabaseClient.from('perfiles_usuario').select('id, nombre'),
+    ]);
+
+    if(errVis){
+      console.error('No se pudieron cargar las visitas vencidas:', errVis);
+      return null;
+    }
+    if(errRep || errLamp) console.error('No se pudieron cargar los reportes para Pendientes:', errRep || errLamp);
+    if(errAsig) console.error('No se pudieron cargar los técnicos asignados:', errAsig);
+    // Ventas puede no tener permiso de leer perfiles: en ese caso el
+    // nombre del tecnico sale como "-" y la lista sigue sirviendo.
+    if(errPerf) console.error('No se pudieron cargar los nombres de técnico:', errPerf);
+
+    const conReporte = new Set([
+      ...(reportes || []).map(r => r.visita_id),
+      ...(lamparas || []).map(l => l.visita_id),
+    ].filter(Boolean));
+
+    const nombrePorId = {};
+    (perfiles || []).forEach(p => { nombrePorId[p.id] = p.nombre; });
+
+    const tecnicosPorVisita = {};
+    (asignaciones || []).forEach(a => {
+      (tecnicosPorVisita[a.visita_id] = tecnicosPorVisita[a.visita_id] || []).push(a.tecnico_id);
+    });
+
+    const hoyDate = new Date(hoy + 'T00:00:00');
+
+    return (visitas || [])
+      .filter(v => !conReporte.has(v.id))
+      .map(v => {
+        const ids = tecnicosPorVisita[v.id] && tecnicosPorVisita[v.id].length
+          ? tecnicosPorVisita[v.id]
+          : (v.tecnico_asignado ? [v.tecnico_asignado] : []);
+        const nombres = ids.map(id => nombrePorId[id]).filter(Boolean);
+        const estado = v.estatus === 'Realizada' ? 'sinreporte'
+          : v.estatus === 'Reprogramada' ? 'reprogramada'
+          : 'norealizado';
+        const fechaVisita = new Date((v.fecha_programada || hoy) + 'T00:00:00');
+        const diasRetraso = Math.round((hoyDate - fechaVisita) / 86400000);
+        return {
+          id: v.id,
+          fecha: v.fecha_programada,
+          estado,
+          estatus: v.estatus,
+          clienteId: v.cliente_id,
+          clienteNombre: (v.clientes && v.clientes.nombre) || '(cliente no encontrado)',
+          sede: (v.servicios_cliente && v.servicios_cliente.sede) || '',
+          tipoServicio: (v.servicios_cliente && v.servicios_cliente.tipo_servicio) || '',
+          tecnicoIds: ids,
+          tecnicoNombre: nombres.length ? nombres.join(', ') : (ids.length ? 'Técnico asignado' : 'Sin técnico asignado'),
+          diasRetraso,
+        };
+      });
+  }
+
+  // Contador rojo del tab. Se calcula al entrar a la app para que el aviso
+  // se vea sin tener que abrir la pestaña.
+  async function refrescarContadorPendientes(){
+    const badge = document.getElementById('tabPendientesContador');
+    if(!badge) return;
+    const lista = await obtenerPendientes();
+    if(!lista){ badge.classList.add('hidden'); return; }
+    pendientesCache = lista;
+    const sinHacer = lista.filter(p => p.estado === 'norealizado').length;
+    badge.textContent = lista.length;
+    badge.classList.toggle('hidden', lista.length === 0);
+    badge.title = sinHacer
+      ? `${sinHacer} servicios agendados que no se hicieron`
+      : 'Servicios sin reporte del técnico';
+  }
+
+  function poblarFiltroTecnicosPendientes(){
+    const select = document.getElementById('pendientesFiltroTecnico');
+    const previo = select.value;
+    const vistos = new Map();
+    pendientesCache.forEach(p => {
+      p.tecnicoIds.forEach((id, i) => {
+        if(!vistos.has(id)) vistos.set(id, p.tecnicoNombre.split(', ')[i] || 'Técnico');
+      });
+    });
+    pendientesTecnicosCache = [...vistos.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    select.innerHTML = `<option value="">Todos</option>` +
+      pendientesTecnicosCache.map(([id, nombre]) => `<option value="${id}">${escapeHtml(nombre)}</option>`).join('') +
+      `<option value="__sin__">Sin técnico asignado</option>`;
+    select.value = previo;
+  }
+
+  async function cargarPendientes(){
+    const cont = document.getElementById('pendientesLista');
+    cont.innerHTML = `<div class="empty-msg">Cargando...</div>`;
+    const lista = await obtenerPendientes();
+    if(!lista){
+      cont.innerHTML = `<div class="empty-msg">No se pudieron cargar los servicios pendientes.</div>`;
+      return;
+    }
+    pendientesCache = lista;
+    poblarFiltroTecnicosPendientes();
+    renderPendientesLista();
+    refrescarContadorPendientes();
+  }
+
+  function renderPendientesLista(){
+    const cont = document.getElementById('pendientesLista');
+    const resumen = document.getElementById('pendientesResumen');
+    const tecnicoFiltro = document.getElementById('pendientesFiltroTecnico').value;
+    const mesFiltro = document.getElementById('pendientesFiltroMes').value;
+
+    const conteos = { norealizado: 0, sinreporte: 0, reprogramada: 0 };
+    pendientesCache.forEach(p => { conteos[p.estado]++; });
+    resumen.innerHTML = Object.entries(PENDIENTE_ESTADOS).map(([clave, info]) => `
+      <span class="semaforo-filtro-chip activo ${info.badge}" style="cursor:default;">
+        ${info.emoji} ${info.label} <span class="conteo">${conteos[clave]}</span>
+      </span>
+    `).join('');
+
+    const filtrados = pendientesCache.filter(p => {
+      if(mesFiltro && !(p.fecha || '').startsWith(mesFiltro)) return false;
+      if(tecnicoFiltro === '__sin__') return p.tecnicoIds.length === 0;
+      if(tecnicoFiltro && !p.tecnicoIds.includes(tecnicoFiltro)) return false;
+      return true;
+    });
+
+    if(filtrados.length === 0){
+      cont.innerHTML = pendientesCache.length === 0
+        ? `<div class="empty-msg">Todo al día: no hay servicios vencidos sin reporte. 🎉</div>`
+        : `<div class="empty-msg">No hay servicios pendientes con estos filtros.</div>`;
+      return;
+    }
+
+    const oficina = esOficinaActual();
+    cont.innerHTML = filtrados.map(p => {
+      const info = PENDIENTE_ESTADOS[p.estado];
+      return `
+        <div class="pendiente-card ${info.clase}">
+          <div class="pendiente-info">
+            <div>
+              <strong>${escapeHtml(p.clienteNombre)}</strong>${p.sede ? ' — ' + escapeHtml(p.sede) : ''}
+              <span class="badge ${info.badge}">${info.label}</span>
+            </div>
+            <div class="pendiente-meta">
+              ${formatDate(p.fecha)} · <span class="pendiente-retraso">${p.diasRetraso} ${p.diasRetraso === 1 ? 'día' : 'días'} de retraso</span>${p.tipoServicio ? ' · ' + escapeHtml(p.tipoServicio) : ''} · Técnico: ${escapeHtml(p.tecnicoNombre)}
+            </div>
+          </div>
+          ${oficina ? `<button type="button" class="btn secondary small" data-ver-visita="${p.id}">Ver visita</button>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('pendientesFiltroTecnico').addEventListener('change', renderPendientesLista);
+  document.getElementById('pendientesFiltroMes').addEventListener('change', renderPendientesLista);
+  document.getElementById('btnPendientesLimpiarFiltros').addEventListener('click', ()=>{
+    document.getElementById('pendientesFiltroTecnico').value = '';
+    document.getElementById('pendientesFiltroMes').value = '';
+    renderPendientesLista();
+  });
+  document.getElementById('btnPendientesRecargar').addEventListener('click', cargarPendientes);
+
+  document.getElementById('pendientesLista').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('[data-ver-visita]');
+    if(!btn) return;
+    btn.disabled = true;
+    await asegurarVisitaEnCache(btn.dataset.verVisita);
+    abrirPanelVisita(btn.dataset.verVisita);
+    btn.disabled = false;
+  });
 
   // ---------- Vista panoramica del semaforo (oficina: dueño y asistente) ----------
   let semaforoResumenCache = [];
@@ -11221,6 +11503,31 @@
   // datos guardados (para imprimir el comprobante o para alimentar el
   // Certificado con las mismas firmas) o null si algo falló.
   async function guardarReporteVisitaActual(){
+    // El semaforo del cliente es obligatorio para cerrar el reporte, y
+    // tiene que ser de HOY: la idea es que cada cliente quede con su
+    // estado al dia conforme se le va dando servicio, no que arrastre el
+    // color que le pusieron hace tres meses. Si el tecnico ya lo marco en
+    // otra visita del mismo dia, no se le vuelve a pedir.
+    if(!reporteClienteObj || !reporteClienteObj.semaforo){
+      alert('Antes de cerrar el reporte marca el semáforo de estado del cliente (color + motivo).');
+      const panel = document.getElementById('reporteSemaforoPanel');
+      if(panel) panel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return null;
+    }
+    // Ojo: semaforo_actualizado_en se guarda en UTC. Comparar su slice
+    // de fecha contra el dia local marcaria mal todo lo capturado despues
+    // de las 6pm en Monterrey (ya es "manana" en UTC), asi que primero se
+    // convierte el timestamp a fecha LOCAL y luego se comparan.
+    const semaforoDia = reporteClienteObj.semaforo_actualizado_en
+      ? fechaALocalISO(new Date(reporteClienteObj.semaforo_actualizado_en))
+      : '';
+    if(semaforoDia !== fechaALocalISO(new Date())){
+      alert('El semáforo de este cliente es de una visita anterior. Vuelve a marcarlo (color + motivo) con lo que viste hoy antes de cerrar el reporte.');
+      const panel = document.getElementById('reporteSemaforoPanel');
+      if(panel) panel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return null;
+    }
+
     const leerChipsActivos = (card, campo) =>
       Array.from(card.querySelectorAll(`.chips-grupo[data-campo="${campo}"] .chip-opcion.activo`)).map(b => b.dataset.codigo);
 
