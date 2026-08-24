@@ -2554,7 +2554,7 @@
   <section id="tab-pendientes" class="hidden">
     <div class="panel">
       <h2>Servicios sin reporte</h2>
-      <p style="font-size:12px;color:#777;margin-top:0;">Visitas cuya fecha ya pasó y de las que no hay reporte del técnico. Se toma un día de gracia: una visita de hoy no aparece aquí hasta mañana. En cuanto el técnico sube su reporte, la visita desaparece de esta lista sola. Por defecto se ven los <strong>últimos 2 meses</strong>, que es desde cuando el equipo trabaja con el sistema; más atrás son visitas cargadas al montar la base, no omisiones reales.</p>
+      <p style="font-size:12px;color:#777;margin-top:0;">Visitas cuya fecha ya pasó y de las que no hay reporte del técnico. Se toma un día de gracia: una visita de hoy no aparece aquí hasta mañana. En cuanto el técnico sube su reporte, la visita desaparece de esta lista sola. No cuentan las visitas cuyo calendario se armó <em>después</em> de la fecha del servicio: el plan de trabajo genera el año completo, así que un plan hecho en agosto crea de golpe fechas de enero a julio que ya pasaron y que nadie pudo haber reportado.</p>
 
       <div id="pendientesResumen" class="semaforo-filtros"></div>
 
@@ -2563,10 +2563,10 @@
           <label for="pendientesFiltroPeriodo">Periodo</label>
           <select id="pendientesFiltroPeriodo">
             <option value="30">Últimos 30 días</option>
-            <option value="60" selected>Últimos 2 meses</option>
+            <option value="60">Últimos 2 meses</option>
             <option value="90">Últimos 90 días</option>
             <option value="180">Últimos 6 meses</option>
-            <option value="todo">Todo el histórico</option>
+            <option value="todo" selected>Todo el histórico</option>
           </select>
         </div>
         <div class="field" style="max-width:260px;">
@@ -6888,9 +6888,13 @@
   // aqui ahogaba las omisiones de verdad (98 falsas contra 1 real), asi
   // que el histórico completo queda disponible pero NO por defecto.
   const PENDIENTES_DIAS_DEFAULT = 60;
+  // Con las retroactivas ya descartadas no queda ruido que esconder, asi
+  // que la pestaña abre mostrando TODO lo que de verdad falta.
+  const PENDIENTES_PERIODO_DEFAULT = 'todo';
 
   let pendientesCache = [];
   let pendientesTecnicosCache = [];
+  let pendientesRetroactivas = 0; // cuantas se descartaron por retroactivas
 
   // Fecha mas antigua que se muestra, segun el periodo elegido.
   // 'todo' devuelve null = sin corte.
@@ -6921,7 +6925,7 @@
       { data: perfiles, error: errPerf },
     ] = await Promise.all([
       supabaseClient.from('visitas_programadas')
-        .select('id, fecha_programada, hora, estatus, tecnico_asignado, cliente_id, clientes(nombre), servicios_cliente(tipo_servicio, sede)')
+        .select('id, fecha_programada, hora, estatus, tecnico_asignado, cliente_id, fecha_creacion, clientes(nombre), servicios_cliente(tipo_servicio, sede)')
         .lt('fecha_programada', hoy)
         .in('estatus', ['Programada', 'Realizada', 'Reprogramada'])
         .order('fecha_programada'),
@@ -6956,8 +6960,23 @@
 
     const hoyDate = new Date(hoy + 'T00:00:00');
 
-    return (visitas || [])
-      .filter(v => !conReporte.has(v.id))
+    // Visitas RETROACTIVAS: su fecha de servicio es anterior al dia en que
+    // se capturaron. Nacen del generador del plan de trabajo, que arma el
+    // calendario del AÑO COMPLETO: un plan que se arma en agosto crea de
+    // golpe las fechas de enero a julio, que ya pasaron. Nadie pudo haber
+    // reportado un servicio que se agendo despues de su propia fecha, asi
+    // que no son omisiones del tecnico y no cuentan aqui. Sin esta regla
+    // eran 77 falsas contra 22 reales, y la pestaña dejaba de servir.
+    const esRetroactiva = (v) => {
+      if(!v.fecha_creacion) return false;
+      return v.fecha_programada < fechaALocalISO(new Date(v.fecha_creacion));
+    };
+
+    const todas = visitas || [];
+    pendientesRetroactivas = todas.filter(v => !conReporte.has(v.id) && esRetroactiva(v)).length;
+
+    return todas
+      .filter(v => !conReporte.has(v.id) && !esRetroactiva(v))
       .map(v => {
         const ids = tecnicosPorVisita[v.id] && tecnicosPorVisita[v.id].length
           ? tecnicosPorVisita[v.id]
@@ -6999,7 +7018,7 @@
     // ventana vigente), no el histórico completo: si contara todo, el
     // badge diria 99 para siempre y dejaria de significar algo.
     const select = document.getElementById('pendientesFiltroPeriodo');
-    const periodo = (select && select.value) || String(PENDIENTES_DIAS_DEFAULT);
+    const periodo = (select && select.value) || PENDIENTES_PERIODO_DEFAULT;
     const visibles = pendientesEnPeriodo(lista, periodo);
     const sinHacer = visibles.filter(p => p.estado === 'norealizado').length;
     badge.textContent = visibles.length;
@@ -7056,7 +7075,10 @@
       <span class="semaforo-filtro-chip activo ${info.badge}" style="cursor:default;">
         ${info.emoji} ${info.label} <span class="conteo">${conteos[clave]}</span>
       </span>
-    `).join('');
+    `).join('') + (pendientesRetroactivas > 0 ? `
+      <span class="hint" style="flex:1 1 100%;margin:2px 0 0 2px;">
+        No se cuentan ${pendientesRetroactivas} visitas cuyo calendario se armó después de la fecha del servicio (plan hecho en retroactivo).
+      </span>` : '');
 
     const filtrados = enPeriodo.filter(p => {
       if(mesFiltro && !(p.fecha || '').startsWith(mesFiltro)) return false;
@@ -7105,7 +7127,7 @@
   document.getElementById('btnPendientesLimpiarFiltros').addEventListener('click', ()=>{
     document.getElementById('pendientesFiltroTecnico').value = '';
     document.getElementById('pendientesFiltroMes').value = '';
-    document.getElementById('pendientesFiltroPeriodo').value = String(PENDIENTES_DIAS_DEFAULT);
+    document.getElementById('pendientesFiltroPeriodo').value = PENDIENTES_PERIODO_DEFAULT;
     renderPendientesLista();
     refrescarContadorPendientes(pendientesCache);
   });
