@@ -2554,11 +2554,21 @@
   <section id="tab-pendientes" class="hidden">
     <div class="panel">
       <h2>Servicios sin reporte</h2>
-      <p style="font-size:12px;color:#777;margin-top:0;">Visitas cuya fecha ya pasó y de las que no hay reporte del técnico. Se toma un día de gracia: una visita de hoy no aparece aquí hasta mañana. En cuanto el técnico sube su reporte, la visita desaparece de esta lista sola.</p>
+      <p style="font-size:12px;color:#777;margin-top:0;">Visitas cuya fecha ya pasó y de las que no hay reporte del técnico. Se toma un día de gracia: una visita de hoy no aparece aquí hasta mañana. En cuanto el técnico sube su reporte, la visita desaparece de esta lista sola. Por defecto se ven los <strong>últimos 2 meses</strong>, que es desde cuando el equipo trabaja con el sistema; más atrás son visitas cargadas al montar la base, no omisiones reales.</p>
 
       <div id="pendientesResumen" class="semaforo-filtros"></div>
 
       <div class="grid" style="align-items:end;">
+        <div class="field" style="max-width:220px;">
+          <label for="pendientesFiltroPeriodo">Periodo</label>
+          <select id="pendientesFiltroPeriodo">
+            <option value="30">Últimos 30 días</option>
+            <option value="60" selected>Últimos 2 meses</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="180">Últimos 6 meses</option>
+            <option value="todo">Todo el histórico</option>
+          </select>
+        </div>
         <div class="field" style="max-width:260px;">
           <label for="pendientesFiltroTecnico">Filtrar por técnico</label>
           <select id="pendientesFiltroTecnico"><option value="">Todos</option></select>
@@ -6872,8 +6882,30 @@
     reprogramada: { label: 'Reprogramada sin reporte',badge: 'pend-reprogramada', clase: 'estado-reprogramada', emoji: '🟡' },
   };
 
+  // Ventana por defecto de la pestaña. El CRM lleva ~2 meses en uso real:
+  // mas atras solo hay visitas historicas cargadas al montar la base, que
+  // nunca tuvieron reporte porque el sistema no existia todavia. Meterlas
+  // aqui ahogaba las omisiones de verdad (98 falsas contra 1 real), asi
+  // que el histórico completo queda disponible pero NO por defecto.
+  const PENDIENTES_DIAS_DEFAULT = 60;
+
   let pendientesCache = [];
   let pendientesTecnicosCache = [];
+
+  // Fecha mas antigua que se muestra, segun el periodo elegido.
+  // 'todo' devuelve null = sin corte.
+  function pendientesDesdeISO(periodo){
+    if(periodo === 'todo') return null;
+    const dias = Number(periodo) || PENDIENTES_DIAS_DEFAULT;
+    const d = new Date();
+    d.setDate(d.getDate() - dias);
+    return fechaALocalISO(d);
+  }
+
+  function pendientesEnPeriodo(lista, periodo){
+    const desde = pendientesDesdeISO(periodo);
+    return desde ? lista.filter(p => (p.fecha || '') >= desde) : lista.slice();
+  }
 
   // Trae las visitas vencidas sin reporte. Se usa tanto para pintar la
   // pestaña como para el contador rojo del tab (por eso devuelve la lista
@@ -6954,15 +6986,24 @@
 
   // Contador rojo del tab. Se calcula al entrar a la app para que el aviso
   // se vea sin tener que abrir la pestaña.
-  async function refrescarContadorPendientes(){
+  // listaPreCargada evita volver a consultar la base cuando quien llama ya
+  // tiene los pendientes en mano (al pintar la pestaña o al cambiar el
+  // periodo); sin ella, hace la consulta (arranque de la app).
+  async function refrescarContadorPendientes(listaPreCargada){
     const badge = document.getElementById('tabPendientesContador');
     if(!badge) return;
-    const lista = await obtenerPendientes();
+    const lista = listaPreCargada || await obtenerPendientes();
     if(!lista){ badge.classList.add('hidden'); return; }
     pendientesCache = lista;
-    const sinHacer = lista.filter(p => p.estado === 'norealizado').length;
-    badge.textContent = lista.length;
-    badge.classList.toggle('hidden', lista.length === 0);
+    // El contador refleja lo que la pestaña muestra por defecto (la
+    // ventana vigente), no el histórico completo: si contara todo, el
+    // badge diria 99 para siempre y dejaria de significar algo.
+    const select = document.getElementById('pendientesFiltroPeriodo');
+    const periodo = (select && select.value) || String(PENDIENTES_DIAS_DEFAULT);
+    const visibles = pendientesEnPeriodo(lista, periodo);
+    const sinHacer = visibles.filter(p => p.estado === 'norealizado').length;
+    badge.textContent = visibles.length;
+    badge.classList.toggle('hidden', visibles.length === 0);
     badge.title = sinHacer
       ? `${sinHacer} servicios agendados que no se hicieron`
       : 'Servicios sin reporte del técnico';
@@ -6995,24 +7036,29 @@
     pendientesCache = lista;
     poblarFiltroTecnicosPendientes();
     renderPendientesLista();
-    refrescarContadorPendientes();
+    refrescarContadorPendientes(lista);
   }
 
   function renderPendientesLista(){
     const cont = document.getElementById('pendientesLista');
     const resumen = document.getElementById('pendientesResumen');
+    const periodo = document.getElementById('pendientesFiltroPeriodo').value;
     const tecnicoFiltro = document.getElementById('pendientesFiltroTecnico').value;
     const mesFiltro = document.getElementById('pendientesFiltroMes').value;
 
+    // El periodo manda: los contadores de arriba cuentan sobre la ventana
+    // elegida, para que cuadren con lo que se ve listado abajo.
+    const enPeriodo = pendientesEnPeriodo(pendientesCache, periodo);
+
     const conteos = { norealizado: 0, sinreporte: 0, reprogramada: 0 };
-    pendientesCache.forEach(p => { conteos[p.estado]++; });
+    enPeriodo.forEach(p => { conteos[p.estado]++; });
     resumen.innerHTML = Object.entries(PENDIENTE_ESTADOS).map(([clave, info]) => `
       <span class="semaforo-filtro-chip activo ${info.badge}" style="cursor:default;">
         ${info.emoji} ${info.label} <span class="conteo">${conteos[clave]}</span>
       </span>
     `).join('');
 
-    const filtrados = pendientesCache.filter(p => {
+    const filtrados = enPeriodo.filter(p => {
       if(mesFiltro && !(p.fecha || '').startsWith(mesFiltro)) return false;
       if(tecnicoFiltro === '__sin__') return p.tecnicoIds.length === 0;
       if(tecnicoFiltro && !p.tecnicoIds.includes(tecnicoFiltro)) return false;
@@ -7020,9 +7066,13 @@
     });
 
     if(filtrados.length === 0){
-      cont.innerHTML = pendientesCache.length === 0
-        ? `<div class="empty-msg">Todo al día: no hay servicios vencidos sin reporte. 🎉</div>`
-        : `<div class="empty-msg">No hay servicios pendientes con estos filtros.</div>`;
+      const masAtras = pendientesCache.length - enPeriodo.length;
+      const nota = masAtras > 0
+        ? ` (hay ${masAtras} más antiguos, fuera de este periodo)`
+        : '';
+      cont.innerHTML = enPeriodo.length === 0
+        ? `<div class="empty-msg">Todo al día: no hay servicios vencidos sin reporte en este periodo${nota}. 🎉</div>`
+        : `<div class="empty-msg">No hay servicios pendientes con estos filtros${nota}.</div>`;
       return;
     }
 
@@ -7046,12 +7096,18 @@
     }).join('');
   }
 
+  document.getElementById('pendientesFiltroPeriodo').addEventListener('change', ()=>{
+    renderPendientesLista();
+    refrescarContadorPendientes(pendientesCache);
+  });
   document.getElementById('pendientesFiltroTecnico').addEventListener('change', renderPendientesLista);
   document.getElementById('pendientesFiltroMes').addEventListener('change', renderPendientesLista);
   document.getElementById('btnPendientesLimpiarFiltros').addEventListener('click', ()=>{
     document.getElementById('pendientesFiltroTecnico').value = '';
     document.getElementById('pendientesFiltroMes').value = '';
+    document.getElementById('pendientesFiltroPeriodo').value = String(PENDIENTES_DIAS_DEFAULT);
     renderPendientesLista();
+    refrescarContadorPendientes(pendientesCache);
   });
   document.getElementById('btnPendientesRecargar').addEventListener('click', cargarPendientes);
 
