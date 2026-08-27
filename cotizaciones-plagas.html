@@ -1731,6 +1731,38 @@
       </div>
 
       <div class="panel">
+        <h2>&iquest;C&oacute;mo nos contact&oacute;?</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="origenProspecto">&iquest;De d&oacute;nde nos conoci&oacute;? *</label>
+            <select id="origenProspecto" required>
+              <option value="">Selecciona...</option>
+              <option value="Google Ads">Google &mdash; anuncio pagado</option>
+              <option value="Google organico">Google &mdash; b&uacute;squeda o Maps</option>
+              <option value="Sitio web">Sitio web</option>
+              <option value="Facebook o Instagram">Facebook o Instagram</option>
+              <option value="Recomendacion">Recomendaci&oacute;n de un cliente</option>
+              <option value="Cliente anterior">Ya era cliente</option>
+              <option value="Rotulo o camioneta">R&oacute;tulo / camioneta</option>
+              <option value="Otro">Otro / no s&eacute;</option>
+            </select>
+            <div class="hint" style="margin-top:6px;">Si el mensaje de WhatsApp empieza con <strong>&ldquo;vi su anuncio en Google&rdquo;</strong> es anuncio pagado. Si dice <strong>&ldquo;deseo cotizar Servicio de fumigaci&oacute;n&rdquo;</strong> vino del sitio web.</div>
+          </div>
+          <div class="field">
+            <label for="medioContacto">&iquest;Por d&oacute;nde nos contact&oacute;? *</label>
+            <select id="medioContacto" required>
+              <option value="">Selecciona...</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Llamada">Llamada telef&oacute;nica</option>
+              <option value="Correo">Correo electr&oacute;nico</option>
+              <option value="Presencial">Presencial / en oficina</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
         <h2>Servicio a cotizar</h2>
         <div class="grid">
           <div class="field">
@@ -1930,6 +1962,34 @@
             </tr>
           </thead>
           <tbody id="tablaEfectividadCategoria"></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 4px 0;">&iquest;De d&oacute;nde llegan los clientes que s&iacute; cierran?</h3>
+      <p class="hint" style="margin:0 0 10px 0;">Cada rengl&oacute;n es un canal. La columna que importa es <strong>Efectividad (cantidad)</strong>: de cada 100 personas que llegaron por ah&iacute;, cu&aacute;ntas contrataron.</p>
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table class="tabla-efectividad">
+          <thead>
+            <tr>
+              <th>Nos conoci&oacute; por</th><th>Cotizaciones</th><th>Cerradas</th><th>Perdidas</th><th>Efectividad (cantidad)</th>
+              <th>Monto cerrado</th><th>Monto perdido</th><th>Efectividad (valor)</th>
+            </tr>
+          </thead>
+          <tbody id="tablaEfectividadOrigen"></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 4px 0;">&iquest;Por d&oacute;nde nos contactan?</h3>
+      <p class="hint" style="margin:0 0 10px 0;">Aqu&iacute; se ve cu&aacute;ntas cotizaciones nacieron de un mensaje de WhatsApp y cu&aacute;ntas de una llamada.</p>
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table class="tabla-efectividad">
+          <thead>
+            <tr>
+              <th>Nos contact&oacute; por</th><th>Cotizaciones</th><th>Cerradas</th><th>Perdidas</th><th>Efectividad (cantidad)</th>
+              <th>Monto cerrado</th><th>Monto perdido</th><th>Efectividad (valor)</th>
+            </tr>
+          </thead>
+          <tbody id="tablaEfectividadMedio"></tbody>
         </table>
       </div>
 
@@ -5990,6 +6050,9 @@
     document.getElementById('clienteContacto').value = cot.cliente.contacto || '';
     document.getElementById('clienteZona').value = cot.cliente.zona || '';
 
+    document.getElementById('origenProspecto').value = cot.origenProspecto || '';
+    document.getElementById('medioContacto').value = cot.medioContacto || '';
+
     document.getElementById('categoriaServicio').value = cot.categoriaServicio || '';
 
     areas = (cot.areas || []).slice();
@@ -6140,6 +6203,8 @@
       fechaCreacion: new Date().toISOString().slice(0,10),
       generadoPorRol: document.getElementById('generadoPor').value,
       generadoPorNombre: document.getElementById('generadoPorNombre').value.trim(),
+      origenProspecto: document.getElementById('origenProspecto').value,
+      medioContacto: document.getElementById('medioContacto').value,
       cliente: {
         nombre: document.getElementById('clienteNombre').value.trim(),
         telefono: document.getElementById('clienteTelefono').value.trim(),
@@ -6275,6 +6340,8 @@
         <h3>Detalle general del servicio</h3>
         <div class="doc-grid">
           <div><span>Categoría de servicio:</span> ${escapeHtml(cot.categoriaServicio || "-")}</div>
+          <div><span>Nos conoci&oacute; por:</span> ${escapeHtml(cot.origenProspecto || "-")}</div>
+          <div><span>Nos contact&oacute; por:</span> ${escapeHtml(cot.medioContacto || "-")}</div>
           <div><span>Tipo de plaga / servicio:</span> ${escapeHtml(nombresPlagas)}</div>
           <div><span>Tipo de contratación:</span> ${contratacionTexto}</div>
           ${(srv.contratacionLabel === 'Póliza') ? `
@@ -6485,8 +6552,48 @@
     }).join("");
   }
 
+  const ORIGENES_PROSPECTO = ['Google Ads','Google organico','Sitio web','Facebook o Instagram','Recomendacion','Cliente anterior','Rotulo o camioneta','Otro'];
+  const MEDIOS_CONTACTO   = ['WhatsApp','Llamada','Correo','Presencial','Otro'];
+
+  function renderEfectividadPorCampo(campo, valores, idTabla){
+    const all = getCotizaciones();
+    const filas = [{ nombre: 'Total general', total: all.length, ...calcularBloqueEfectividad(all) }];
+
+    valores.forEach(v=>{
+      const lista = all.filter(c => (c[campo] || '') === v);
+      if(!lista.length) return;
+      filas.push({ nombre: v, total: lista.length, ...calcularBloqueEfectividad(lista) });
+    });
+
+    const sinDato = all.filter(c => !c[campo]);
+    if(sinDato.length){
+      filas.push({ nombre: 'Sin registrar', total: sinDato.length, ...calcularBloqueEfectividad(sinDato) });
+    }
+
+    const cuerpo = document.getElementById(idTabla);
+    if(!cuerpo) return;
+    cuerpo.innerHTML = filas.map(f=>{
+      const cant = formatearEfectividad(f.efectividadCantidad);
+      const valor = formatearEfectividad(f.efectividadValor);
+      return `
+        <tr>
+          <td>${escapeHtml(f.nombre)}</td>
+          <td>${f.total}</td>
+          <td>${f.cerradasCount}</td>
+          <td>${f.perdidasCount}</td>
+          <td class="${cant.clase}">${cant.texto}</td>
+          <td>${formatMoney(f.montoCerrado)}</td>
+          <td>${formatMoney(f.montoPerdido)}</td>
+          <td class="${valor.clase}">${valor.texto}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
   function renderReporte(){
     renderEfectividadCategorias();
+    renderEfectividadPorCampo('origenProspecto', ORIGENES_PROSPECTO, 'tablaEfectividadOrigen');
+    renderEfectividadPorCampo('medioContacto',   MEDIOS_CONTACTO,   'tablaEfectividadMedio');
     const all = getCotizaciones();
 
     // ---- Resumen global de estados (todas las cotizaciones, sin filtro de fecha) ----
@@ -6602,6 +6709,7 @@
         <td>${formatDate(c.fechaCreacion)}${c.editada ? `<div class="hint" title="Última modificación: ${escapeHtml(formatFechaHora(c.fechaActualizacion))}">Editada</div>` : ''}</td>
         <td>${escapeHtml(c.cliente.nombre)}</td>
         <td>${escapeHtml(c.categoriaServicio || "-")}</td>
+        <td>${escapeHtml(c.origenProspecto || "-")}${c.medioContacto ? `<div class="hint">${escapeHtml(c.medioContacto)}</div>` : ''}</td>
         <td>${escapeHtml(nombresPlagasCot(c))}</td>
         <td>${escapeHtml(describirServicio(c).resumenCorto)}</td>
         <td>${formatMoney(montoTotalConIva(c))}</td>
@@ -6626,7 +6734,7 @@
       <table>
         <thead>
           <tr>
-            <th>Folio</th><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Servicio</th>
+            <th>Folio</th><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Origen</th><th>Servicio</th>
             <th>Contratación</th><th>Total (c/IVA)</th><th>Vigencia</th><th>Generó</th><th>Estado</th><th>Acciones</th>
           </tr>
         </thead>
