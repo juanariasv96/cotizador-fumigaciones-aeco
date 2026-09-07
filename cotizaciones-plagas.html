@@ -1993,6 +1993,31 @@
         </table>
       </div>
 
+      <h3 style="font-size:14px;color:var(--verde-oscuro);margin:0 0 4px 0;">Embudo de WhatsApp: del clic a la cotizaci&oacute;n</h3>
+      <p class="hint" style="margin:0 0 10px 0;">Cu&aacute;nta gente abri&oacute; WhatsApp desde el sitio, contra cu&aacute;ntas cotizaciones se levantaron. La diferencia son los que se arrepintieron antes de escribir.</p>
+
+      <div class="field" style="max-width:260px;margin-bottom:12px;">
+        <label for="periodoEmbudo">Periodo</label>
+        <select id="periodoEmbudo">
+          <option value="7">&Uacute;ltimos 7 d&iacute;as</option>
+          <option value="30" selected>&Uacute;ltimos 30 d&iacute;as</option>
+          <option value="90">&Uacute;ltimos 90 d&iacute;as</option>
+        </select>
+      </div>
+
+      <div class="reporte-grid" style="margin-bottom:14px;" id="tarjetasEmbudo"></div>
+
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table class="tabla-efectividad">
+          <thead>
+            <tr>
+              <th>Canal</th><th>Clics a WhatsApp</th><th>Cotizaciones</th><th>Cerradas</th>
+            </tr>
+          </thead>
+          <tbody id="tablaEmbudo"></tbody>
+        </table>
+      </div>
+
       <div class="field" style="max-width:320px;margin-bottom:12px;">
         <label for="filtroEstadoTotales">Montos de Hoy / Semana / Mes / Año para:</label>
         <select id="filtroEstadoTotales">
@@ -6590,8 +6615,121 @@
     }).join("");
   }
 
+  // ---- Embudo de WhatsApp: clics del sitio vs cotizaciones levantadas ----
+  const MAPA_ORIGEN_CLIC = {
+    'google-ads': 'Google Ads',
+    'google':     'Google organico',
+    'facebook':   'Facebook o Instagram',
+    'directo':    'Sitio web',
+    'otro':       'Otro'
+  };
+
+  let clicsWhatsappCache = null;
+
+  async function cargarClicsWhatsapp(){
+    if(clicsWhatsappCache) return clicsWhatsappCache;
+    try{
+      const { data, error } = await supabaseClient
+        .from('clics_whatsapp')
+        .select('fecha, origen, pagina')
+        .order('fecha', { ascending: false })
+        .limit(5000);
+      if(error) throw error;
+      clicsWhatsappCache = data || [];
+    }catch(e){
+      clicsWhatsappCache = null;
+    }
+    return clicsWhatsappCache;
+  }
+
+  async function renderEmbudoWhatsapp(){
+    const sel      = document.getElementById('periodoEmbudo');
+    const tarjetas = document.getElementById('tarjetasEmbudo');
+    const cuerpo   = document.getElementById('tablaEmbudo');
+    if(!tarjetas || !cuerpo) return;
+
+    if(sel && !sel.dataset.ligado){
+      sel.dataset.ligado = '1';
+      sel.addEventListener('change', renderEmbudoWhatsapp);
+    }
+
+    const dias  = parseInt(sel ? sel.value : '30', 10) || 30;
+    const desde = new Date();
+    desde.setHours(0,0,0,0);
+    desde.setDate(desde.getDate() - dias);
+
+    const clics = await cargarClicsWhatsapp();
+    if(clics === null){
+      tarjetas.innerHTML = '<div class="empty-msg">No se pudieron leer los clics de WhatsApp.</div>';
+      cuerpo.innerHTML = '';
+      return;
+    }
+
+    const clicsPeriodo = clics.filter(c => new Date(c.fecha) >= desde);
+
+    const cots = getCotizaciones().filter(c => {
+      if(!c.fechaCreacion) return false;
+      const f = new Date(c.fechaCreacion + 'T12:00:00');
+      return !isNaN(f) && f >= desde;
+    });
+    const cotsWhats = cots.filter(c => (c.medioContacto || '') === 'WhatsApp');
+
+    const totalClics  = clicsPeriodo.length;
+    const escribieron = cotsWhats.length;
+    const perdidos    = Math.max(0, totalClics - escribieron);
+    const pctEscribio = totalClics ? (escribieron / totalClics * 100) : 0;
+    const cerradasW   = cotsWhats.filter(c => estadoDe(c) === 'Cerrada').length;
+
+    tarjetas.innerHTML = `
+      <div class="reporte-tarjeta">
+        <div class="reporte-label">Abrieron WhatsApp</div>
+        <div class="reporte-valor">${totalClics}</div>
+        <div class="reporte-sub">clics desde el sitio</div>
+      </div>
+      <div class="reporte-tarjeta">
+        <div class="reporte-label">S&iacute; escribieron</div>
+        <div class="reporte-valor">${escribieron}</div>
+        <div class="reporte-sub">cotizaciones por WhatsApp</div>
+      </div>
+      <div class="reporte-tarjeta">
+        <div class="reporte-label">Se arrepintieron</div>
+        <div class="reporte-valor">${perdidos}</div>
+        <div class="reporte-sub">abrieron y no escribieron</div>
+      </div>
+      <div class="reporte-tarjeta">
+        <div class="reporte-label">% que s&iacute; escribi&oacute;</div>
+        <div class="reporte-valor">${totalClics ? pctEscribio.toFixed(0) + '%' : '-'}</div>
+      </div>
+      <div class="reporte-tarjeta">
+        <div class="reporte-label">Cerradas de esos</div>
+        <div class="reporte-valor">${cerradasW}</div>
+      </div>
+    `;
+
+    const canales = {};
+    const asegura = k => { if(!canales[k]) canales[k] = { clics:0, cot:0, cerradas:0 }; return canales[k]; };
+
+    clicsPeriodo.forEach(c => { asegura(MAPA_ORIGEN_CLIC[c.origen] || 'Otro').clics++; });
+    cots.forEach(c => {
+      const fila = asegura(c.origenProspecto || 'Sin registrar');
+      fila.cot++;
+      if(estadoDe(c) === 'Cerrada') fila.cerradas++;
+    });
+
+    const nombres = Object.keys(canales).sort((a,b) => (canales[b].clics + canales[b].cot) - (canales[a].clics + canales[a].cot));
+    cuerpo.innerHTML = nombres.length ? nombres.map(n => `
+      <tr>
+        <td>${escapeHtml(n)}</td>
+        <td>${canales[n].clics || '-'}</td>
+        <td>${canales[n].cot || '-'}</td>
+        <td>${canales[n].cerradas || '-'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4">Sin datos en el periodo.</td></tr>';
+  }
+
   function renderReporte(){
     renderEfectividadCategorias();
+    renderEmbudoWhatsapp();
     renderEfectividadPorCampo('origenProspecto', ORIGENES_PROSPECTO, 'tablaEfectividadOrigen');
     renderEfectividadPorCampo('medioContacto',   MEDIOS_CONTACTO,   'tablaEfectividadMedio');
     const all = getCotizaciones();
