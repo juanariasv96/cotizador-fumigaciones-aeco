@@ -2005,6 +2005,8 @@
         </select>
       </div>
 
+      <p class="hint" id="avisoEmbudo" style="margin:0 0 10px 0;"></p>
+
       <div class="reporte-grid" style="margin-bottom:14px;" id="tarjetasEmbudo"></div>
 
       <div style="overflow-x:auto;margin-bottom:20px;">
@@ -6665,12 +6667,35 @@
       return;
     }
 
-    const clicsPeriodo = clics.filter(c => new Date(c.fecha) >= desde);
+    // El registro de clics arranco despues que las cotizaciones. Para que la
+    // comparacion signifique algo, ambos lados se miden desde la misma fecha.
+    const aviso = document.getElementById('avisoEmbudo');
+    let inicio = desde;
+    let sinClics = clics.length === 0;
+
+    if(!sinClics){
+      const primero = new Date(Math.min.apply(null, clics.map(c => new Date(c.fecha).getTime())));
+      primero.setHours(0,0,0,0);
+      if(primero > inicio) inicio = primero;
+    }
+
+    if(aviso){
+      if(sinClics){
+        aviso.innerHTML = 'Todavia no hay clics registrados. El contador empieza desde que se instalo el registro en el sitio.';
+      } else if(inicio > desde){
+        aviso.innerHTML = 'Comparando desde el <strong>' + inicio.toLocaleDateString('es-MX') +
+          '</strong>, que es cuando empezo a registrarse el clic en el sitio. Antes de esa fecha hay cotizaciones pero no hay clics, y mezclarlas daria un porcentaje falso.';
+      } else {
+        aviso.innerHTML = '';
+      }
+    }
+
+    const clicsPeriodo = clics.filter(c => new Date(c.fecha) >= inicio);
 
     const cots = getCotizaciones().filter(c => {
       if(!c.fechaCreacion) return false;
       const f = new Date(c.fechaCreacion + 'T12:00:00');
-      return !isNaN(f) && f >= desde;
+      return !isNaN(f) && f >= inicio;
     });
     const cotsWhats = cots.filter(c => (c.medioContacto || '') === 'WhatsApp');
 
@@ -6693,12 +6718,13 @@
       </div>
       <div class="reporte-tarjeta">
         <div class="reporte-label">Se arrepintieron</div>
-        <div class="reporte-valor">${perdidos}</div>
-        <div class="reporte-sub">abrieron y no escribieron</div>
+        <div class="reporte-valor">${totalClics < 10 ? '-' : perdidos}</div>
+        <div class="reporte-sub">${totalClics < 10 ? 'faltan datos' : 'abrieron y no escribieron'}</div>
       </div>
       <div class="reporte-tarjeta">
         <div class="reporte-label">% que s&iacute; escribi&oacute;</div>
-        <div class="reporte-valor">${totalClics ? pctEscribio.toFixed(0) + '%' : '-'}</div>
+        <div class="reporte-valor">${totalClics < 10 ? '-' : Math.min(100, pctEscribio).toFixed(0) + '%'}</div>
+        <div class="reporte-sub">${totalClics < 10 ? 'faltan datos' : ''}</div>
       </div>
       <div class="reporte-tarjeta">
         <div class="reporte-label">Cerradas de esos</div>
