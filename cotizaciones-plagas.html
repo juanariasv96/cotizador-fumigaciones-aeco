@@ -1602,6 +1602,7 @@
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
+  <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
   <button class="tab-btn hidden" data-tab="pendientes" id="tabBtnPendientes">Pendientes <span class="tab-contador hidden" id="tabPendientesContador">0</span></button>
   <button class="tab-btn hidden" data-tab="semaforo" id="tabBtnSemaforo">Semáforo</button>
   <button class="tab-btn hidden" data-tab="almacen" id="tabBtnAlmacen">Almacén</button>
@@ -2638,6 +2639,65 @@
        nunca subió reporte. Es una vista de vigilancia: aquí no se edita
        nada, solo se detecta. Quien tiene permiso (oficina) puede saltar
        a la visita para reprogramarla o cancelarla. -->
+  <!-- ===============================================================
+       PROSPECTOS DEL SITIO WEB
+       ===============================================================
+       Quien llena el formulario de la home cae en la tabla
+       prospectos_web de Supabase. Esta pestana es donde se trabajan:
+       los que faltan por atender salen primero. Marcar "atendido" no
+       borra nada, solo lo saca de la lista de pendientes. -->
+  <section id="tab-prospectos" class="hidden">
+    <div class="panel">
+      <h2>Prospectos del sitio web</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">
+        Gente que dejo sus datos en el formulario de
+        <strong>fumigacionmonterrey.mx</strong>. Aparecen aqui al instante.
+        Tambien llega aviso al correo, pero esta lista es la que manda:
+        aqui se ve quien falta por atender.
+      </p>
+
+      <div class="grid" style="margin-bottom:14px;">
+        <div class="field" style="max-width:260px;">
+          <label for="prospectosFiltro">Mostrar</label>
+          <select id="prospectosFiltro">
+            <option value="pendientes" selected>Solo los que faltan por atender</option>
+            <option value="todos">Todos</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:220px;">
+          <label for="prospectosPeriodo">Periodo</label>
+          <select id="prospectosPeriodo">
+            <option value="30" selected>&Uacute;ltimos 30 d&iacute;as</option>
+            <option value="90">&Uacute;ltimos 90 d&iacute;as</option>
+            <option value="0">Todo</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="prospectosLista"></div>
+    </div>
+
+    <style>
+      .pw-tarjeta{border:1px solid #dfe6e0;border-left:5px solid #016937;border-radius:8px;padding:14px 16px;margin-bottom:12px;background:#fff}
+      .pw-tarjeta.pw-atendido{border-left-color:#b9c4bb;background:#fafbfa;opacity:.75}
+      .pw-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+      .pw-nombre{font-size:16px;font-weight:700;color:#016937}
+      .pw-fecha{font-size:12px;color:#777}
+      .pw-datos{font-size:14px;color:#333;line-height:1.7}
+      .pw-datos span.pw-et{color:#777;font-size:12px;display:inline-block;min-width:92px}
+      .pw-mensaje{margin-top:8px;padding:9px 11px;background:#f4f7f5;border-radius:6px;font-size:14px;color:#333;white-space:pre-wrap}
+      .pw-origen{display:inline-block;margin-top:9px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e3f0e8;color:#016937}
+      .pw-origen.pw-ads{background:#fff3cd;color:#8a6100}
+      .pw-acciones{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+      .pw-btn{display:inline-block;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:0;cursor:pointer;font-family:inherit}
+      .pw-wa{background:#25d366;color:#fff}
+      .pw-tel{background:#016937;color:#fff}
+      .pw-ok{background:#fff;color:#016937;border:1px solid #016937}
+      .pw-listo{font-size:12px;color:#777}
+      @media (max-width:640px){ .pw-datos span.pw-et{min-width:0;display:block} }
+    </style>
+  </section>
+
   <section id="tab-pendientes" class="hidden">
     <div class="panel">
       <h2>Servicios sin reporte</h2>
@@ -4116,6 +4176,10 @@
     const veePendientes = ['dueño', 'vendedor', 'asistente'].includes(usuarioActual.rol);
     document.getElementById('tabBtnPendientes').classList.toggle('hidden', !veePendientes);
     if(veePendientes) refrescarContadorPendientes();
+    // Prospectos del sitio: los trabaja quien contesta. El tecnico no.
+    const veeProspectos = ['dueño', 'vendedor', 'asistente'].includes(usuarioActual.rol);
+    document.getElementById('tabBtnProspectos').classList.toggle('hidden', !veeProspectos);
+    if(veeProspectos) refrescarContadorProspectos();
     document.getElementById('tabBtnSemaforo').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
@@ -4952,6 +5016,7 @@
     estaciones: document.getElementById('tab-estaciones'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
+    prospectos: document.getElementById('tab-prospectos'),
     pendientes: document.getElementById('tab-pendientes'),
     semaforo: document.getElementById('tab-semaforo'),
     almacen: document.getElementById('tab-almacen'),
@@ -4964,6 +5029,140 @@
     dispositivos: document.getElementById('tab-dispositivos'),
     hoteles: document.getElementById('tab-hoteles'),
   };
+  // ---------- Prospectos del sitio web ----------
+  // Vienen de la tabla prospectos_web, que llena el formulario de la home.
+  // Politica de la tabla: el sitio publico solo puede INSERTAR; leer y
+  // actualizar requiere sesion del equipo, que es la que usa el CRM.
+
+  const MAPA_ORIGEN_PW = {
+    'google-ads': 'Google Ads',
+    'google':     'Google organico',
+    'facebook':   'Facebook o Instagram',
+    'directo':    'Entro directo',
+    'otro':       'Otro'
+  };
+
+  function telLimpio(t){ return String(t || '').replace(/\D/g, ''); }
+
+  function fechaProspecto(iso){
+    const d = new Date(iso);
+    if(isNaN(d)) return '';
+    return d.toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
+
+  async function obtenerProspectos(){
+    const sel = document.getElementById('prospectosPeriodo');
+    const dias = sel ? parseInt(sel.value, 10) : 30;
+    let q = supabaseClient
+      .from('prospectos_web')
+      .select('id, fecha, nombre, telefono, email, tipo, servicio, mensaje, origen, campana, gclid, pagina, atendido, nota')
+      .order('fecha', { ascending: false })
+      .limit(500);
+    if(dias > 0){
+      const desde = new Date();
+      desde.setDate(desde.getDate() - dias);
+      q = q.gte('fecha', desde.toISOString());
+    }
+    const { data, error } = await q;
+    if(error) return null;
+    return data || [];
+  }
+
+  async function marcarProspectoAtendido(id, boton){
+    if(boton){ boton.disabled = true; boton.textContent = 'Guardando...'; }
+    const { error } = await supabaseClient
+      .from('prospectos_web')
+      .update({ atendido: true })
+      .eq('id', id);
+    if(error){
+      if(boton){ boton.disabled = false; boton.textContent = 'Marcar como atendido'; }
+      alert('No se pudo guardar. Revisa tu conexion e intentalo otra vez.');
+      return;
+    }
+    await cargarProspectos();
+    refrescarContadorProspectos();
+  }
+
+  function pintarProspectos(lista){
+    const cont = document.getElementById('prospectosLista');
+    if(!cont) return;
+    const filtro = (document.getElementById('prospectosFiltro') || {}).value || 'pendientes';
+    const visibles = filtro === 'pendientes' ? lista.filter(p => !p.atendido) : lista;
+
+    if(!visibles.length){
+      cont.innerHTML = filtro === 'pendientes'
+        ? '<div class="empty-msg">No hay prospectos por atender. Todo al corriente.</div>'
+        : '<div class="empty-msg">Todavia no llegan prospectos por el formulario del sitio.</div>';
+      return;
+    }
+
+    cont.innerHTML = visibles.map(p => {
+      const tel = telLimpio(p.telefono);
+      const wa = tel.length >= 10 ? 'https://api.whatsapp.com/send/?phone=52' + tel.slice(-10) : '';
+      const origen = MAPA_ORIGEN_PW[p.origen] || p.origen || 'Sin registrar';
+      const esAds = p.origen === 'google-ads' || !!p.gclid;
+      return '' +
+        '<div class="pw-tarjeta' + (p.atendido ? ' pw-atendido' : '') + '">' +
+          '<div class="pw-cab">' +
+            '<span class="pw-nombre">' + escapeHtml(p.nombre || 'Sin nombre') + '</span>' +
+            '<span class="pw-fecha">' + fechaProspecto(p.fecha) + '</span>' +
+          '</div>' +
+          '<div class="pw-datos">' +
+            '<div><span class="pw-et">Telefono</span> <strong>' + escapeHtml(p.telefono || '-') + '</strong></div>' +
+            (p.email ? '<div><span class="pw-et">Correo</span> ' + escapeHtml(p.email) + '</div>' : '') +
+            '<div><span class="pw-et">Para</span> ' + escapeHtml(p.tipo || '-') + '</div>' +
+            '<div><span class="pw-et">Necesita</span> ' + escapeHtml(p.servicio || '-') + '</div>' +
+          '</div>' +
+          (p.mensaje ? '<div class="pw-mensaje">' + escapeHtml(p.mensaje) + '</div>' : '') +
+          '<div><span class="pw-origen' + (esAds ? ' pw-ads' : '') + '">' + escapeHtml(origen) +
+            (esAds ? ' - pago' : '') + '</span></div>' +
+          '<div class="pw-acciones">' +
+            (wa ? '<a class="pw-btn pw-wa" href="' + wa + '" target="_blank" rel="noopener">WhatsApp</a>' : '') +
+            (tel ? '<a class="pw-btn pw-tel" href="tel:+52' + tel.slice(-10) + '">Llamar</a>' : '') +
+            (p.atendido
+              ? '<span class="pw-listo">Ya atendido</span>'
+              : '<button type="button" class="pw-btn pw-ok" data-atender="' + p.id + '">Marcar como atendido</button>') +
+          '</div>' +
+        '</div>';
+    }).join('');
+
+    cont.querySelectorAll('button[data-atender]').forEach(b => {
+      b.addEventListener('click', () => marcarProspectoAtendido(b.dataset.atender, b));
+    });
+  }
+
+  async function cargarProspectos(){
+    const cont = document.getElementById('prospectosLista');
+    if(!cont) return;
+    cont.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    const lista = await obtenerProspectos();
+    if(lista === null){
+      cont.innerHTML = '<div class="empty-msg">No se pudieron leer los prospectos.</div>';
+      return;
+    }
+    pintarProspectos(lista);
+  }
+
+  // Contador rojo del tab: cuantos faltan por atender. Se calcula al entrar
+  // a la app para que se vea sin abrir la pestana.
+  async function refrescarContadorProspectos(){
+    const badge = document.getElementById('tabProspectosContador');
+    if(!badge) return;
+    const { count, error } = await supabaseClient
+      .from('prospectos_web')
+      .select('id', { count: 'exact', head: true })
+      .eq('atendido', false);
+    if(error || !count){ badge.classList.add('hidden'); return; }
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.classList.remove('hidden');
+  }
+
+  document.addEventListener('change', function(e){
+    if(e.target && (e.target.id === 'prospectosFiltro' || e.target.id === 'prospectosPeriodo')){
+      cargarProspectos();
+    }
+  });
+
   function activarTab(nombre){
     tabButtons.forEach(b=>b.classList.toggle('active', b.dataset.tab === nombre));
     Object.values(tabs).forEach(s=>s.classList.add('hidden'));
@@ -4981,6 +5180,7 @@
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
+    if(nombre === 'prospectos') cargarProspectos();
     if(nombre === 'semaforo') cargarSemaforoResumen();
     if(nombre === 'almacen') cargarAlmacen();
     if(nombre === 'ventaMostrador') cargarVentaMostradorModulo();
