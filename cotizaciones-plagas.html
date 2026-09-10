@@ -1024,6 +1024,39 @@
   .cal-chip.cancelada{background:#fde8e8;color:#b3261e;text-decoration:line-through;}
   .cal-chip.refuerzo{border-left:3px solid #b3261e;font-weight:700;}
 
+  /* ---------- Calendario en celular ----------
+     Problema real que se arregla aqui: repeat(7,1fr) NO deja que una
+     columna baje del ancho de la palabra mas larga que lleva dentro.
+     Con nombres como "INTERNACIONAL" la cuadricula se hacia mas ancha
+     que la pantalla del telefono y se cortaba por la derecha.
+     minmax(0,1fr) si permite que encojan. */
+  .cal-daynames{grid-template-columns:repeat(7,minmax(0,1fr));}
+  .cal-grid{grid-template-columns:repeat(7,minmax(0,1fr));}
+  .cal-chip{overflow-wrap:anywhere;}
+
+  /* Agenda: en el celular sustituye la cuadricula del mes. Un mes de 7
+     columnas en una pantalla de 360px deja columnas de 45px, donde no
+     cabe el nombre de un cliente. La lista si lo muestra completo, que
+     es lo que el tecnico necesita en la calle. */
+  .cal-agenda{display:none;}
+  .cal-agenda-dia{border:1px solid var(--gris-borde);border-radius:8px;margin-bottom:10px;background:var(--blanco);overflow:hidden;}
+  .cal-agenda-dia.hoy{border-color:var(--verde);border-width:2px;}
+  .cal-agenda-fecha{background:var(--gris-fondo);padding:7px 10px;font-size:12px;font-weight:700;color:#444;}
+  .cal-agenda-dia.hoy .cal-agenda-fecha{background:#e3f5e1;color:#016937;}
+  .cal-agenda-items{padding:6px;display:flex;flex-direction:column;gap:5px;}
+  .cal-agenda .cal-chip{font-size:13px;padding:9px 10px;line-height:1.35;border-radius:6px;}
+  .cal-agenda-hora{font-weight:700;opacity:.75;}
+  .cal-agenda-tec{opacity:.7;font-size:11.5px;}
+  .cal-agenda-vacio{padding:22px 10px;text-align:center;color:#777;font-size:13px;}
+  @media (max-width:640px){
+    .cal-daynames{display:none;}
+    .cal-grid{display:none;}
+    .cal-agenda{display:block;}
+    .cal-toolbar{gap:6px;}
+    .cal-toolbar h3{order:-1;flex:1 1 100%;min-width:0;margin:0 0 4px 0;text-align:left;font-size:19px;}
+    .cal-toolbar .btn{flex:1 1 auto;}
+  }
+
   /* ---------- Documentación (oficina) ---------- */
   .documentacion-card{
     border:1px solid var(--gris-borde);border-radius:8px;padding:12px 14px;margin-bottom:10px;
@@ -2631,6 +2664,7 @@
         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
       </div>
       <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-agenda" id="calAgenda"></div>
     </div>
   </section>
 
@@ -3359,7 +3393,7 @@
       <h4 style="margin-top:0;">Tipo de reporte</h4>
       <div class="reporte-tipo-tabs" id="reporteTipoTabs">
         <button type="button" class="reporte-tipo-tab active" data-reporte-tipo="estaciones">Cebaderos / Trampas</button>
-        <button type="button" class="reporte-tipo-tab hidden" id="reporteTipoTabLamparas" data-reporte-tipo="lamparas">Lámparas UV</button>
+        <button type="button" class="reporte-tipo-tab" id="reporteTipoTabLamparas" data-reporte-tipo="lamparas">Lámparas UV</button>
         <button type="button" class="reporte-tipo-tab" data-reporte-tipo="certificado">Certificado</button>
       </div>
     </div>
@@ -3427,6 +3461,23 @@
       </div>
 
       <div id="lamparasUVLista" style="margin-top:14px;"></div>
+
+      <div class="panel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">Agregar lampara</h4>
+        <p class="hint" style="margin:0 0 8px 0;">Si el cliente puso una lampara nueva, dala de alta aqui mismo: queda registrada en su lista de estaciones, no solo en este reporte.</p>
+        <div class="grid" style="align-items:end;">
+          <div class="field" style="flex:1 1 220px;">
+            <label for="lamparaNuevaUbicacion">Ubicacion</label>
+            <select id="lamparaNuevaUbicacion">
+              <option value="Interior">Interior</option>
+              <option value="Exterior">Exterior</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:170px;">
+            <button type="button" class="btn secondary small" id="btnAgregarLamparaUV" style="width:100%;">+ Agregar lampara</button>
+          </div>
+        </div>
+      </div>
 
       <div class="field" style="margin-top:14px;">
         <label for="lamparasUVObservaciones">Observaciones de lámparas UV</label>
@@ -11094,6 +11145,53 @@
       `;
     }
     calGrid.innerHTML = celdas;
+    renderCalendarioAgenda(visitasPorFecha, hoyISO);
+  }
+
+  // Misma informacion del mes, pero en lista vertical para el celular.
+  // Solo salen los dias que si tienen visitas, con el nombre completo del
+  // cliente. Los botones llevan la misma clase .cal-chip y el mismo
+  // data-id, asi que el clic abre lo mismo que en la cuadricula.
+  const DIAS_NOMBRE_AGENDA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+  function renderCalendarioAgenda(visitasPorFecha, hoyISO){
+    const cont = document.getElementById('calAgenda');
+    if(!cont) return;
+    const diasDelMes = new Date(calAnioActual, calMesActual + 1, 0).getDate();
+    let html = '';
+
+    for(let d = 1; d <= diasDelMes; d++){
+      const dia = new Date(calAnioActual, calMesActual, d);
+      const diaISO = fechaALocalISO(dia);
+      const visitasDelDia = visitasPorFecha[diaISO] || [];
+      if(visitasDelDia.length === 0) continue;
+
+      const items = visitasDelDia.map(v => {
+        const clienteNombre = (v.clientes && v.clientes.nombre) || '';
+        const sedeServicio = (v.servicios_cliente && v.servicios_cliente.sede) || '';
+        const estatusClase = (v.estatus || 'Programada').toLowerCase();
+        const esRefuerzo = v.tipo === 'Refuerzo';
+        const nombresTecnicos = tecnicosDeVisita(v)
+          .map(tecnicoId => (calTecnicosCache.find(t => t.id === tecnicoId) || {}).nombre)
+          .filter(Boolean);
+        const hora = v.hora ? v.hora.slice(0, 5) : '';
+        return '<button type="button" class="cal-chip ' + estatusClase + (esRefuerzo ? ' refuerzo' : '') + '" data-id="' + v.id + '">'
+          + (hora ? '<span class="cal-agenda-hora">' + hora + '</span> ' : '')
+          + (esRefuerzo ? 'Refuerzo: ' : '')
+          + escapeHtml(clienteNombre)
+          + (sedeServicio ? ' &middot; ' + escapeHtml(sedeServicio) : '')
+          + '<br><span class="cal-agenda-tec">' + (nombresTecnicos.length ? escapeHtml(nombresTecnicos.join(' + ')) : 'Sin asignar') + '</span>'
+          + '</button>';
+      }).join('');
+
+      html += '<div class="cal-agenda-dia' + (diaISO === hoyISO ? ' hoy' : '') + '">'
+        + '<div class="cal-agenda-fecha">' + DIAS_NOMBRE_AGENDA[dia.getDay()] + ' ' + d + ' de ' + MESES_NOMBRE[calMesActual].toLowerCase()
+        + (diaISO === hoyISO ? ' &mdash; hoy' : '') + '</div>'
+        + '<div class="cal-agenda-items">' + items + '</div>'
+        + '</div>';
+    }
+
+    cont.innerHTML = html || '<div class="cal-agenda-vacio">No hay visitas programadas este mes.</div>';
   }
 
   document.getElementById('btnCalMesAnterior').addEventListener('click', async ()=>{
@@ -11139,6 +11237,83 @@
     document.getElementById('visitaNotas').value = visita.notas || '';
     visitaOverlay.classList.remove('hidden');
   }
+
+  // Alta de una lampara UV desde el propio reporte del tecnico. La tabla
+  // estaciones exige numero unico por cliente y ubicacion Interior/Exterior,
+  // por eso el numero se pide a la base (cuenta tambien las inactivas) y la
+  // ubicacion es un selector, no texto libre.
+  document.getElementById('btnAgregarLamparaUV').addEventListener('click', async ()=>{
+    if(!reporteClienteActualId){ alert('Primero abre el reporte de una visita.'); return; }
+    const ubicacion = document.getElementById('lamparaNuevaUbicacion').value;
+    const btn = document.getElementById('btnAgregarLamparaUV');
+    btn.disabled = true;
+    btn.textContent = 'Agregando...';
+
+    const { data: previas, error: errNum } = await supabaseClient
+      .from('estaciones')
+      .select('numero')
+      .eq('cliente_id', reporteClienteActualId)
+      .order('numero', { ascending: false })
+      .limit(1);
+
+    if(errNum){
+      btn.disabled = false; btn.textContent = '+ Agregar lampara';
+      alert('No se pudo consultar el numero de estacion: ' + errNum.message);
+      return;
+    }
+
+    const siguienteNumero = ((previas && previas[0] && previas[0].numero) || 0) + 1;
+
+    const { data: creada, error: errIns } = await supabaseClient
+      .from('estaciones')
+      .insert({
+        cliente_id: reporteClienteActualId,
+        numero: siguienteNumero,
+        ubicacion,
+        tipo_estacion: 'Lámpara UV',
+        creado_por: (usuarioActual && usuarioActual.id) || null,
+      })
+      .select()
+      .single();
+
+    btn.disabled = false;
+    btn.textContent = '+ Agregar lampara';
+
+    if(errIns){
+      alert('No se pudo agregar la lampara: ' + errIns.message);
+      return;
+    }
+
+    lamparasUVCache = lamparasUVCache.concat([creada]);
+    // Se vuelve a dibujar la tabla, pero conservando lo que el tecnico ya
+    // habia escrito en los renglones anteriores.
+    renderLamparasUVDetalle(leerDetalleLamparasDelFormulario());
+    document.getElementById('lamparaNuevaUbicacion').selectedIndex = 0;
+  });
+
+  function leerDetalleLamparasDelFormulario(){
+    const mapa = {};
+    document.querySelectorAll('#lamparasUVLista [data-estacion-id]').forEach(fila => {
+      const conteo = fila.querySelector('.lampara-conteo');
+      mapa[fila.dataset.estacionId] = {
+        conteo_insectos: conteo && conteo.value !== '' ? parseInt(conteo.value, 10) : null,
+        estado_tubo: (fila.querySelector('.lampara-estado-tubo') || {}).value || null,
+        tubo_cambiado: !!(fila.querySelector('.lampara-cambiado') || {}).checked,
+        notas: ((fila.querySelector('.lampara-notas') || {}).value || '').trim() || null,
+      };
+    });
+    return mapa;
+  }
+
+  document.getElementById('calAgenda').addEventListener('click', (e)=>{
+    const chip = e.target.closest('.cal-chip');
+    if(!chip) return;
+    if(usuarioActual.rol === 'tecnico'){
+      abrirReporteVisita(chip.dataset.id);
+    } else {
+      abrirPanelVisita(chip.dataset.id);
+    }
+  });
 
   calGrid.addEventListener('click', (e)=>{
     const chip = e.target.closest('.cal-chip');
@@ -11867,7 +12042,7 @@
     // cebaderos/trampas (que trae un selector de fauna que no les aplica).
     reporteEstacionesCache = (estaciones || []).filter(e => e.tipo_estacion !== 'Lámpara UV');
     lamparasUVCache = (estaciones || []).filter(e => e.tipo_estacion === 'Lámpara UV');
-    document.getElementById('reporteTipoTabLamparas').classList.toggle('hidden', lamparasUVCache.length === 0);
+    document.getElementById('reporteTipoTabLamparas').classList.remove('hidden');
     certificadoCargado = false;
     lamparasUVCargado = false;
     await activarReporteTipoTab('estaciones');
@@ -12610,7 +12785,7 @@
   function renderLamparasUVDetalle(detalleMap){
     const cont = document.getElementById('lamparasUVLista');
     if(lamparasUVCache.length === 0){
-      cont.innerHTML = `<div class="empty-msg">Este cliente no tiene lámparas UV registradas.</div>`;
+      cont.innerHTML = `<div class="empty-msg">Este cliente todavia no tiene lamparas UV registradas. Puedes darlas de alta aqui abajo.</div>`;
       return;
     }
 
