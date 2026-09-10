@@ -3452,7 +3452,8 @@
       <div class="grid">
         <div class="field">
           <label for="lamparasUVFolio">Folio</label>
-          <input type="number" id="lamparasUVFolio" readonly>
+          <input type="number" id="lamparasUVFolio">
+          <div class="hint">Viene consecutivo. Solo cambialo si de verdad hace falta, y no repitas uno ya usado.</div>
         </div>
         <div class="field">
           <label for="lamparasUVFecha">Fecha de servicio</label>
@@ -3492,7 +3493,8 @@
       <div class="grid">
         <div class="field">
           <label for="certificadoFolio">Folio</label>
-          <input type="number" id="certificadoFolio" readonly>
+          <input type="number" id="certificadoFolio">
+          <div class="hint">Viene consecutivo. Solo cambialo si de verdad hace falta, y no repitas uno ya usado.</div>
         </div>
         <div class="field">
           <label for="certificadoFecha">Fecha</label>
@@ -12464,8 +12466,10 @@
     certificadoExistenteIdActual = (existente && existente.id) || null;
 
     const folioInput = document.getElementById('certificadoFolio');
-    const puedeEditarFolio = usuarioActual && (usuarioActual.rol === 'dueño' || usuarioActual.rol === 'asistente');
-    folioInput.readOnly = !puedeEditarFolio;
+    // El folio lo puede corregir cualquiera, tecnicos incluidos: mientras no
+    // exista un seguimiento formal de folios, es mejor que quien esta en
+    // campo pueda ajustarlo a que se quede mal. Decision de Juan, 10-sep-2026.
+    folioInput.readOnly = false;
 
     let servicios, areas, comentarios, ingredienteDosis, fecha;
 
@@ -12830,8 +12834,10 @@
     lamparasUVExistenteIdActual = (existente && existente.id) || null;
 
     const folioInput = document.getElementById('lamparasUVFolio');
-    const puedeEditarFolio = usuarioActual && (usuarioActual.rol === 'dueño' || usuarioActual.rol === 'asistente');
-    folioInput.readOnly = !puedeEditarFolio;
+    // El folio lo puede corregir cualquiera, tecnicos incluidos: mientras no
+    // exista un seguimiento formal de folios, es mejor que quien esta en
+    // campo pueda ajustarlo a que se quede mal. Decision de Juan, 10-sep-2026.
+    folioInput.readOnly = false;
 
     let detalleExistente = [];
     let fecha, observaciones;
