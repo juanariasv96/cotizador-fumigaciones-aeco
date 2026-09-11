@@ -1067,6 +1067,7 @@
   .badge.doc-reporte{background:#e7f0fd;color:#1d4ed8;}
   .badge.doc-certificado{background:#e3f5e1;color:#016937;}
   .badge.doc-lamparas{background:#fdf1d8;color:#8a5a00;}
+  .badge.doc-orden{background:#e0f2f1;color:#00695c;}
   .badge.doc-contrato{background:#efe4fb;color:#5b21b6;}
 
   /* ---------- Resumen del día (oficina) ---------- */
@@ -13539,6 +13540,28 @@
     abrirImpresionLamparasUV(reporte, filasLamparas);
   }
 
+  // Reimpresion de la orden de servicio desde oficina. La fila guardada ya
+  // trae todo lo que la hoja necesita (ingredientes, aplicacion, areas y
+  // las firmas), asi que se le pasa tal cual a la misma funcion de
+  // impresion que usa el tecnico. No se vuelve a guardar nada.
+  async function verOrdenServicioDesdeOficina(visitaId){
+    const visita = calVisitasCache.find(v => v.id === visitaId);
+    reporteVisitaActualId = visitaId;
+    reporteClienteActualId = visita ? visita.cliente_id : null;
+
+    const { data: orden, error } = await supabaseClient
+      .from('ordenes_servicio_visita')
+      .select('*')
+      .eq('visita_id', visitaId)
+      .maybeSingle();
+    if(error || !orden){
+      alert('No se encontró la orden de servicio guardada.');
+      return;
+    }
+
+    abrirImpresionOrdenServicio(orden);
+  }
+
 
   // ---------- Documentación (oficina: dueño y asistente) ----------
   // Lista de solo consulta: reutiliza abrirImpresionReporte/abrirImpresionCertificado
@@ -13575,6 +13598,7 @@
       { data: reportes, error: errRep },
       { data: certificados, error: errCert },
       { data: reportesLamparasUV, error: errLampUV },
+      { data: ordenesServicio, error: errOrdenes },
       { data: perfiles, error: errPerf },
       { data: extras, error: errExtras },
       { data: contratosDoc, error: errContratos },
@@ -13586,6 +13610,8 @@
         .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
       supabaseClient.from('reportes_lamparas_uv')
         .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
+      supabaseClient.from('ordenes_servicio_visita')
+        .select('id, visita_id, cliente_id, folio, fecha, tecnico_id, visitas_programadas(tipo), clientes(nombre)'),
       supabaseClient.from('perfiles_usuario').select('id, nombre'),
       supabaseClient.from('extras_fuera_horario').select('*'),
       supabaseClient.from('contratos')
@@ -13596,6 +13622,7 @@
     if(errRep) console.error('No se pudieron cargar los reportes de visita:', errRep);
     if(errCert) console.error('No se pudieron cargar los certificados:', errCert);
     if(errLampUV) console.error('No se pudieron cargar los reportes de lámparas UV:', errLampUV);
+    if(errOrdenes) console.error('No se pudieron cargar las órdenes de servicio:', errOrdenes);
     if(errPerf) console.error('No se pudieron cargar los perfiles de usuario (nombres de técnico):', errPerf);
     if(errExtras) console.error('No se pudieron cargar los extras fuera de horario:', errExtras);
     if(errContratos) console.error('No se pudieron cargar los contratos:', errContratos);
@@ -13655,6 +13682,20 @@
       };
     });
 
+    const itemsOrden = (ordenesServicio || []).map(o => {
+      const visita = o.visitas_programadas || {};
+      return {
+        tipo: 'orden',
+        visitaId: o.visita_id,
+        clienteId: o.cliente_id,
+        clienteNombre: (o.clientes && o.clientes.nombre) || '(cliente no encontrado)',
+        fecha: o.fecha,
+        tipoVisita: visita.tipo || 'Mantenimiento',
+        tecnicoNombre: nombrePorId[o.tecnico_id] || '-',
+        folio: o.folio,
+      };
+    });
+
     // Los contratos no nacen de una visita de campo como los otros tres
     // documentos: nacen del plan de trabajo. Por eso no traen tecnico ni
     // visitaId, y en su lugar la tarjeta muestra vigencia, servicios y
@@ -13679,7 +13720,7 @@
       datos: c.datos,
     }));
 
-    documentacionCache = [...itemsReporte, ...itemsCertificado, ...itemsLamparasUV, ...itemsContrato]
+    documentacionCache = [...itemsReporte, ...itemsCertificado, ...itemsLamparasUV, ...itemsOrden, ...itemsContrato]
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   }
 
@@ -13739,8 +13780,8 @@
     `;
   }
 
-  const DOC_TIPO_LABEL = { reporte: 'Reporte de visita', certificado: 'Certificado', lamparas_uv: 'Reporte de Lámparas UV', contrato: 'Contrato' };
-  const DOC_TIPO_BADGE_CLASS = { reporte: 'doc-reporte', certificado: 'doc-certificado', lamparas_uv: 'doc-lamparas', contrato: 'doc-contrato' };
+  const DOC_TIPO_LABEL = { reporte: 'Reporte de visita', certificado: 'Certificado', lamparas_uv: 'Reporte de Lámparas UV', orden: 'Orden de servicio', contrato: 'Contrato' };
+  const DOC_TIPO_BADGE_CLASS = { reporte: 'doc-reporte', certificado: 'doc-certificado', lamparas_uv: 'doc-lamparas', orden: 'doc-orden', contrato: 'doc-contrato' };
 
   // Linea de detalle de cada tarjeta. Un contrato no tiene tecnico ni
   // tipo de visita, asi que muestra lo suyo: vigencia, servicios y monto.
@@ -13808,6 +13849,8 @@
         await verReporteDesdeOficina(btnVer.dataset.visitaId);
       } else if(btnVer.dataset.verDoc === 'lamparas_uv'){
         await verLamparasUVDesdeOficina(btnVer.dataset.visitaId);
+      } else if(btnVer.dataset.verDoc === 'orden'){
+        await verOrdenServicioDesdeOficina(btnVer.dataset.visitaId);
       } else {
         await verCertificadoDesdeOficina(btnVer.dataset.visitaId);
       }
