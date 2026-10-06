@@ -6515,7 +6515,7 @@
     if(!el) return;
     const a = atribucionPendiente;
     if(!a){
-      el.innerHTML = 'Si el WhatsApp o el formulario vienen del sitio, aqu&iacute; se liga al clic. Si no trae c&oacute;digo, d&eacute;jalo vac&iacute;o: al guardar se busca solo por tel&eacute;fono.';
+      el.innerHTML = 'Si el WhatsApp o el formulario vienen del sitio, aqu&iacute; se liga al clic. Si el cliente dej&oacute; su tel&eacute;fono en el sitio, se liga solo al escribir su n&uacute;mero en Datos del cliente.';
       return;
     }
     const de = a.tipo === 'whatsapp' ? 'clic a WhatsApp del sitio' : 'formulario del sitio';
@@ -6577,26 +6577,48 @@
     }
   }
 
-  // Busca un formulario del sitio de los ultimos 120 dias con el mismo telefono.
+  // Busca, por telefono, el clic del sitio que origino al cliente (ultimos 120
+  // dias): un formulario (prospectos_web) o un clic a WhatsApp en el que el
+  // cliente dejo su numero (clics_whatsapp.telefono). Gana el mas reciente.
   async function buscarProspectoPorTelefono(telefono){
     const tel = String(telefono || '').replace(/\D/g, '').slice(-10);
     if(tel.length < 10) return null;
+    const desde = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+    const candidatos = [];
     try{
-      const desde = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabaseClient
         .from('prospectos_web')
         .select('id, fecha, telefono, origen, campana, gclid, pagina')
         .gte('fecha', desde)
         .order('fecha', { ascending: false })
         .limit(500);
-      if(error || !data) return null;
-      const p = data.find(x => String(x.telefono || '').replace(/\D/g, '').slice(-10) === tel);
-      if(!p) return null;
-      return {
-        tipo: 'formulario', refId: p.id, origen: p.origen || '', campana: p.campana || '',
-        termino: '', gclid: p.gclid || '', pagina: p.pagina || '', fechaClic: p.fecha, ligadaPor: 'telefono'
-      };
-    }catch(e){ return null; }
+      if(!error && data){
+        const p = data.find(x => String(x.telefono || '').replace(/\D/g, '').slice(-10) === tel);
+        if(p) candidatos.push({
+          tipo: 'formulario', refId: p.id, origen: p.origen || '', campana: p.campana || '',
+          termino: '', gclid: p.gclid || '', pagina: p.pagina || '', fechaClic: p.fecha, ligadaPor: 'telefono'
+        });
+      }
+    }catch(e){}
+    try{
+      const { data, error } = await supabaseClient
+        .from('clics_whatsapp')
+        .select('fecha, telefono, codigo, origen, campana, termino, gclid, pagina')
+        .eq('telefono', tel)
+        .gte('fecha', desde)
+        .order('fecha', { ascending: false })
+        .limit(1);
+      if(!error && data && data.length){
+        const c = data[0];
+        candidatos.push({
+          tipo: 'whatsapp', codigo: c.codigo || '', origen: c.origen || '', campana: c.campana || '',
+          termino: c.termino || '', gclid: c.gclid || '', pagina: c.pagina || '', fechaClic: c.fecha, ligadaPor: 'telefono'
+        });
+      }
+    }catch(e){}
+    if(!candidatos.length) return null;
+    candidatos.sort((a, b) => new Date(b.fechaClic) - new Date(a.fechaClic));
+    return candidatos[0];
   }
 
   function cotizarDesdeProspecto(p){
@@ -6619,6 +6641,18 @@
     if(ev.key === 'Enter'){ ev.preventDefault(); ligarPorCodigo(); }
   });
   pintarAtribucion();
+  // En cuanto la asistente escribe el telefono del cliente, se busca solo el
+  // clic que lo trajo; asi ve de una vez si viene de Google Ads.
+  document.getElementById('clienteTelefono').addEventListener('change', async () => {
+    if(atribucionPendiente) return;
+    const encontrada = await buscarProspectoPorTelefono(document.getElementById('clienteTelefono').value);
+    if(encontrada && !atribucionPendiente){
+      atribucionPendiente = encontrada;
+      if(encontrada.codigo) document.getElementById('codigoSeguimiento').value = encontrada.codigo;
+      sugerirOrigenDesdeAtribucion(encontrada, encontrada.tipo === 'whatsapp' ? 'WhatsApp' : '');
+      pintarAtribucion();
+    }
+  });
 
   // ---------- Editar cotización existente ----------
   let cotizacionEditandoId = null;
