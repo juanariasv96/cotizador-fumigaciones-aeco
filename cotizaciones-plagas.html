@@ -1697,6 +1697,7 @@
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn hidden" data-tab="cuentas" id="tabBtnCuentas">Clientes</button>
+  <button class="tab-btn hidden" data-tab="perdidos" id="tabBtnPerdidos">Clientes perdidos <span class="tab-contador hidden" id="tabPerdidosContador">0</span></button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
@@ -2649,6 +2650,56 @@
       .ce-check input{width:auto;margin:0}
       .ce-mover{width:100%;margin-top:8px;padding:10px;background:#f4f7f5;border-radius:6px}
       .ce-mover .grid{align-items:end}
+    </style>
+  </section>
+
+  <section id="tab-perdidos" class="hidden">
+    <div class="panel">
+      <h2>Clientes perdidos</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">
+        Clientes que nos dejaron. Anota por qué se fueron y dales seguimiento para tratar de recuperarlos.
+        Los que dicen <strong>"Por confirmar"</strong> los sugirió el sistema porque tienen meses sin servicio:
+        confirma si de verdad nos dejaron.
+      </p>
+      <div id="cpAvisoBase" class="hint hidden" style="margin-bottom:12px;color:#8a6100;"></div>
+      <div class="cp-chips" id="cpChips"></div>
+      <div class="grid" style="margin:10px 0 12px;align-items:end;">
+        <div class="field">
+          <label for="cpBuscar">Buscar</label>
+          <input type="text" id="cpBuscar" placeholder="Nombre, teléfono o motivo">
+        </div>
+        <div class="field" style="max-width:240px;">
+          <button type="button" class="btn" id="cpBtnNuevo">+ Registrar cliente perdido</button>
+        </div>
+      </div>
+      <div id="cpForm" class="hidden"></div>
+      <div id="cpResumen" class="hint" style="margin-bottom:8px;"></div>
+      <div id="cpLista"></div>
+    </div>
+    <style>
+      .cp-chips{display:flex;flex-wrap:wrap;gap:6px}
+      .cp-chip{border:1px solid #dfe6e0;background:#fff;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:600;color:#2f3a32;cursor:pointer;font-family:inherit}
+      .cp-chip.activo{background:#016937;color:#fff;border-color:#016937}
+      .cp-tarjeta{border:1px solid #dfe6e0;border-left:5px solid #c0392b;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff}
+      .cp-tarjeta.cp-confirmar{border-left-color:#f39c12}
+      .cp-tarjeta.cp-recuperado{border-left-color:#27ae60}
+      .cp-tarjeta.cp-cerrado{border-left-color:#b9c4bb;opacity:.8}
+      .cp-cab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
+      .cp-nombre{font-size:16px;font-weight:700;color:#016937}
+      .cp-estado{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fde8e8;color:#b3261e}
+      .cp-estado.e-confirmar{background:#fff3cd;color:#8a6100}
+      .cp-estado.e-contactado,.cp-estado.e-negociacion{background:#e3f0fb;color:#1f5f99}
+      .cp-estado.e-recuperado{background:#e3f0e8;color:#016937}
+      .cp-estado.e-cerrado{background:#eef1ef;color:#666}
+      .cp-datos{font-size:13px;color:#444;line-height:1.6;margin-top:4px}
+      .cp-vencido{color:#b3261e;font-weight:700}
+      .cp-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+      .cp-hist{margin-top:8px;padding:8px 10px;background:#f4f7f5;border-radius:6px;font-size:13px}
+      .cp-hist div{padding:3px 0;border-top:1px solid #e3e9e4}
+      .cp-hist div:first-child{border-top:0}
+      .cp-caja{margin-top:10px;padding:12px;background:#f4f7f5;border-radius:8px}
+      .cp-wa{background:#25d366;color:#fff;border:0}
+      .cp-acc a.btn{text-decoration:none;display:inline-block}
     </style>
   </section>
 
@@ -4501,6 +4552,9 @@
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnCuentas').classList.toggle('hidden',
       !['dueño', 'asistente', 'vendedor'].includes(usuarioActual.rol));
+    const veePerdidos = ['dueño', 'asistente', 'vendedor'].includes(usuarioActual.rol);
+    document.getElementById('tabBtnPerdidos').classList.toggle('hidden', !veePerdidos);
+    if(veePerdidos) refrescarContadorPerdidos();
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnVentaMostrador').classList.toggle('hidden',
@@ -5346,6 +5400,7 @@
     empresa: document.getElementById('tab-empresa'),
     estaciones: document.getElementById('tab-estaciones'),
     cuentas: document.getElementById('tab-cuentas'),
+    perdidos: document.getElementById('tab-perdidos'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     prospectos: document.getElementById('tab-prospectos'),
@@ -5519,6 +5574,7 @@
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'cuentas') cargarCuentasModulo();
+    if(nombre === 'perdidos') cargarPerdidosModulo();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'prospectos') cargarProspectos();
@@ -5566,6 +5622,7 @@
     resumen:        { n: 'Resumen del día', c: '#F1C40F', d: '<circle cx="24" cy="24" r="9" fill="#F1C40F"/><g stroke="#F39C12" stroke-width="3.5" stroke-linecap="round"><path d="M24 5v6M24 37v6M5 24h6M37 24h6M10.5 10.5l4 4M33.5 33.5l4 4M10.5 37.5l4-4M33.5 14.5l4-4"/></g>' },
     accesos:        { n: 'Accesos', c: '#7F8C8D', d: '<rect x="10" y="21" width="28" height="21" rx="4" fill="#7F8C8D"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" stroke="#7F8C8D" stroke-width="4" fill="none"/><circle cx="24" cy="30" r="3" fill="#fff"/><rect x="22.5" y="31" width="3" height="6" rx="1.5" fill="#fff"/>' },
     dispositivos:   { n: 'Dispositivos', c: '#5D6D7E', d: '<rect x="14" y="5" width="20" height="38" rx="4" fill="#5D6D7E"/><rect x="17" y="10" width="14" height="25" rx="1.5" fill="#d6eaf8"/><circle cx="24" cy="39" r="1.8" fill="#fff"/>' },
+    perdidos:       { n: 'Clientes perdidos', c: '#6C5CE7', d: '<circle cx="19" cy="16" r="8" fill="#6C5CE7"/><path d="M4 41c0-9 7-15 15-15s15 6 15 15z" fill="#6C5CE7"/><circle cx="36" cy="32" r="10" fill="#fff" stroke="#E74C3C" stroke-width="3"/><path d="M31 32h10" stroke="#E74C3C" stroke-width="3.5" stroke-linecap="round"/>' },
     hoteles:        { n: 'Hoteles', c: '#B03A2E', d: '<path d="M6 41V20h36v21" fill="none" stroke="#B03A2E" stroke-width="3.5" stroke-linejoin="round"/><rect x="6" y="28" width="36" height="7" fill="#B03A2E"/><circle cx="14" cy="24" r="4" fill="#B03A2E"/><path d="M20 28v-6h18a4 4 0 0 1 4 4v2z" fill="#e6b0aa"/>' },
   };
 
@@ -5614,7 +5671,7 @@
   });
   // Los contadores (prospectos y pendientes) llegan despues de cargar:
   // si cambian mientras se ve Inicio, se repintan los globos rojos.
-  ['tabProspectosContador', 'tabPendientesContador'].forEach(id => {
+  ['tabProspectosContador', 'tabPendientesContador', 'tabPerdidosContador'].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
     new MutationObserver(() => {
@@ -9291,6 +9348,311 @@
     ]);
     if(r2.error || !r2.data) return null;
     return { empresa: r2.data, sucursales: (r3.data || []).length };
+  }
+
+  // ---------- Clientes perdidos (oct 2026) ----------
+  // Lista de clientes que nos dejaron, con el motivo y su seguimiento para
+  // intentar recuperarlos. Tabla: clientes_perdidos (ver
+  // fase1b_empresas_y_perdidos.sql). Los "Por confirmar" vienen sugeridos
+  // de Odoo (clientes con varios trabajos y meses sin actividad).
+  const CP_MOTIVOS = [
+    'Precio / se le hizo caro',
+    'Se fue con otra empresa',
+    'Mal servicio o queja',
+    'La plaga regresó / no quedó satisfecho',
+    'Cerró o se cambió de lugar',
+    'Ya no lo necesita',
+    'Lo hacen ellos mismos',
+    'Dejó de contestar',
+    'Otro',
+  ];
+  const CP_ACTIVOS = ['Por confirmar', 'Por contactar', 'Contactado', 'En negociación'];
+  const CP_ESTADOS = ['Por confirmar', 'Por contactar', 'Contactado', 'En negociación', 'Recuperado', 'No regresa', 'Descartado'];
+  const cpEstado = { lista: [], sucursales: [], empresas: [], filtro: 'activos', editandoId: null, baseLista: false };
+  const cpLista = document.getElementById('cpLista');
+  const cpForm = document.getElementById('cpForm');
+
+  function cpHoyISO(){ return fechaALocalISO(new Date()); }
+  function cpClaseEstado(e){
+    return { 'Por confirmar': 'e-confirmar', 'Contactado': 'e-contactado', 'En negociación': 'e-negociacion',
+      'Recuperado': 'e-recuperado', 'No regresa': 'e-cerrado', 'Descartado': 'e-cerrado' }[e] || '';
+  }
+  function cpTxt(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function cpFecha(iso){ return iso ? formatDate(String(iso).slice(0, 10)) : ''; }
+  function cpTel10(t){ const d = String(t || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; }
+
+  async function refrescarContadorPerdidos(){
+    const el = document.getElementById('tabPerdidosContador');
+    if(!el) return;
+    const { data, error } = await supabaseClient.from('clientes_perdidos').select('estado, proximo_contacto');
+    if(error){ el.classList.add('hidden'); return; }
+    const hoy = cpHoyISO();
+    const n = (data || []).filter(p => p.estado === 'Por confirmar'
+      || (CP_ACTIVOS.includes(p.estado) && p.proximo_contacto && p.proximo_contacto <= hoy)).length;
+    el.textContent = String(n);
+    el.classList.toggle('hidden', !n);
+  }
+
+  async function cargarPerdidosModulo(){
+    cpLista.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    const [p, s, e] = await Promise.all([
+      supabaseClient.from('clientes_perdidos').select('*').order('fecha_creacion', { ascending: false }),
+      supabaseClient.from('clientes').select('id, nombre, telefono, contacto, empresa_id').order('nombre'),
+      supabaseClient.from('empresas').select('id, nombre').order('nombre'),
+    ]);
+    const aviso = document.getElementById('cpAvisoBase');
+    if(p.error){
+      console.error('Clientes perdidos:', p.error);
+      cpEstado.baseLista = false;
+      aviso.textContent = 'Esta sección todavía no está activada en la base de datos (falta correr el archivo fase1b_empresas_y_perdidos.sql en Supabase).';
+      aviso.classList.remove('hidden');
+      cpLista.innerHTML = '';
+      document.getElementById('cpChips').innerHTML = '';
+      return;
+    }
+    aviso.classList.add('hidden');
+    cpEstado.baseLista = true;
+    cpEstado.lista = p.data || [];
+    cpEstado.sucursales = s.error ? [] : (s.data || []);
+    cpEstado.empresas = e.error ? [] : (e.data || []);
+    cpRender();
+    refrescarContadorPerdidos();
+  }
+
+  function cpRender(){
+    const hoy = cpHoyISO();
+    const cuenta = est => cpEstado.lista.filter(x => x.estado === est).length;
+    const activos = cpEstado.lista.filter(x => CP_ACTIVOS.includes(x.estado)).length;
+    const chips = [['activos', `Por atender (${activos})`]]
+      .concat(CP_ESTADOS.map(est => [est, `${est} (${cuenta(est)})`]))
+      .concat([['todos', `Todos (${cpEstado.lista.length})`]]);
+    document.getElementById('cpChips').innerHTML = chips.map(([k, t]) =>
+      `<button type="button" class="cp-chip${cpEstado.filtro === k ? ' activo' : ''}" data-filtro="${escapeHtml(k)}">${escapeHtml(t)}</button>`).join('');
+
+    const filtro = cpTxt(document.getElementById('cpBuscar').value).trim();
+    let vis = cpEstado.lista.filter(x => cpEstado.filtro === 'todos' ? true
+      : (cpEstado.filtro === 'activos' ? CP_ACTIVOS.includes(x.estado) : x.estado === cpEstado.filtro));
+    if(filtro) vis = vis.filter(x => cpTxt([x.nombre, x.telefono, x.contacto, x.motivo, x.detalle].join(' ')).includes(filtro));
+    // Primero lo que ya toca (proximo contacto vencido), luego por confirmar, luego el resto.
+    const peso = x => (x.proximo_contacto && x.proximo_contacto <= hoy && CP_ACTIVOS.includes(x.estado)) ? 0
+      : (x.estado === 'Por confirmar' ? 2 : 1);
+    vis.sort((a, b) => peso(a) - peso(b)
+      || String(a.proximo_contacto || '9999').localeCompare(String(b.proximo_contacto || '9999'))
+      || String(b.ultimo_servicio || '').localeCompare(String(a.ultimo_servicio || '')));
+
+    const valor = cpEstado.lista.filter(x => CP_ACTIVOS.includes(x.estado) && x.estado !== 'Por confirmar')
+      .reduce((s, x) => s + (Number(x.valor_mensual) || 0), 0);
+    const recuperados = cuenta('Recuperado');
+    document.getElementById('cpResumen').textContent =
+      `${vis.length} en la lista` + (valor ? ` · ${formatMoney(valor)} al mes por recuperar` : '') +
+      (recuperados ? ` · ${recuperados} recuperado${recuperados === 1 ? '' : 's'}` : '');
+
+    if(!vis.length){
+      cpLista.innerHTML = `<div class="empty-msg">${cpEstado.lista.length ? 'No hay clientes con este filtro.' : 'Todavía no hay clientes perdidos registrados.'}</div>`;
+      return;
+    }
+    cpLista.innerHTML = vis.map(x => {
+      const emp = cpEstado.empresas.find(e => e.id === x.empresa_id);
+      const suc = cpEstado.sucursales.find(s => s.id === x.cliente_id);
+      const vencido = x.proximo_contacto && x.proximo_contacto <= hoy && CP_ACTIVOS.includes(x.estado);
+      const tel = cpTel10(x.telefono);
+      const clase = x.estado === 'Por confirmar' ? ' cp-confirmar' : (x.estado === 'Recuperado' ? ' cp-recuperado'
+        : (['No regresa', 'Descartado'].includes(x.estado) ? ' cp-cerrado' : ''));
+      const hist = Array.isArray(x.seguimientos) ? x.seguimientos : [];
+      const lineas = [];
+      if(emp && cpTxt(emp.nombre) !== cpTxt(x.nombre)) lineas.push(`Empresa: ${escapeHtml(emp.nombre)}`);
+      if(suc && cpTxt(suc.nombre) !== cpTxt(x.nombre)) lineas.push(`Sucursal: ${escapeHtml(suc.nombre)}`);
+      if(x.motivo) lineas.push(`<strong>Motivo:</strong> ${escapeHtml(x.motivo)}`);
+      if(x.detalle) lineas.push(escapeHtml(x.detalle));
+      const datos = [];
+      if(x.contacto) datos.push(escapeHtml(x.contacto));
+      if(x.telefono) datos.push(escapeHtml(x.telefono));
+      if(x.ultimo_servicio) datos.push('Último servicio: ' + cpFecha(x.ultimo_servicio));
+      if(x.fecha_baja) datos.push('Nos dejó: ' + cpFecha(x.fecha_baja));
+      if(x.valor_mensual) datos.push('Pagaba ' + formatMoney(Number(x.valor_mensual)) + ' al mes');
+      if(datos.length) lineas.push(datos.join(' · '));
+      if(x.proximo_contacto && CP_ACTIVOS.includes(x.estado)){
+        lineas.push(`<span class="${vencido ? 'cp-vencido' : ''}">Próximo contacto: ${cpFecha(x.proximo_contacto)}${vencido ? ' (ya toca)' : ''}</span>`);
+      }
+      const botones = [];
+      if(x.estado === 'Por confirmar'){
+        botones.push('<button type="button" class="btn small" data-cp="confirmar">Sí, nos dejó</button>');
+        botones.push('<button type="button" class="btn secondary small" data-cp="descartar">No, sigue con nosotros</button>');
+      } else {
+        botones.push('<button type="button" class="btn small" data-cp="seguimiento">Anotar seguimiento</button>');
+      }
+      if(tel){
+        botones.push(`<a class="btn small cp-wa" href="https://wa.me/52${tel}" target="_blank" rel="noopener">WhatsApp</a>`);
+        botones.push(`<a class="btn secondary small" href="tel:${tel}">Llamar</a>`);
+      }
+      botones.push('<button type="button" class="btn secondary small" data-cp="editar">Editar</button>');
+      return `<div class="cp-tarjeta${clase}" data-id="${x.id}">
+        <div class="cp-cab"><span class="cp-nombre">${escapeHtml(x.nombre)}</span>
+          <span class="cp-estado ${cpClaseEstado(x.estado)}">${escapeHtml(x.estado)}</span></div>
+        <div class="cp-datos">${lineas.join('<br>')}</div>
+        ${hist.length ? `<div class="cp-hist">${hist.slice().reverse().map(h =>
+          `<div><strong>${cpFecha(h.fecha)}</strong>${h.por ? ' · ' + escapeHtml(h.por) : ''}${h.estado ? ' · ' + escapeHtml(h.estado) : ''}<br>${escapeHtml(h.nota || '')}</div>`).join('')}</div>` : ''}
+        <div class="cp-acc">${botones.join('')}</div>
+        <div class="cp-zona"></div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('cpChips').addEventListener('click', ev => {
+    const b = ev.target.closest('.cp-chip');
+    if(!b) return;
+    cpEstado.filtro = b.dataset.filtro;
+    cpRender();
+  });
+  document.getElementById('cpBuscar').addEventListener('input', () => { if(cpEstado.baseLista) cpRender(); });
+  document.getElementById('cpBtnNuevo').addEventListener('click', () => { if(cpEstado.baseLista) cpAbrirForm(null); });
+
+  cpLista.addEventListener('click', async ev => {
+    const btn = ev.target.closest('[data-cp]');
+    if(!btn) return;
+    const tarjeta = btn.closest('.cp-tarjeta');
+    const reg = cpEstado.lista.find(x => x.id === tarjeta.dataset.id);
+    if(!reg) return;
+    const accion = btn.dataset.cp;
+    if(accion === 'editar') cpAbrirForm(reg);
+    if(accion === 'confirmar') cpAbrirForm(reg, { estado: 'Por contactar' });
+    if(accion === 'seguimiento') cpCajaSeguimiento(tarjeta.querySelector('.cp-zona'), reg);
+    if(accion === 'descartar'){
+      if(!confirm(`¿Quitar a "${reg.nombre}" de la lista? Queda guardado como "Descartado" (sigue siendo cliente).`)) return;
+      await cpGuardarSeguimiento(reg, 'Sigue siendo cliente, no nos dejó.', 'Descartado', null);
+    }
+  });
+
+  async function cpGuardarSeguimiento(reg, nota, estado, proximo){
+    const hist = Array.isArray(reg.seguimientos) ? reg.seguimientos.slice() : [];
+    hist.push({ fecha: new Date().toISOString(), por: (usuarioActual && usuarioActual.nombre) || '', nota, estado });
+    const cambios = { seguimientos: hist, estado, proximo_contacto: proximo || null };
+    const { error } = await supabaseClient.from('clientes_perdidos').update(cambios).eq('id', reg.id);
+    if(error){ alert('No se pudo guardar: ' + error.message); return false; }
+    Object.assign(reg, cambios);
+    cpRender();
+    refrescarContadorPerdidos();
+    mostrarToast(estado === 'Recuperado' ? '¡Cliente recuperado!' : 'Seguimiento guardado');
+    return true;
+  }
+
+  function cpCajaSeguimiento(zona, reg){
+    const sugerido = reg.estado === 'Por contactar' ? 'Contactado' : reg.estado;
+    zona.innerHTML = `<div class="cp-caja">
+      <div class="field"><label>¿Qué pasó?</label><input type="text" class="cp-s-nota" placeholder="Ej. Le llamé, pidió cotización nueva para noviembre"></div>
+      <div class="grid" style="margin-top:6px;align-items:end;">
+        <div class="field"><label>Cómo queda</label><select class="cp-s-estado">${CP_ESTADOS.filter(e => e !== 'Por confirmar' && e !== 'Descartado').map(e => `<option${e === sugerido ? ' selected' : ''}>${e}</option>`).join('')}</select></div>
+        <div class="field"><label>Volver a contactar el</label><input type="date" class="cp-s-prox"></div>
+        <div class="field" style="display:flex;gap:6px;"><button type="button" class="btn small cp-s-ok">Guardar</button><button type="button" class="btn secondary small cp-s-no">Cancelar</button></div>
+      </div></div>`;
+    zona.querySelector('.cp-s-nota').focus();
+    zona.querySelector('.cp-s-no').addEventListener('click', () => { zona.innerHTML = ''; });
+    zona.querySelector('.cp-s-ok').addEventListener('click', async () => {
+      const nota = zona.querySelector('.cp-s-nota').value.trim();
+      if(!nota){ alert('Escribe qué pasó en el contacto.'); return; }
+      const estado = zona.querySelector('.cp-s-estado').value;
+      const prox = zona.querySelector('.cp-s-prox').value;
+      await cpGuardarSeguimiento(reg, nota, estado, ['Recuperado', 'No regresa'].includes(estado) ? null : prox);
+    });
+  }
+
+  function cpAbrirForm(reg, preset){
+    preset = preset || {};
+    cpEstado.editandoId = reg ? reg.id : null;
+    const r = reg || {};
+    const estado = preset.estado || r.estado || 'Por contactar';
+    const opcSuc = cpEstado.sucursales.map(s => `<option value="${s.id}"${s.id === r.cliente_id ? ' selected' : ''}>${escapeHtml(s.nombre)}</option>`).join('');
+    cpForm.innerHTML = `<div class="cp-caja" style="margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;color:#016937;">${reg ? (preset.estado ? 'Confirmar que nos dejó: ' : 'Editar: ') + escapeHtml(r.nombre) : 'Registrar cliente perdido'}</h3>
+      <div class="grid">
+        ${reg ? '' : `<div class="field"><label for="cpFBuscarSuc">Buscar cliente del CRM</label><input type="text" id="cpFBuscarSuc" placeholder="Escribe para filtrar"></div>`}
+        <div class="field"><label for="cpFSuc">Cliente / sucursal del CRM</label><select id="cpFSuc"><option value="">(no está en el CRM)</option>${opcSuc}</select></div>
+        <div class="field"><label for="cpFNombre">Nombre</label><input type="text" id="cpFNombre" value="${escapeHtml(r.nombre || '')}"></div>
+        <div class="field"><label for="cpFContacto">Contacto</label><input type="text" id="cpFContacto" value="${escapeHtml(r.contacto || '')}"></div>
+        <div class="field"><label for="cpFTel">Teléfono</label><input type="tel" id="cpFTel" value="${escapeHtml(r.telefono || '')}"></div>
+        <div class="field"><label for="cpFMotivo">¿Por qué nos dejó?</label><select id="cpFMotivo"><option value="">Selecciona...</option>${CP_MOTIVOS.map(m => `<option${m === r.motivo ? ' selected' : ''}>${escapeHtml(m)}</option>`).join('')}</select></div>
+        <div class="field"><label for="cpFBaja">¿Cuándo nos dejó?</label><input type="date" id="cpFBaja" value="${escapeHtml(r.fecha_baja || '')}"></div>
+        <div class="field"><label for="cpFUlt">Último servicio</label><input type="date" id="cpFUlt" value="${escapeHtml(r.ultimo_servicio || '')}"></div>
+        <div class="field"><label for="cpFValor">Cuánto pagaba al mes</label><input type="number" id="cpFValor" min="0" step="1" value="${r.valor_mensual != null ? escapeHtml(String(r.valor_mensual)) : ''}"></div>
+        <div class="field"><label for="cpFEstado">Estado</label><select id="cpFEstado">${CP_ESTADOS.map(e => `<option${e === estado ? ' selected' : ''}>${e}</option>`).join('')}</select></div>
+        <div class="field"><label for="cpFProx">Próximo contacto</label><input type="date" id="cpFProx" value="${escapeHtml(r.proximo_contacto || '')}"></div>
+      </div>
+      <div class="field" style="margin-top:6px;"><label for="cpFDetalle">Detalle</label><input type="text" id="cpFDetalle" value="${escapeHtml(r.detalle || '')}" placeholder="Ej. Se fue con otra empresa que le cobra $500 menos"></div>
+      <div class="actions-row" style="margin-top:10px;">
+        <button type="button" class="btn secondary" id="cpFCancelar">Cancelar</button>
+        <button type="button" class="btn" id="cpFGuardar">Guardar</button>
+      </div></div>`;
+    cpForm.classList.remove('hidden');
+    cpForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const selSuc = document.getElementById('cpFSuc');
+    const buscar = document.getElementById('cpFBuscarSuc');
+    if(buscar) buscar.addEventListener('input', () => {
+      const f = cpTxt(buscar.value).trim();
+      const vis = cpEstado.sucursales.filter(s => !f || cpTxt(s.nombre).includes(f)).slice(0, 300);
+      selSuc.innerHTML = '<option value="">(no está en el CRM)</option>' + vis.map(s => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('');
+      if(vis.length === 1){ selSuc.value = vis[0].id; selSuc.dispatchEvent(new Event('change')); }
+    });
+    selSuc.addEventListener('change', () => {
+      const s = cpEstado.sucursales.find(x => x.id === selSuc.value);
+      if(!s) return;
+      const n = document.getElementById('cpFNombre'), c = document.getElementById('cpFContacto'), t = document.getElementById('cpFTel');
+      if(!n.value) n.value = s.nombre || '';
+      if(!c.value) c.value = s.contacto || '';
+      if(!t.value) t.value = s.telefono || '';
+    });
+    document.getElementById('cpFCancelar').addEventListener('click', () => { cpForm.classList.add('hidden'); cpForm.innerHTML = ''; });
+    document.getElementById('cpFGuardar').addEventListener('click', async () => {
+      const nombre = document.getElementById('cpFNombre').value.trim();
+      const motivo = document.getElementById('cpFMotivo').value;
+      const estadoF = document.getElementById('cpFEstado').value;
+      if(!nombre){ alert('Escribe el nombre del cliente.'); return; }
+      if(estadoF !== 'Por confirmar' && estadoF !== 'Descartado' && !motivo){ alert('Elige por qué nos dejó (si no se sabe, elige "Otro").'); return; }
+      const sucId = selSuc.value || null;
+      const suc = cpEstado.sucursales.find(x => x.id === sucId);
+      const valorTxt = document.getElementById('cpFValor').value;
+      const datos = {
+        nombre,
+        cliente_id: sucId,
+        empresa_id: suc ? (suc.empresa_id || null) : (r.empresa_id || null),
+        contacto: document.getElementById('cpFContacto').value.trim() || null,
+        telefono: document.getElementById('cpFTel').value.trim() || null,
+        motivo: motivo || null,
+        fecha_baja: document.getElementById('cpFBaja').value || null,
+        ultimo_servicio: document.getElementById('cpFUlt').value || null,
+        valor_mensual: valorTxt === '' ? null : Number(valorTxt),
+        estado: estadoF,
+        proximo_contacto: document.getElementById('cpFProx').value || null,
+        detalle: document.getElementById('cpFDetalle').value.trim() || null,
+      };
+      if(!reg){
+        const repetido = cpEstado.lista.find(x => (sucId && x.cliente_id === sucId) || cpTxt(x.nombre) === cpTxt(nombre));
+        if(repetido && !confirm(`"${repetido.nombre}" ya está en la lista (${repetido.estado}). ¿Registrarlo otra vez?`)) return;
+      }
+      const btn = document.getElementById('cpFGuardar');
+      btn.disabled = true;
+      let res;
+      if(reg){
+        if(reg.estado !== datos.estado){
+          const hist = Array.isArray(reg.seguimientos) ? reg.seguimientos.slice() : [];
+          hist.push({ fecha: new Date().toISOString(), por: (usuarioActual && usuarioActual.nombre) || '',
+            nota: reg.estado === 'Por confirmar' ? 'Se confirmó que nos dejó.' : 'Cambio de estado.', estado: datos.estado });
+          datos.seguimientos = hist;
+        }
+        res = await supabaseClient.from('clientes_perdidos').update(datos).eq('id', reg.id);
+      } else {
+        datos.creado_por = (usuarioActual && usuarioActual.id) || null;
+        datos.origen = 'manual';
+        res = await supabaseClient.from('clientes_perdidos').insert(datos).select('*').single();
+      }
+      btn.disabled = false;
+      if(res.error){ alert('No se pudo guardar: ' + res.error.message); return; }
+      if(reg) Object.assign(reg, datos); else cpEstado.lista.unshift(res.data);
+      cpForm.classList.add('hidden'); cpForm.innerHTML = '';
+      cpRender();
+      refrescarContadorPerdidos();
+      mostrarToast('Guardado');
+    });
   }
 
   let clientesCache = [];
