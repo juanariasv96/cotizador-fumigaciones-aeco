@@ -1698,6 +1698,7 @@
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
   <button class="tab-btn hidden" data-tab="cuentas" id="tabBtnCuentas">Clientes</button>
   <button class="tab-btn hidden" data-tab="perdidos" id="tabBtnPerdidos">Clientes perdidos <span class="tab-contador hidden" id="tabPerdidosContador">0</span></button>
+  <button class="tab-btn hidden" data-tab="ocasionales" id="tabBtnOcasionales">Clientes ocasionales <span class="tab-contador hidden" id="tabOcasionalesContador">0</span></button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
@@ -2701,6 +2702,31 @@
       .cp-wa{background:#25d366;color:#fff;border:0}
       .cp-acc a.btn{text-decoration:none;display:inline-block}
     </style>
+  </section>
+
+  <section id="tab-ocasionales" class="hidden">
+    <div class="panel">
+      <h2>Clientes ocasionales</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">
+        Clientes sin contrato fijo que nos buscan cada cierto tiempo (por ejemplo, cada 3 o 4 meses).
+        El sistema avisa <strong>una semana antes</strong> de que normalmente nos llamarían, para que nosotros les hablemos primero.
+        Cuando se les da servicio desde el CRM, la fecha se actualiza sola.
+      </p>
+      <div id="ocAvisoBase" class="hint hidden" style="margin-bottom:12px;color:#8a6100;"></div>
+      <div class="cp-chips" id="ocChips"></div>
+      <div class="grid" style="margin:10px 0 12px;align-items:end;">
+        <div class="field">
+          <label for="ocBuscar">Buscar</label>
+          <input type="text" id="ocBuscar" placeholder="Nombre o teléfono">
+        </div>
+        <div class="field" style="max-width:240px;">
+          <button type="button" class="btn" id="ocBtnNuevo">+ Agregar cliente ocasional</button>
+        </div>
+      </div>
+      <div id="ocForm" class="hidden"></div>
+      <div id="ocResumen" class="hint" style="margin-bottom:8px;"></div>
+      <div id="ocLista"></div>
+    </div>
   </section>
 
   <section id="tab-servicios" class="hidden">
@@ -4555,6 +4581,8 @@
     const veePerdidos = ['dueño', 'asistente', 'vendedor'].includes(usuarioActual.rol);
     document.getElementById('tabBtnPerdidos').classList.toggle('hidden', !veePerdidos);
     if(veePerdidos) refrescarContadorPerdidos();
+    document.getElementById('tabBtnOcasionales').classList.toggle('hidden', !veePerdidos);
+    if(veePerdidos) refrescarContadorOcasionales();
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnVentaMostrador').classList.toggle('hidden',
@@ -5401,6 +5429,7 @@
     estaciones: document.getElementById('tab-estaciones'),
     cuentas: document.getElementById('tab-cuentas'),
     perdidos: document.getElementById('tab-perdidos'),
+    ocasionales: document.getElementById('tab-ocasionales'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     prospectos: document.getElementById('tab-prospectos'),
@@ -5575,6 +5604,7 @@
     if(nombre === 'servicios') cargarClientesParaServicios();
     if(nombre === 'cuentas') cargarCuentasModulo();
     if(nombre === 'perdidos') cargarPerdidosModulo();
+    if(nombre === 'ocasionales') cargarOcasionalesModulo();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'prospectos') cargarProspectos();
@@ -5623,6 +5653,7 @@
     accesos:        { n: 'Accesos', c: '#7F8C8D', d: '<rect x="10" y="21" width="28" height="21" rx="4" fill="#7F8C8D"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" stroke="#7F8C8D" stroke-width="4" fill="none"/><circle cx="24" cy="30" r="3" fill="#fff"/><rect x="22.5" y="31" width="3" height="6" rx="1.5" fill="#fff"/>' },
     dispositivos:   { n: 'Dispositivos', c: '#5D6D7E', d: '<rect x="14" y="5" width="20" height="38" rx="4" fill="#5D6D7E"/><rect x="17" y="10" width="14" height="25" rx="1.5" fill="#d6eaf8"/><circle cx="24" cy="39" r="1.8" fill="#fff"/>' },
     perdidos:       { n: 'Clientes perdidos', c: '#6C5CE7', d: '<circle cx="19" cy="16" r="8" fill="#6C5CE7"/><path d="M4 41c0-9 7-15 15-15s15 6 15 15z" fill="#6C5CE7"/><circle cx="36" cy="32" r="10" fill="#fff" stroke="#E74C3C" stroke-width="3"/><path d="M31 32h10" stroke="#E74C3C" stroke-width="3.5" stroke-linecap="round"/>' },
+    ocasionales:    { n: 'Clientes ocasionales', c: '#00897B', d: '<circle cx="24" cy="26" r="16" fill="#00897B"/><path d="M24 16v10l7 4" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10l5-4M40 10l-5-4" stroke="#00897B" stroke-width="3.5" stroke-linecap="round"/><circle cx="37" cy="37" r="7" fill="#F39C12" stroke="#fff" stroke-width="2"/><path d="M37 34v4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="37" cy="40.5" r="1.2" fill="#fff"/>' },
     hoteles:        { n: 'Hoteles', c: '#B03A2E', d: '<path d="M6 41V20h36v21" fill="none" stroke="#B03A2E" stroke-width="3.5" stroke-linejoin="round"/><rect x="6" y="28" width="36" height="7" fill="#B03A2E"/><circle cx="14" cy="24" r="4" fill="#B03A2E"/><path d="M20 28v-6h18a4 4 0 0 1 4 4v2z" fill="#e6b0aa"/>' },
   };
 
@@ -5671,7 +5702,7 @@
   });
   // Los contadores (prospectos y pendientes) llegan despues de cargar:
   // si cambian mientras se ve Inicio, se repintan los globos rojos.
-  ['tabProspectosContador', 'tabPendientesContador', 'tabPerdidosContador'].forEach(id => {
+  ['tabProspectosContador', 'tabPendientesContador', 'tabPerdidosContador', 'tabOcasionalesContador'].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
     new MutationObserver(() => {
@@ -9478,6 +9509,7 @@
       if(x.estado === 'Por confirmar'){
         botones.push('<button type="button" class="btn small" data-cp="confirmar">Sí, nos dejó</button>');
         botones.push('<button type="button" class="btn secondary small" data-cp="descartar">No, sigue con nosotros</button>');
+        botones.push('<button type="button" class="btn secondary small" data-cp="ocasional" title="Nos busca cada cierto tiempo, no tiene contrato fijo">Es ocasional</button>');
       } else {
         botones.push('<button type="button" class="btn small" data-cp="seguimiento">Anotar seguimiento</button>');
       }
@@ -9517,6 +9549,7 @@
     if(accion === 'editar') cpAbrirForm(reg);
     if(accion === 'confirmar') cpAbrirForm(reg, { estado: 'Por contactar' });
     if(accion === 'seguimiento') cpCajaSeguimiento(tarjeta.querySelector('.cp-zona'), reg);
+    if(accion === 'ocasional') ocPasarDesdePerdido(reg);
     if(accion === 'descartar'){
       if(!confirm(`¿Quitar a "${reg.nombre}" de la lista? Queda guardado como "Descartado" (sigue siendo cliente).`)) return;
       await cpGuardarSeguimiento(reg, 'Sigue siendo cliente, no nos dejó.', 'Descartado', null);
@@ -9652,6 +9685,337 @@
       cpRender();
       refrescarContadorPerdidos();
       mostrarToast('Guardado');
+    });
+  }
+
+  // ---------- Clientes ocasionales: aviso para hablarles (oct 2026) ----------
+  // Clientes sin contrato que nos buscan cada X dias (ej. Hotel Arcoiris
+  // cada 3-4 meses). proximo_aviso = ultimo_servicio + cada_dias - 7: una
+  // semana antes de cuando normalmente llamarian. Tabla recordatorios_cliente
+  // (ver sql/ocasionales_setup.sql). El ultimo servicio se actualiza solo con
+  // las visitas realizadas y las cotizaciones cerradas del CRM.
+  const OC_AVISO_ANTES = 7;
+  const ocEstado = { lista: [], sucursales: [], empresas: [], filtro: 'toca', baseLista: false };
+  const ocLista = document.getElementById('ocLista');
+  const ocForm = document.getElementById('ocForm');
+
+  function ocSumarDias(iso, dias){
+    const d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+    d.setDate(d.getDate() + dias);
+    return fechaALocalISO(d);
+  }
+  function ocCalcularAviso(ultimo, cada){
+    return ultimo ? ocSumarDias(ultimo, Math.max(1, cada - OC_AVISO_ANTES)) : cpHoyISO();
+  }
+  function ocDiasDesde(iso){
+    if(!iso) return null;
+    return Math.round((new Date(cpHoyISO() + 'T12:00:00') - new Date(String(iso).slice(0, 10) + 'T12:00:00')) / 864e5);
+  }
+  function ocTextoCada(d){
+    if(d % 30 === 0) return d === 30 ? 'cada mes' : `cada ${d / 30} meses`;
+    if(d >= 45) return `cada ${(d / 30).toFixed(1).replace('.0', '')} meses (${d} días)`;
+    return `cada ${d} días`;
+  }
+
+  async function refrescarContadorOcasionales(){
+    const el = document.getElementById('tabOcasionalesContador');
+    if(!el) return;
+    const { data, error } = await supabaseClient.from('recordatorios_cliente').select('estado, proximo_aviso');
+    if(error){ el.classList.add('hidden'); return; }
+    const hoy = cpHoyISO();
+    const n = (data || []).filter(r => r.estado === 'Activo' && r.proximo_aviso && r.proximo_aviso <= hoy).length;
+    el.textContent = String(n);
+    el.classList.toggle('hidden', !n);
+  }
+
+  // Revisa si en el CRM hubo un servicio mas reciente (visita realizada o
+  // cotizacion cerrada) que el guardado; si si, lo actualiza y recalcula.
+  async function ocActualizarUltimosServicios(){
+    const conLiga = ocEstado.lista.filter(r => r.cliente_id || r.empresa_id);
+    if(!conLiga.length) return;
+    const idsPorReg = new Map();
+    conLiga.forEach(r => {
+      const ids = new Set();
+      if(r.cliente_id) ids.add(r.cliente_id);
+      if(r.empresa_id) ocEstado.sucursales.filter(s => s.empresa_id === r.empresa_id).forEach(s => ids.add(s.id));
+      idsPorReg.set(r.id, ids);
+    });
+    const todos = [...new Set([].concat(...[...idsPorReg.values()].map(s => [...s])))];
+    if(!todos.length) return;
+    const [v, c] = await Promise.all([
+      supabaseClient.from('visitas_programadas').select('cliente_id, fecha_realizada, fecha_programada, estatus').in('cliente_id', todos).eq('estatus', 'Realizada'),
+      supabaseClient.from('cotizaciones').select('cliente_id, estado, datos, fecha_actualizacion').in('cliente_id', todos).eq('estado', 'Cerrada'),
+    ]);
+    const ultimo = {};
+    const anotar = (cid, f) => { if(cid && f && (!ultimo[cid] || f > ultimo[cid])) ultimo[cid] = f; };
+    if(!v.error) (v.data || []).forEach(x => anotar(x.cliente_id, String(x.fecha_realizada || x.fecha_programada || '').slice(0, 10)));
+    if(!c.error) (c.data || []).forEach(x => anotar(x.cliente_id, String((x.datos && x.datos.fechaCierre) || x.fecha_actualizacion || '').slice(0, 10)));
+    const hoy = cpHoyISO();
+    for(const r of conLiga){
+      let max = '';
+      idsPorReg.get(r.id).forEach(id => { if(ultimo[id] && ultimo[id] > max) max = ultimo[id]; });
+      if(max && max <= hoy && (!r.ultimo_servicio || max > r.ultimo_servicio)){
+        const cambios = { ultimo_servicio: max, proximo_aviso: ocCalcularAviso(max, r.cada_dias) };
+        const { error } = await supabaseClient.from('recordatorios_cliente').update(cambios).eq('id', r.id);
+        if(!error) Object.assign(r, cambios);
+      }
+    }
+  }
+
+  async function cargarOcasionalesModulo(){
+    ocLista.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    const [r, s, e] = await Promise.all([
+      supabaseClient.from('recordatorios_cliente').select('*').order('proximo_aviso', { ascending: true }),
+      supabaseClient.from('clientes').select('id, nombre, telefono, contacto, empresa_id').order('nombre'),
+      supabaseClient.from('empresas').select('id, nombre').order('nombre'),
+    ]);
+    const aviso = document.getElementById('ocAvisoBase');
+    if(r.error){
+      console.error('Clientes ocasionales:', r.error);
+      ocEstado.baseLista = false;
+      aviso.textContent = 'Esta sección todavía no está activada en la base de datos (falta correr el archivo ocasionales_setup.sql en Supabase).';
+      aviso.classList.remove('hidden');
+      ocLista.innerHTML = '';
+      document.getElementById('ocChips').innerHTML = '';
+      return;
+    }
+    aviso.classList.add('hidden');
+    ocEstado.baseLista = true;
+    ocEstado.lista = r.data || [];
+    ocEstado.sucursales = s.error ? [] : (s.data || []);
+    ocEstado.empresas = e.error ? [] : (e.data || []);
+    ocRender();
+    await ocActualizarUltimosServicios();
+    ocRender();
+    refrescarContadorOcasionales();
+  }
+
+  function ocRender(){
+    const hoy = cpHoyISO();
+    const en30 = ocSumarDias(hoy, 30);
+    const activos = ocEstado.lista.filter(r => r.estado === 'Activo');
+    const toca = activos.filter(r => r.proximo_aviso && r.proximo_aviso <= hoy);
+    const pronto = activos.filter(r => r.proximo_aviso && r.proximo_aviso > hoy && r.proximo_aviso <= en30);
+    const pausados = ocEstado.lista.filter(r => r.estado === 'Pausado');
+    const chips = [['toca', `Ya toca hablarles (${toca.length})`], ['pronto', `Próximos 30 días (${pronto.length})`],
+      ['activos', `Todos (${activos.length})`], ['pausados', `Pausados (${pausados.length})`]];
+    document.getElementById('ocChips').innerHTML = chips.map(([k, t]) =>
+      `<button type="button" class="cp-chip${ocEstado.filtro === k ? ' activo' : ''}" data-filtro="${k}">${escapeHtml(t)}</button>`).join('');
+
+    let vis = { toca, pronto, activos, pausados }[ocEstado.filtro] || activos;
+    const f = cpTxt(document.getElementById('ocBuscar').value).trim();
+    if(f) vis = ocEstado.lista.filter(r => cpTxt([r.nombre, r.telefono, r.contacto, r.notas].join(' ')).includes(f));
+    vis = vis.slice().sort((a, b) => String(a.proximo_aviso || '9999').localeCompare(String(b.proximo_aviso || '9999')));
+    document.getElementById('ocResumen').textContent = `${vis.length} en la lista`;
+    if(!vis.length){
+      ocLista.innerHTML = `<div class="empty-msg">${ocEstado.filtro === 'toca' && !f ? 'Por hoy no toca hablarle a nadie.' : 'No hay clientes con este filtro.'}</div>`;
+      return;
+    }
+    ocLista.innerHTML = vis.map(r => {
+      const emp = ocEstado.empresas.find(e => e.id === r.empresa_id);
+      const tocaYa = r.estado === 'Activo' && r.proximo_aviso && r.proximo_aviso <= hoy;
+      const dias = ocDiasDesde(r.ultimo_servicio);
+      const tel = cpTel10(r.telefono);
+      const meses = dias != null ? Math.max(1, Math.round(dias / 30)) : null;
+      const msg = `Hola, le saluda Fumigaciones AECO.${meses ? ` Ya pasaron cerca de ${meses} ${meses === 1 ? 'mes' : 'meses'} desde su último servicio de fumigación.` : ''} ¿Le gustaría que agendemos el siguiente?`;
+      const hist = Array.isArray(r.historial) ? r.historial : [];
+      const lineas = [];
+      if(emp && cpTxt(emp.nombre) !== cpTxt(r.nombre)) lineas.push('Empresa: ' + escapeHtml(emp.nombre));
+      lineas.push(`Nos busca <strong>${escapeHtml(ocTextoCada(r.cada_dias))}</strong>`);
+      if(r.ultimo_servicio) lineas.push(`Último servicio: ${cpFecha(r.ultimo_servicio)} (hace ${dias} días)`);
+      if(r.estado === 'Activo' && r.proximo_aviso){
+        lineas.push(`<span class="${tocaYa ? 'cp-vencido' : ''}">${tocaYa ? 'Ya toca hablarle (desde el ' + cpFecha(r.proximo_aviso) + ')' : 'Hablarle a partir del ' + cpFecha(r.proximo_aviso)}</span>`);
+      }
+      const datos = [r.contacto, r.telefono].filter(Boolean).map(escapeHtml);
+      if(datos.length) lineas.push(datos.join(' · '));
+      if(r.notas) lineas.push(escapeHtml(r.notas));
+      const clase = r.estado === 'Pausado' ? ' cp-cerrado' : (tocaYa ? '' : ' cp-recuperado');
+      return `<div class="cp-tarjeta${clase}" data-id="${r.id}">
+        <div class="cp-cab"><span class="cp-nombre">${escapeHtml(r.nombre)}</span>
+          <span class="cp-estado ${r.estado === 'Pausado' ? 'e-cerrado' : (tocaYa ? '' : 'e-recuperado')}">${r.estado === 'Pausado' ? 'Pausado' : (tocaYa ? 'Ya toca' : 'Al corriente')}</span></div>
+        <div class="cp-datos">${lineas.join('<br>')}</div>
+        ${hist.length ? `<div class="cp-hist">${hist.slice(-3).reverse().map(h =>
+          `<div><strong>${cpFecha(h.fecha)}</strong>${h.por ? ' · ' + escapeHtml(h.por) : ''}<br>${escapeHtml(h.nota || '')}</div>`).join('')}</div>` : ''}
+        <div class="cp-acc">
+          ${r.estado === 'Activo' ? '<button type="button" class="btn small" data-oc="hable">Ya le hablé</button>' : '<button type="button" class="btn small" data-oc="reactivar">Reactivar</button>'}
+          ${tel ? `<a class="btn small cp-wa" href="https://wa.me/52${tel}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn secondary small" href="tel:${tel}">Llamar</a>` : ''}
+          <button type="button" class="btn secondary small" data-oc="editar">Editar</button>
+        </div>
+        <div class="cp-zona"></div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('ocChips').addEventListener('click', ev => {
+    const b = ev.target.closest('.cp-chip');
+    if(!b) return;
+    ocEstado.filtro = b.dataset.filtro;
+    document.getElementById('ocBuscar').value = '';
+    ocRender();
+  });
+  document.getElementById('ocBuscar').addEventListener('input', () => { if(ocEstado.baseLista) ocRender(); });
+  document.getElementById('ocBtnNuevo').addEventListener('click', () => { if(ocEstado.baseLista) ocAbrirForm(null); });
+
+  async function ocGuardar(reg, cambios, nota){
+    const hist = Array.isArray(reg.historial) ? reg.historial.slice() : [];
+    if(nota) hist.push({ fecha: new Date().toISOString(), por: (usuarioActual && usuarioActual.nombre) || '', nota });
+    const datos = Object.assign({}, cambios, { historial: hist });
+    const { error } = await supabaseClient.from('recordatorios_cliente').update(datos).eq('id', reg.id);
+    if(error){ alert('No se pudo guardar: ' + error.message); return false; }
+    Object.assign(reg, datos);
+    ocRender();
+    refrescarContadorOcasionales();
+    return true;
+  }
+
+  ocLista.addEventListener('click', async ev => {
+    const btn = ev.target.closest('[data-oc]');
+    if(!btn) return;
+    const tarjeta = btn.closest('.cp-tarjeta');
+    const reg = ocEstado.lista.find(r => r.id === tarjeta.dataset.id);
+    if(!reg) return;
+    const acc = btn.dataset.oc;
+    if(acc === 'editar') ocAbrirForm(reg);
+    if(acc === 'reactivar'){
+      await ocGuardar(reg, { estado: 'Activo', proximo_aviso: ocCalcularAviso(reg.ultimo_servicio, reg.cada_dias) }, 'Se reactivó el aviso.');
+    }
+    if(acc === 'hable'){
+      const zona = tarjeta.querySelector('.cp-zona');
+      zona.innerHTML = `<div class="cp-caja">
+        <div class="field"><label>¿Qué pasó?</label><input type="text" class="oc-nota" placeholder="Ej. Dijo que nos llama en noviembre"></div>
+        <div class="field" style="margin-top:6px;"><label>Resultado</label>
+          <select class="oc-res">
+            <option value="servicio">Ya se le dio servicio (o quedó agendado)</option>
+            <option value="15">Le hablé, todavía no: volver a avisar en 15 días</option>
+            <option value="30" selected>Le hablé, todavía no: volver a avisar en 1 mes</option>
+            <option value="60">Le hablé, todavía no: volver a avisar en 2 meses</option>
+            <option value="pausar">Ya no quiere / pausar el aviso</option>
+          </select></div>
+        <div class="field oc-fecha-wrap" style="margin-top:6px;display:none;"><label>Fecha del servicio</label><input type="date" class="oc-fecha" value="${cpHoyISO()}"></div>
+        <div class="actions-row" style="margin-top:8px;"><button type="button" class="btn secondary small oc-no">Cancelar</button><button type="button" class="btn small oc-ok">Guardar</button></div>
+      </div>`;
+      const sel = zona.querySelector('.oc-res');
+      const wrap = zona.querySelector('.oc-fecha-wrap');
+      const toggle = () => { wrap.style.display = sel.value === 'servicio' ? '' : 'none'; };
+      sel.addEventListener('change', toggle); toggle();
+      zona.querySelector('.oc-nota').focus();
+      zona.querySelector('.oc-no').addEventListener('click', () => { zona.innerHTML = ''; });
+      zona.querySelector('.oc-ok').addEventListener('click', async () => {
+        const nota = zona.querySelector('.oc-nota').value.trim();
+        const res = sel.value;
+        let cambios, texto;
+        if(res === 'servicio'){
+          const f = zona.querySelector('.oc-fecha').value || cpHoyISO();
+          cambios = { ultimo_servicio: f, proximo_aviso: ocCalcularAviso(f, reg.cada_dias) };
+          texto = 'Servicio del ' + cpFecha(f) + (nota ? '. ' + nota : '');
+        } else if(res === 'pausar'){
+          cambios = { estado: 'Pausado' };
+          texto = 'Se pausó el aviso' + (nota ? '. ' + nota : '');
+        } else {
+          cambios = { proximo_aviso: ocSumarDias(cpHoyISO(), Number(res)) };
+          texto = (nota || 'Le hablé, todavía no.') + ` Volver a avisar en ${res} días.`;
+        }
+        if(await ocGuardar(reg, cambios, texto)) mostrarToast('Guardado');
+      });
+    }
+  });
+
+  function ocAbrirForm(reg, preset){
+    const r = Object.assign({}, reg || {}, preset || {});
+    const nuevo = !reg;
+    const opcSuc = ocEstado.sucursales.map(s => `<option value="${s.id}"${s.id === r.cliente_id ? ' selected' : ''}>${escapeHtml(s.nombre)}</option>`).join('');
+    const opcCada = [[60, 'Cada 2 meses'], [90, 'Cada 3 meses'], [105, 'Cada 3 a 4 meses'], [120, 'Cada 4 meses'], [180, 'Cada 6 meses'], [365, 'Cada año']];
+    const cada = r.cada_dias || 105;
+    const enLista = opcCada.some(([d]) => d === cada);
+    ocForm.innerHTML = `<div class="cp-caja" style="margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;color:#016937;">${nuevo ? 'Agregar cliente ocasional' : 'Editar: ' + escapeHtml(r.nombre || '')}</h3>
+      <div class="grid">
+        <div class="field"><label for="ocFBuscarSuc">Buscar cliente del CRM</label><input type="text" id="ocFBuscarSuc" placeholder="Escribe para filtrar"></div>
+        <div class="field"><label for="ocFSuc">Cliente / sucursal del CRM</label><select id="ocFSuc"><option value="">(no está en el CRM)</option>${opcSuc}</select></div>
+        <div class="field"><label for="ocFNombre">Nombre</label><input type="text" id="ocFNombre" value="${escapeHtml(r.nombre || '')}"></div>
+        <div class="field"><label for="ocFContacto">Contacto</label><input type="text" id="ocFContacto" value="${escapeHtml(r.contacto || '')}"></div>
+        <div class="field"><label for="ocFTel">Teléfono</label><input type="tel" id="ocFTel" value="${escapeHtml(r.telefono || '')}"></div>
+        <div class="field"><label for="ocFCada">¿Cada cuánto nos busca?</label><select id="ocFCada">${opcCada.map(([d, t]) => `<option value="${d}"${d === cada ? ' selected' : ''}>${t}</option>`).join('')}<option value="otro"${enLista ? '' : ' selected'}>Otro (días)</option></select></div>
+        <div class="field" id="ocFDiasWrap" style="${enLista ? 'display:none;' : ''}"><label for="ocFDias">Cada cuántos días</label><input type="number" id="ocFDias" min="15" max="730" value="${cada}"></div>
+        <div class="field"><label for="ocFUlt">Último servicio</label><input type="date" id="ocFUlt" value="${escapeHtml(r.ultimo_servicio || '')}"></div>
+      </div>
+      <div class="field" style="margin-top:6px;"><label for="ocFNotas">Notas</label><input type="text" id="ocFNotas" value="${escapeHtml(r.notas || '')}" placeholder="Ej. Pide servicio de cucaracha en cocina y habitaciones"></div>
+      <div class="actions-row" style="margin-top:10px;">
+        <button type="button" class="btn secondary" id="ocFCancelar">Cancelar</button>
+        <button type="button" class="btn" id="ocFGuardar">Guardar</button>
+      </div></div>`;
+    ocForm.classList.remove('hidden');
+    ocForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const selSuc = document.getElementById('ocFSuc');
+    const selCada = document.getElementById('ocFCada');
+    selCada.addEventListener('change', () => { document.getElementById('ocFDiasWrap').style.display = selCada.value === 'otro' ? '' : 'none'; });
+    document.getElementById('ocFBuscarSuc').addEventListener('input', ev => {
+      const f = cpTxt(ev.target.value).trim();
+      const vis = ocEstado.sucursales.filter(s => !f || cpTxt(s.nombre).includes(f)).slice(0, 300);
+      selSuc.innerHTML = '<option value="">(no está en el CRM)</option>' + vis.map(s => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('');
+      if(vis.length === 1){ selSuc.value = vis[0].id; selSuc.dispatchEvent(new Event('change')); }
+    });
+    selSuc.addEventListener('change', () => {
+      const s = ocEstado.sucursales.find(x => x.id === selSuc.value);
+      if(!s) return;
+      const n = document.getElementById('ocFNombre'), c = document.getElementById('ocFContacto'), t = document.getElementById('ocFTel');
+      if(!n.value) n.value = s.nombre || '';
+      if(!c.value) c.value = s.contacto || '';
+      if(!t.value) t.value = s.telefono || '';
+    });
+    document.getElementById('ocFCancelar').addEventListener('click', () => { ocForm.classList.add('hidden'); ocForm.innerHTML = ''; });
+    document.getElementById('ocFGuardar').addEventListener('click', async () => {
+      if(!ocEstado.baseLista){ alert('Esta sección todavía no está activada en la base de datos.'); return; }
+      const nombre = document.getElementById('ocFNombre').value.trim();
+      if(!nombre){ alert('Escribe el nombre del cliente.'); return; }
+      const cadaDias = selCada.value === 'otro' ? Number(document.getElementById('ocFDias').value) : Number(selCada.value);
+      if(!(cadaDias >= 15 && cadaDias <= 730)){ alert('Los días deben estar entre 15 y 730.'); return; }
+      const ult = document.getElementById('ocFUlt').value || null;
+      const sucId = selSuc.value || null;
+      const suc = ocEstado.sucursales.find(x => x.id === sucId);
+      const datos = {
+        nombre,
+        cliente_id: sucId,
+        empresa_id: suc ? (suc.empresa_id || null) : (r.empresa_id || null),
+        contacto: document.getElementById('ocFContacto').value.trim() || null,
+        telefono: document.getElementById('ocFTel').value.trim() || null,
+        cada_dias: cadaDias,
+        ultimo_servicio: ult,
+        notas: document.getElementById('ocFNotas').value.trim() || null,
+      };
+      if(nuevo || r.cada_dias !== cadaDias || (reg && reg.ultimo_servicio !== ult)) datos.proximo_aviso = ocCalcularAviso(ult, cadaDias);
+      if(nuevo){
+        const rep = ocEstado.lista.find(x => (sucId && x.cliente_id === sucId) || cpTxt(x.nombre) === cpTxt(nombre));
+        if(rep && !confirm(`"${rep.nombre}" ya está en la lista. ¿Agregarlo otra vez?`)) return;
+        datos.creado_por = (usuarioActual && usuarioActual.id) || null;
+        if(preset && preset.origen) datos.origen = preset.origen;
+        datos.estado = 'Activo';
+      }
+      const btn = document.getElementById('ocFGuardar');
+      btn.disabled = true;
+      const res = nuevo
+        ? await supabaseClient.from('recordatorios_cliente').insert(datos).select('*').single()
+        : await supabaseClient.from('recordatorios_cliente').update(datos).eq('id', reg.id);
+      btn.disabled = false;
+      if(res.error){ alert('No se pudo guardar: ' + res.error.message); return; }
+      if(nuevo) ocEstado.lista.push(res.data); else Object.assign(reg, datos);
+      ocForm.classList.add('hidden'); ocForm.innerHTML = '';
+      ocRender();
+      refrescarContadorOcasionales();
+      mostrarToast('Guardado');
+      if(preset && preset.alGuardar) preset.alGuardar();
+    });
+  }
+
+  // Desde "Clientes perdidos": "Es ocasional" pasa el cliente a esta lista.
+  function ocPasarDesdePerdido(perdido){
+    if(cpEstado.sucursales.length){ ocEstado.sucursales = cpEstado.sucursales; ocEstado.empresas = cpEstado.empresas; }
+    activarTab('ocasionales');
+    ocAbrirForm(null, {
+      nombre: perdido.nombre, telefono: perdido.telefono, contacto: perdido.contacto,
+      cliente_id: perdido.cliente_id, empresa_id: perdido.empresa_id,
+      ultimo_servicio: perdido.ultimo_servicio, origen: 'perdidos',
+      alGuardar: () => cpGuardarSeguimiento(perdido, 'Es cliente ocasional: pasó a Clientes ocasionales.', 'Descartado', null),
     });
   }
 
