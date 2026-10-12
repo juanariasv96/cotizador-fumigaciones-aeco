@@ -1670,6 +1670,7 @@
   <button class="tab-btn" data-tab="seguimiento" id="tabBtnSeguimiento">Seguimiento</button>
   <button class="tab-btn" data-tab="empresa">Datos de la Empresa</button>
   <button class="tab-btn hidden" data-tab="estaciones" id="tabBtnEstaciones">Estaciones</button>
+  <button class="tab-btn hidden" data-tab="cuentas" id="tabBtnCuentas">Clientes</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
@@ -2390,6 +2391,7 @@
         <div class="panel hidden" id="facturacionClientePanel" style="margin:16px 0;">
           <h3 style="margin-top:0;">Datos de facturación</h3>
           <p style="font-size:12px;color:#777;margin-top:0;">Datos fiscales para la futura emisión de CFDI 4.0. Visibles y editables solo para oficina.</p>
+          <div id="facturacionEmpresaAviso" class="hint hidden" style="margin-bottom:10px;"></div>
           <div id="facturacionClienteVacioAviso" class="hint hidden" style="margin-bottom:10px;">Sin datos de facturación capturados todavía.</div>
           <div class="grid">
             <div class="field">
@@ -2548,6 +2550,69 @@
   </section>
 
   <!-- ================= TAB: SERVICIOS CONTRATADOS ================= -->
+  <section id="tab-cuentas" class="hidden">
+    <div class="panel">
+      <div id="ceVistaLista">
+        <h2>Clientes: empresas, sucursales y contactos</h2>
+        <p style="font-size:12px;color:#777;margin-top:0;">
+          Cada <strong>empresa</strong> es a quien se le factura (un RFC). Sus <strong>sucursales</strong>
+          son los lugares donde damos servicio: cada una lleva su propio plan, reporte y certificado.
+          Los <strong>contactos</strong> son las personas a quienes llamamos o les mandamos certificados y facturas.
+        </p>
+        <div id="ceAvisoBase" class="hint hidden" style="margin-bottom:12px;color:#8a6100;"></div>
+        <div class="grid" style="margin-bottom:12px;align-items:end;">
+          <div class="field">
+            <label for="ceBuscar">Buscar</label>
+            <input type="text" id="ceBuscar" placeholder="Empresa, RFC, sucursal o contacto">
+          </div>
+          <div class="field" style="max-width:260px;">
+            <label for="ceFiltro">Mostrar</label>
+            <select id="ceFiltro">
+              <option value="todas">Todas</option>
+              <option value="varias">Con varias sucursales</option>
+              <option value="sinrfc">Sin RFC capturado</option>
+              <option value="grupo">Que pertenecen a un grupo</option>
+              <option value="vacias">Sin sucursales</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:200px;">
+            <button type="button" class="btn" id="ceBtnNuevaEmpresa">+ Nueva empresa</button>
+          </div>
+        </div>
+        <div id="ceConteo" class="hint" style="margin-bottom:8px;"></div>
+        <div id="ceLista"></div>
+      </div>
+
+      <div id="ceVistaDetalle" class="hidden">
+        <button type="button" class="btn secondary small" id="ceBtnVolver">&larr; Volver a la lista</button>
+        <div id="ceDetalle" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <style>
+      .ce-tarjeta{border:1px solid #dfe6e0;border-left:5px solid #016937;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff;cursor:pointer}
+      .ce-tarjeta:hover{background:#fafffb}
+      .ce-tarjeta.ce-vacia{border-left-color:#b9c4bb;opacity:.8}
+      .ce-nombre{font-size:16px;font-weight:700;color:#016937}
+      .ce-sub{font-size:13px;color:#555;margin-top:2px}
+      .ce-chips{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+      .ce-chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;background:#e3f0e8;color:#016937}
+      .ce-chip.ce-alerta{background:#fff3cd;color:#8a6100}
+      .ce-chip.ce-gris{background:#eef1ef;color:#666}
+      .ce-bloque{border:1px solid #e3e9e4;border-radius:8px;padding:14px 16px;margin-bottom:16px;background:#fff}
+      .ce-bloque h3{margin:0 0 8px 0;color:#016937;font-size:16px}
+      .ce-fila{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid #eef1ef}
+      .ce-fila:first-of-type{border-top:0}
+      .ce-fila-info{flex:1 1 260px;font-size:14px;line-height:1.5}
+      .ce-fila-acc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+      .ce-mini{font-size:12px;color:#777}
+      .ce-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+      .ce-check input{width:auto;margin:0}
+      .ce-mover{width:100%;margin-top:8px;padding:10px;background:#f4f7f5;border-radius:6px}
+      .ce-mover .grid{align-items:end}
+    </style>
+  </section>
+
   <section id="tab-servicios" class="hidden">
     <div class="panel">
       <h2>Servicios contratados</h2>
@@ -4395,6 +4460,8 @@
     if(veeProspectos) refrescarContadorProspectos();
     document.getElementById('tabBtnSemaforo').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
+    document.getElementById('tabBtnCuentas').classList.toggle('hidden',
+      !['dueño', 'asistente', 'vendedor'].includes(usuarioActual.rol));
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnVentaMostrador').classList.toggle('hidden',
@@ -5237,6 +5304,7 @@
     seguimiento: document.getElementById('tab-seguimiento'),
     empresa: document.getElementById('tab-empresa'),
     estaciones: document.getElementById('tab-estaciones'),
+    cuentas: document.getElementById('tab-cuentas'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     prospectos: document.getElementById('tab-prospectos'),
@@ -5406,6 +5474,7 @@
     if(nombre === 'accesos') cargarRegistroAccesos();
     if(nombre === 'estaciones') cargarClientesParaEstaciones();
     if(nombre === 'servicios') cargarClientesParaServicios();
+    if(nombre === 'cuentas') cargarCuentasModulo();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'prospectos') cargarProspectos();
@@ -8365,22 +8434,41 @@
 
   const facturacionClientePanel = document.getElementById('facturacionClientePanel');
 
-  function renderFacturacionPanel(cliente){
+  // Desde la fase de empresas (oct 2026) los datos fiscales viven en la
+  // EMPRESA de la sucursal: se capturan una vez y aplican a todas sus
+  // sucursales. Si la base aun no tiene empresas, se usa el cliente como antes.
+  let facturacionEmpresaActual = null;
+  async function renderFacturacionPanel(cliente){
     if(!facturacionClientePanel) return;
     const esOficina = esOficinaFacturacion();
     facturacionClientePanel.classList.toggle('hidden', !esOficina);
     if(!esOficina) return;
 
-    document.getElementById('facturacionTipoPersona').value = cliente.tipo_persona || '';
-    document.getElementById('facturacionRfc').value = cliente.rfc || '';
-    document.getElementById('facturacionRazonSocial').value = cliente.razon_social || '';
-    document.getElementById('facturacionRegimenFiscal').value = cliente.regimen_fiscal || '';
-    document.getElementById('facturacionUsoCfdi').value = cliente.uso_cfdi || '';
-    document.getElementById('facturacionCpFiscal').value = cliente.cp_fiscal || '';
-    document.getElementById('facturacionEmail').value = cliente.email_facturacion || '';
+    const avisoEmp = document.getElementById('facturacionEmpresaAviso');
+    facturacionEmpresaActual = null;
+    const info = await ceEmpresaDeSucursal(cliente.id);
+    if(estacionesClienteActualId && estacionesClienteActualId !== cliente.id) return;
+    const fuente = info ? info.empresa : cliente;
+    if(info){
+      facturacionEmpresaActual = info.empresa;
+      avisoEmp.textContent = info.sucursales > 1
+        ? `Estos datos son de la empresa "${info.empresa.nombre}" y aplican a sus ${info.sucursales} sucursales. Contactos y sucursales: pestaña Clientes.`
+        : `Estos datos son de la empresa "${info.empresa.nombre}". Contactos y sucursales: pestaña Clientes.`;
+      avisoEmp.classList.remove('hidden');
+    } else {
+      avisoEmp.classList.add('hidden');
+    }
 
-    const sinDatos = !cliente.rfc && !cliente.razon_social && !cliente.regimen_fiscal
-      && !cliente.uso_cfdi && !cliente.cp_fiscal && !cliente.email_facturacion && !cliente.tipo_persona;
+    document.getElementById('facturacionTipoPersona').value = fuente.tipo_persona || '';
+    document.getElementById('facturacionRfc').value = fuente.rfc || '';
+    document.getElementById('facturacionRazonSocial').value = fuente.razon_social || '';
+    document.getElementById('facturacionRegimenFiscal').value = fuente.regimen_fiscal || '';
+    document.getElementById('facturacionUsoCfdi').value = fuente.uso_cfdi || '';
+    document.getElementById('facturacionCpFiscal').value = fuente.cp_fiscal || '';
+    document.getElementById('facturacionEmail').value = fuente.email_facturacion || '';
+
+    const sinDatos = !fuente.rfc && !fuente.razon_social && !fuente.regimen_fiscal
+      && !fuente.uso_cfdi && !fuente.cp_fiscal && !fuente.email_facturacion && !fuente.tipo_persona;
     document.getElementById('facturacionClienteVacioAviso').classList.toggle('hidden', !sinDatos);
     document.getElementById('facturacionClienteInfo').textContent = '';
   }
@@ -8412,7 +8500,7 @@
 
     const btn = document.getElementById('btnGuardarFacturacion');
     btn.disabled = true;
-    const { error } = await supabaseClient.from('clientes').update({
+    const datosFiscales = {
       rfc: rfc || null,
       razon_social: razonSocial || null,
       regimen_fiscal: regimenFiscal || null,
@@ -8420,12 +8508,21 @@
       cp_fiscal: cpFiscal || null,
       email_facturacion: emailFacturacion || null,
       tipo_persona: tipoPersona || null,
-    }).eq('id', cliente.id);
+    };
+    const empresaFiscal = facturacionEmpresaActual;
+    const { error } = empresaFiscal
+      ? await supabaseClient.from('empresas').update(datosFiscales).eq('id', empresaFiscal.id)
+      : await supabaseClient.from('clientes').update(datosFiscales).eq('id', cliente.id);
     btn.disabled = false;
 
     if(error){
       alert('No se pudieron guardar los datos de facturación: ' + error.message);
       return;
+    }
+    if(empresaFiscal){
+      Object.assign(empresaFiscal, datosFiscales);
+      const enLista = ceEstado.empresas.find(e => e.id === empresaFiscal.id);
+      if(enLista) Object.assign(enLista, datosFiscales);
     }
 
     // Se muta el mismo objeto que ya vive en clientesCache para que quede
@@ -8438,10 +8535,634 @@
     cliente.email_facturacion = emailFacturacion || null;
     cliente.tipo_persona = tipoPersona || null;
 
-    renderFacturacionPanel(cliente);
+    await renderFacturacionPanel(cliente);
     document.getElementById('facturacionClienteInfo').textContent =
       `Guardado el ${formatDate(new Date().toISOString().slice(0, 10))}.`;
   });
+
+  // ---------- Clientes: empresas, sucursales y contactos (fase 1, oct 2026) ----------
+  // Empresa = a quien se factura (un RFC). Sucursal = fila de "clientes"
+  // (el lugar donde se da el servicio; sigue siendo lo que usan plan,
+  // calendario, reportes y certificados). Contacto = persona de la empresa,
+  // de toda la empresa o de una sucursal. Grupo = opcional, para franquicias
+  // con un RFC por tienda. Tablas: ver sql/empresas_setup.sql.
+  // Datos fiscales: solo oficina (dueño y asistente). Vendedor ve empresas,
+  // sucursales y contactos, y puede capturar contactos.
+  const ceEstado = {
+    empresas: [], sucursales: [], grupos: [], contactos: [],
+    actualId: null, contactoEditandoId: null, baseLista: false,
+  };
+  const CE_MODOS = {
+    por_sucursal: 'Una factura por cada sucursal',
+    consolidada: 'Una sola factura por todas sus sucursales',
+    variable: 'Depende del mes (se decide al facturar)',
+  };
+  const CE_REGIMENES = [
+    ['601', '601 - General de Ley Personas Morales'],
+    ['603', '603 - Personas Morales con Fines no Lucrativos'],
+    ['605', '605 - Sueldos y Salarios'],
+    ['606', '606 - Arrendamiento'],
+    ['612', '612 - Personas Físicas con Actividades Empresariales y Profesionales'],
+    ['621', '621 - Incorporación Fiscal'],
+    ['626', '626 - Régimen Simplificado de Confianza (RESICO)'],
+    ['616', '616 - Sin obligaciones fiscales'],
+  ];
+  const CE_USOS = [
+    ['G01', 'G01 - Adquisición de mercancías'],
+    ['G03', 'G03 - Gastos en general'],
+    ['I01', 'I01 - Construcciones'],
+    ['I08', 'I08 - Otra maquinaria y equipo'],
+    ['P01', 'P01 - Por definir'],
+    ['S01', 'S01 - Sin efectos fiscales'],
+  ];
+  const ceLista = document.getElementById('ceLista');
+  const ceDetalle = document.getElementById('ceDetalle');
+  const ceBuscar = document.getElementById('ceBuscar');
+  const ceFiltro = document.getElementById('ceFiltro');
+
+  function ceTxt(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function ceEmpresa(id){ return ceEstado.empresas.find(e => e.id === id) || null; }
+  function ceSucursalesDe(id){ return ceEstado.sucursales.filter(s => s.empresa_id === id); }
+  function ceContactosDe(id){ return ceEstado.contactos.filter(c => c.empresa_id === id); }
+  function ceGrupo(id){ return ceEstado.grupos.find(g => g.id === id) || null; }
+  function ceOpciones(lista, valor){
+    return '<option value="">Selecciona...</option>' + lista.map(([v, t]) =>
+      `<option value="${v}"${v === valor ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
+  }
+
+  async function ceCargarTodo(){
+    const aviso = document.getElementById('ceAvisoBase');
+    const [e, s, g, c] = await Promise.all([
+      supabaseClient.from('empresas').select('*').order('nombre'),
+      supabaseClient.from('clientes').select('id, nombre, telefono, direccion, contacto, empresa_id, facturar_aparte').order('nombre'),
+      supabaseClient.from('grupos_empresa').select('*').order('nombre'),
+      supabaseClient.from('contactos_cliente').select('*').order('nombre'),
+    ]);
+    const err = e.error || s.error || g.error || c.error;
+    if(err){
+      console.error('Clientes/empresas:', err);
+      ceEstado.baseLista = false;
+      aviso.textContent = 'Esta sección todavía no está activada en la base de datos (falta correr el archivo empresas_setup.sql en Supabase). Mientras tanto, el resto del sistema funciona igual que siempre.';
+      aviso.classList.remove('hidden');
+      ceLista.innerHTML = '';
+      document.getElementById('ceConteo').textContent = '';
+      return false;
+    }
+    aviso.classList.add('hidden');
+    ceEstado.baseLista = true;
+    ceEstado.empresas = e.data || [];
+    ceEstado.sucursales = s.data || [];
+    ceEstado.grupos = g.data || [];
+    ceEstado.contactos = c.data || [];
+    return true;
+  }
+
+  async function cargarCuentasModulo(){
+    document.getElementById('ceBtnNuevaEmpresa').classList.toggle('hidden', !esOficinaFacturacion());
+    ceMostrarLista();
+    ceLista.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    if(await ceCargarTodo()) ceRenderLista();
+  }
+
+  function ceMostrarLista(){
+    ceEstado.actualId = null;
+    document.getElementById('ceVistaLista').classList.remove('hidden');
+    document.getElementById('ceVistaDetalle').classList.add('hidden');
+  }
+
+  function ceRenderLista(){
+    const filtro = ceTxt(ceBuscar.value).trim();
+    const modo = ceFiltro.value;
+    const porEmpresa = {};
+    ceEstado.sucursales.forEach(s => { (porEmpresa[s.empresa_id] = porEmpresa[s.empresa_id] || []).push(s); });
+    const contactosPor = {};
+    ceEstado.contactos.forEach(c => { (contactosPor[c.empresa_id] = contactosPor[c.empresa_id] || []).push(c); });
+
+    const visibles = ceEstado.empresas.filter(emp => {
+      const sucs = porEmpresa[emp.id] || [];
+      if(modo === 'varias' && sucs.length < 2) return false;
+      if(modo === 'sinrfc' && emp.rfc) return false;
+      if(modo === 'grupo' && !emp.grupo_id) return false;
+      if(modo === 'vacias' && sucs.length) return false;
+      if(!filtro) return true;
+      const g = ceGrupo(emp.grupo_id);
+      const texto = [emp.nombre, emp.razon_social, emp.rfc, g && g.nombre]
+        .concat(sucs.map(s => s.nombre + ' ' + (s.direccion || '')))
+        .concat((contactosPor[emp.id] || []).map(c => c.nombre + ' ' + (c.telefono || '') + ' ' + (c.email || '')))
+        .map(ceTxt).join(' | ');
+      return texto.includes(filtro);
+    });
+
+    document.getElementById('ceConteo').textContent =
+      `${visibles.length} de ${ceEstado.empresas.length} empresas · ${ceEstado.sucursales.length} sucursales en total`;
+    if(!visibles.length){
+      ceLista.innerHTML = '<div class="empty-msg">No hay empresas con ese filtro.</div>';
+      return;
+    }
+    const MAX = 200;
+    ceLista.innerHTML = visibles.slice(0, MAX).map(emp => {
+      const sucs = porEmpresa[emp.id] || [];
+      const g = ceGrupo(emp.grupo_id);
+      const nCont = (contactosPor[emp.id] || []).length;
+      const chips = [];
+      chips.push(`<span class="ce-chip${sucs.length ? '' : ' ce-gris'}">${sucs.length} ${sucs.length === 1 ? 'sucursal' : 'sucursales'}</span>`);
+      if(sucs.length > 1) chips.push(`<span class="ce-chip ce-gris">${escapeHtml(CE_MODOS[emp.modo_facturacion] || '')}</span>`);
+      if(g) chips.push(`<span class="ce-chip">Grupo: ${escapeHtml(g.nombre)}</span>`);
+      if(nCont) chips.push(`<span class="ce-chip ce-gris">${nCont} ${nCont === 1 ? 'contacto' : 'contactos'}</span>`);
+      if(!emp.rfc) chips.push('<span class="ce-chip ce-alerta">Sin RFC</span>');
+      const nombresSuc = sucs.length > 1 || (sucs.length === 1 && ceTxt(sucs[0].nombre) !== ceTxt(emp.nombre))
+        ? `<div class="ce-sub">${sucs.slice(0, 4).map(s => escapeHtml(s.nombre)).join(' · ')}${sucs.length > 4 ? ` · y ${sucs.length - 4} más` : ''}</div>` : '';
+      return `<div class="ce-tarjeta${sucs.length ? '' : ' ce-vacia'}" data-id="${emp.id}">
+        <div class="ce-nombre">${escapeHtml(emp.nombre)}</div>
+        ${emp.razon_social || emp.rfc ? `<div class="ce-sub">${escapeHtml(emp.razon_social || '')}${emp.rfc ? ' · RFC ' + escapeHtml(emp.rfc) : ''}</div>` : ''}
+        ${nombresSuc}
+        <div class="ce-chips">${chips.join('')}</div>
+      </div>`;
+    }).join('') + (visibles.length > MAX ? `<div class="hint">Se muestran las primeras ${MAX}. Usa la búsqueda para encontrar las demás.</div>` : '');
+  }
+
+  ceBuscar.addEventListener('input', () => { if(ceEstado.baseLista) ceRenderLista(); });
+  ceFiltro.addEventListener('change', () => { if(ceEstado.baseLista) ceRenderLista(); });
+  ceLista.addEventListener('click', ev => {
+    const t = ev.target.closest('.ce-tarjeta');
+    if(t) ceAbrirEmpresa(t.dataset.id);
+  });
+  document.getElementById('ceBtnVolver').addEventListener('click', () => { ceMostrarLista(); ceRenderLista(); });
+
+  document.getElementById('ceBtnNuevaEmpresa').addEventListener('click', async () => {
+    if(!ceEstado.baseLista || !esOficinaFacturacion()) return;
+    const nombre = (prompt('Nombre de la nueva empresa (como la conocemos, ej. "Quita Kilos"):') || '').trim();
+    if(!nombre) return;
+    const parecida = ceEstado.empresas.find(e => normalizarNombreCliente(e.nombre) === normalizarNombreCliente(nombre));
+    if(parecida && !confirm(`Ya existe una empresa llamada "${parecida.nombre}". ¿Crear otra de todos modos?`)) return;
+    const { data, error } = await supabaseClient.from('empresas')
+      .insert({ nombre, creado_por: (usuarioActual && usuarioActual.id) || null })
+      .select('*').single();
+    if(error){ alert('No se pudo crear la empresa: ' + error.message); return; }
+    ceEstado.empresas.push(data);
+    ceEstado.empresas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    ceAbrirEmpresa(data.id);
+  });
+
+  // ---------- Detalle de una empresa ----------
+  function ceAbrirEmpresa(id){
+    const emp = ceEmpresa(id);
+    if(!emp) return;
+    ceEstado.actualId = id;
+    ceEstado.contactoEditandoId = null;
+    document.getElementById('ceVistaLista').classList.add('hidden');
+    document.getElementById('ceVistaDetalle').classList.remove('hidden');
+    ceRenderDetalle();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function ceRenderDetalle(){
+    const emp = ceEmpresa(ceEstado.actualId);
+    if(!emp){ ceMostrarLista(); ceRenderLista(); return; }
+    const oficina = esOficinaFacturacion();
+    const sucs = ceSucursalesDe(emp.id);
+    const conts = ceContactosDe(emp.id);
+    const g = ceGrupo(emp.grupo_id);
+
+    let html = `<h2 style="margin-top:0;">${escapeHtml(emp.nombre)}</h2>`;
+
+    // --- Datos de la empresa y facturacion ---
+    if(oficina){
+      const opcGrupos = '<option value="">Sin grupo</option>' +
+        ceEstado.grupos.map(x => `<option value="${x.id}"${x.id === emp.grupo_id ? ' selected' : ''}>${escapeHtml(x.nombre)}</option>`).join('') +
+        '<option value="__nuevo">+ Crear grupo nuevo...</option>';
+      html += `<div class="ce-bloque">
+        <h3>Datos de la empresa y facturación</h3>
+        <div class="grid">
+          <div class="field"><label for="ceENombre">Nombre (como la conocemos)</label><input type="text" id="ceENombre" value="${escapeHtml(emp.nombre)}"></div>
+          <div class="field"><label for="ceERazon">Razón social</label><input type="text" id="ceERazon" value="${escapeHtml(emp.razon_social || '')}" placeholder="Exacta, como en la Constancia de Situación Fiscal"></div>
+          <div class="field"><label for="ceERfc">RFC</label><input type="text" id="ceERfc" maxlength="13" style="text-transform:uppercase;" value="${escapeHtml(emp.rfc || '')}"></div>
+          <div class="field"><label for="ceETipo">Tipo de persona</label><select id="ceETipo">${ceOpciones([['fisica', 'Física'], ['moral', 'Moral']], emp.tipo_persona || '')}</select></div>
+          <div class="field"><label for="ceERegimen">Régimen fiscal</label><select id="ceERegimen">${ceOpciones(CE_REGIMENES, emp.regimen_fiscal || '')}</select></div>
+          <div class="field"><label for="ceEUso">Uso de CFDI</label><select id="ceEUso">${ceOpciones(CE_USOS, emp.uso_cfdi || '')}</select></div>
+          <div class="field"><label for="ceECp">CP fiscal</label><input type="text" id="ceECp" maxlength="5" inputmode="numeric" value="${escapeHtml(emp.cp_fiscal || '')}"></div>
+          <div class="field"><label for="ceEEmail">Correo para facturas</label><input type="email" id="ceEEmail" value="${escapeHtml(emp.email_facturacion || '')}"></div>
+          <div class="field"><label for="ceEModo">¿Cómo se le factura?</label><select id="ceEModo">${Object.keys(CE_MODOS).map(k => `<option value="${k}"${k === emp.modo_facturacion ? ' selected' : ''}>${escapeHtml(CE_MODOS[k])}</option>`).join('')}</select></div>
+          <div class="field"><label for="ceEGrupo">Grupo (franquicias con varios RFC)</label><select id="ceEGrupo">${opcGrupos}</select></div>
+        </div>
+        <div class="field" style="margin-top:8px;"><label for="ceENotas">Notas</label><input type="text" id="ceENotas" value="${escapeHtml(emp.notas || '')}" placeholder="Ej. Subcontratista: se le factura y se le mandan certificados de todas sus tiendas"></div>
+        <div class="actions-row" style="margin-top:10px;"><button type="button" class="btn" id="ceBtnGuardarEmpresa">Guardar datos</button></div>
+        <div id="ceEInfo" class="hint" style="margin-top:6px;"></div>
+      </div>`;
+    } else {
+      html += `<div class="ce-bloque"><h3>Empresa</h3>
+        <div class="ce-sub">${g ? 'Grupo: ' + escapeHtml(g.nombre) + ' · ' : ''}${sucs.length > 1 ? escapeHtml(CE_MODOS[emp.modo_facturacion] || '') : ''}</div>
+        ${emp.notas ? `<div class="ce-sub" style="margin-top:6px;">${escapeHtml(emp.notas)}</div>` : ''}
+        <div class="ce-mini" style="margin-top:6px;">Los datos fiscales los ve y edita oficina.</div></div>`;
+    }
+
+    // --- Sucursales ---
+    const verAparte = emp.modo_facturacion !== 'por_sucursal';
+    html += `<div class="ce-bloque"><h3>Sucursales (${sucs.length})</h3>
+      <div class="ce-mini">Cada sucursal tiene su propio plan de trabajo, reportes y certificados.${verAparte && oficina ? ' Marca "Se factura aparte" en la sucursal que lleva su propia factura aunque la empresa facture junto.' : ''}</div>
+      ${sucs.length ? '' : '<div class="empty-msg">Esta empresa todavía no tiene sucursales.</div>'}
+      ${sucs.map(s => `<div class="ce-fila" data-suc="${s.id}">
+        <div class="ce-fila-info"><strong>${escapeHtml(s.nombre)}</strong>
+          ${s.direccion ? `<div class="ce-mini">${escapeHtml(s.direccion)}</div>` : ''}
+          ${s.telefono || s.contacto ? `<div class="ce-mini">${escapeHtml([s.contacto, s.telefono].filter(Boolean).join(' · '))}</div>` : ''}
+        </div>
+        <div class="ce-fila-acc">
+          ${oficina && verAparte ? `<label class="ce-check"><input type="checkbox" data-accion="aparte" ${s.facturar_aparte ? 'checked' : ''}> Se factura aparte</label>` : (s.facturar_aparte ? '<span class="ce-chip ce-alerta">Se factura aparte</span>' : '')}
+          ${oficina ? '<button type="button" class="btn secondary small" data-accion="mover">Pasar a otra empresa</button>' : ''}
+        </div>
+        <div class="ce-mover hidden"></div>
+      </div>`).join('')}
+      ${oficina ? `<div class="actions-row" style="justify-content:flex-start;">
+        <button type="button" class="btn secondary small" id="ceBtnTraerSucursal">+ Agregar una sucursal que ya existe</button>
+        <button type="button" class="btn secondary small" id="ceBtnNuevaSucursal">+ Dar de alta sucursal nueva</button>
+      </div>
+      <div id="ceZonaSucursal"></div>` : ''}
+    </div>`;
+
+    // --- Contactos ---
+    const nombreSuc = id => { const s = sucs.find(x => x.id === id); return s ? s.nombre : 'Sucursal de otra empresa'; };
+    html += `<div class="ce-bloque"><h3>Contactos (${conts.length})</h3>
+      ${conts.length ? '' : '<div class="empty-msg">Sin contactos capturados.</div>'}
+      ${conts.map(c => `<div class="ce-fila" data-cont="${c.id}">
+        <div class="ce-fila-info"><strong>${escapeHtml(c.nombre)}</strong>${c.puesto ? ' · ' + escapeHtml(c.puesto) : ''}
+          <div class="ce-mini">${c.cliente_id ? 'Sucursal: ' + escapeHtml(nombreSuc(c.cliente_id)) : 'Toda la empresa'}</div>
+          <div class="ce-mini">${escapeHtml([c.telefono, c.email].filter(Boolean).join(' · '))}</div>
+          <div class="ce-chips">${c.recibe_certificados ? '<span class="ce-chip">Recibe certificados</span>' : ''}${c.recibe_facturas ? '<span class="ce-chip">Recibe facturas</span>' : ''}</div>
+          ${c.notas ? `<div class="ce-mini">${escapeHtml(c.notas)}</div>` : ''}
+        </div>
+        <div class="ce-fila-acc">
+          <button type="button" class="btn secondary small" data-accion="editarCont">Editar</button>
+          <button type="button" class="btn danger small" data-accion="quitarCont">Quitar</button>
+        </div>
+      </div>`).join('')}
+      <div id="ceFormContacto" style="margin-top:12px;padding-top:10px;border-top:1px dashed #dfe6e0;">
+        <div class="ce-mini" id="ceCTitulo" style="font-weight:700;margin-bottom:6px;">Agregar contacto</div>
+        <div class="grid">
+          <div class="field"><label for="ceCNombre">Nombre</label><input type="text" id="ceCNombre"></div>
+          <div class="field"><label for="ceCPuesto">Puesto</label><input type="text" id="ceCPuesto" placeholder="Ej. Gerente de tienda"></div>
+          <div class="field"><label for="ceCTel">Teléfono</label><input type="tel" id="ceCTel"></div>
+          <div class="field"><label for="ceCEmail">Correo</label><input type="email" id="ceCEmail"></div>
+          <div class="field"><label for="ceCSuc">¿De qué sucursal?</label><select id="ceCSuc"><option value="">Toda la empresa</option>${sucs.map(s => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+          <div class="field"><label for="ceCNotas">Notas</label><input type="text" id="ceCNotas"></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;">
+          <label class="ce-check"><input type="checkbox" id="ceCCert"> Recibe certificados</label>
+          <label class="ce-check"><input type="checkbox" id="ceCFact"> Recibe facturas</label>
+        </div>
+        <div class="actions-row" style="margin-top:10px;">
+          <button type="button" class="btn secondary hidden" id="ceBtnCancelarCont">Cancelar</button>
+          <button type="button" class="btn" id="ceBtnGuardarCont">Guardar contacto</button>
+        </div>
+      </div>
+    </div>`;
+
+    // --- Juntar / eliminar ---
+    if(oficina){
+      html += `<div class="ce-bloque"><h3>Ordenar</h3>
+        <div class="ce-mini" style="margin-bottom:8px;">Si esta empresa está repetida (es la misma que otra), júntalas: sus sucursales y contactos pasan a la otra y los datos fiscales que le falten a la otra se completan con los de esta.</div>
+        <button type="button" class="btn secondary small" id="ceBtnJuntar">Juntar con otra empresa</button>
+        ${!sucs.length && !conts.length ? '<button type="button" class="btn danger small" id="ceBtnEliminarEmpresa" style="margin-left:8px;">Eliminar esta empresa (está vacía)</button>' : ''}
+        <div id="ceZonaJuntar"></div>
+      </div>`;
+    }
+
+    ceDetalle.innerHTML = html;
+    if(oficina) ceConectarEmpresa(emp);
+    ceConectarContactos(emp);
+    if(oficina) ceConectarSucursales(emp);
+  }
+
+  // Selector reutilizable: buscador + lista + boton. alElegir(id) recibe el id.
+  function ceSelector(contenedor, opciones, textoBoton, alElegir){
+    contenedor.innerHTML = `<div class="ce-mover"><div class="grid">
+        <div class="field"><label>Buscar</label><input type="text" class="ce-sel-buscar" placeholder="Escribe para filtrar"></div>
+        <div class="field"><label>Elegir</label><select class="ce-sel-lista"></select></div>
+        <div class="field" style="display:flex;gap:6px;"><button type="button" class="btn small ce-sel-ok">${escapeHtml(textoBoton)}</button><button type="button" class="btn secondary small ce-sel-no">Cancelar</button></div>
+      </div></div>`;
+    const buscar = contenedor.querySelector('.ce-sel-buscar');
+    const lista = contenedor.querySelector('.ce-sel-lista');
+    const pintar = () => {
+      const f = ceTxt(buscar.value).trim();
+      const vis = opciones.filter(o => !f || ceTxt(o.texto).includes(f)).slice(0, 300);
+      lista.innerHTML = '<option value="">Selecciona...</option>' + vis.map(o => `<option value="${o.id}">${escapeHtml(o.texto)}</option>`).join('');
+    };
+    pintar();
+    buscar.addEventListener('input', pintar);
+    buscar.focus();
+    contenedor.querySelector('.ce-sel-no').addEventListener('click', () => { contenedor.innerHTML = ''; });
+    contenedor.querySelector('.ce-sel-ok').addEventListener('click', () => {
+      if(!lista.value){ alert('Elige una opción de la lista.'); return; }
+      alElegir(lista.value);
+    });
+  }
+
+  function ceOpcionesEmpresas(excluirId){
+    return ceEstado.empresas.filter(e => e.id !== excluirId).map(e => {
+      const n = ceSucursalesDe(e.id).length;
+      return { id: e.id, texto: `${e.nombre}${e.rfc ? ' · ' + e.rfc : ''} (${n} ${n === 1 ? 'sucursal' : 'sucursales'})` };
+    });
+  }
+
+  function ceConectarEmpresa(emp){
+    const selGrupo = document.getElementById('ceEGrupo');
+    selGrupo.addEventListener('change', async () => {
+      if(selGrupo.value !== '__nuevo') return;
+      const nombre = (prompt('Nombre del grupo (ej. la marca de la franquicia):') || '').trim();
+      if(!nombre){ selGrupo.value = emp.grupo_id || ''; return; }
+      const { data, error } = await supabaseClient.from('grupos_empresa').insert({ nombre }).select('*').single();
+      if(error){ alert('No se pudo crear el grupo: ' + error.message); selGrupo.value = emp.grupo_id || ''; return; }
+      ceEstado.grupos.push(data);
+      const opt = document.createElement('option');
+      opt.value = data.id; opt.textContent = data.nombre;
+      selGrupo.insertBefore(opt, selGrupo.querySelector('option[value="__nuevo"]'));
+      selGrupo.value = data.id;
+    });
+
+    document.getElementById('ceBtnGuardarEmpresa').addEventListener('click', async () => {
+      const nombre = document.getElementById('ceENombre').value.trim();
+      const rfc = document.getElementById('ceERfc').value.trim().toUpperCase();
+      const cp = document.getElementById('ceECp').value.trim();
+      const email = document.getElementById('ceEEmail').value.trim();
+      if(!nombre){ alert('El nombre no puede quedar vacío.'); return; }
+      if(rfc && !validarFormatoRfc(rfc)){ alert('El RFC no tiene un formato válido (13 caracteres persona física, 12 persona moral). Corrígelo o déjalo en blanco.'); return; }
+      if(cp && !/^\d{5}$/.test(cp)){ alert('El código postal fiscal debe tener 5 dígitos.'); return; }
+      if(email && !validarEmailBasico(email)){ alert('El correo para facturas no parece válido.'); return; }
+      if(rfc && rfc !== 'XAXX010101000' && rfc !== 'XEXX010101000'){
+        const otra = ceEstado.empresas.find(e => e.id !== emp.id && (e.rfc || '').toUpperCase() === rfc);
+        if(otra && !confirm(`La empresa "${otra.nombre}" ya tiene ese mismo RFC. Si son la misma, conviene juntarlas (botón "Juntar con otra empresa"). ¿Guardar de todos modos?`)) return;
+      }
+      let tipo = document.getElementById('ceETipo').value;
+      if(!tipo && rfc) tipo = rfc.length === 12 ? 'moral' : 'fisica';
+      const grupo = selGrupo.value === '__nuevo' ? '' : selGrupo.value;
+      const cambios = {
+        nombre,
+        razon_social: document.getElementById('ceERazon').value.trim() || null,
+        rfc: rfc || null,
+        tipo_persona: tipo || null,
+        regimen_fiscal: document.getElementById('ceERegimen').value || null,
+        uso_cfdi: document.getElementById('ceEUso').value || null,
+        cp_fiscal: cp || null,
+        email_facturacion: email || null,
+        modo_facturacion: document.getElementById('ceEModo').value,
+        grupo_id: grupo || null,
+        notas: document.getElementById('ceENotas').value.trim() || null,
+      };
+      const btn = document.getElementById('ceBtnGuardarEmpresa');
+      btn.disabled = true;
+      const { error } = await supabaseClient.from('empresas').update(cambios).eq('id', emp.id);
+      btn.disabled = false;
+      if(error){ alert('No se pudieron guardar los datos: ' + error.message); return; }
+      Object.assign(emp, cambios);
+      ceRenderDetalle();
+      mostrarToast('Datos de la empresa guardados');
+    });
+
+    const btnJuntar = document.getElementById('ceBtnJuntar');
+    btnJuntar.addEventListener('click', () => {
+      ceSelector(document.getElementById('ceZonaJuntar'), ceOpcionesEmpresas(emp.id), 'Juntar', destinoId => ceJuntar(emp.id, destinoId));
+    });
+    const btnEliminar = document.getElementById('ceBtnEliminarEmpresa');
+    if(btnEliminar) btnEliminar.addEventListener('click', async () => {
+      if(ceSucursalesDe(emp.id).length || ceContactosDe(emp.id).length) return;
+      if(!confirm(`¿Eliminar la empresa "${emp.nombre}"? No tiene sucursales ni contactos.`)) return;
+      const { error } = await supabaseClient.from('empresas').delete().eq('id', emp.id);
+      if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+      ceEstado.empresas = ceEstado.empresas.filter(e => e.id !== emp.id);
+      ceMostrarLista(); ceRenderLista();
+      mostrarToast('Empresa eliminada');
+    });
+  }
+
+  async function ceJuntar(origenId, destinoId){
+    const origen = ceEmpresa(origenId), destino = ceEmpresa(destinoId);
+    if(!origen || !destino) return;
+    const sucs = ceSucursalesDe(origenId), conts = ceContactosDe(origenId);
+    if(origen.rfc && destino.rfc && origen.rfc.toUpperCase() !== destino.rfc.toUpperCase()){
+      if(!confirm(`Ojo: tienen RFC distinto (${origen.rfc} y ${destino.rfc}). Si se juntan, se queda el RFC de "${destino.nombre}". ¿Seguir?`)) return;
+    }
+    if(!confirm(`Juntar "${origen.nombre}" dentro de "${destino.nombre}":\n\n· ${sucs.length} sucursal(es) y ${conts.length} contacto(s) pasan a "${destino.nombre}".\n· Los datos fiscales que le falten a "${destino.nombre}" se completan con los de "${origen.nombre}".\n· "${origen.nombre}" deja de aparecer como empresa.\n\n¿Continuar?`)) return;
+
+    const campos = ['razon_social', 'rfc', 'tipo_persona', 'regimen_fiscal', 'uso_cfdi', 'cp_fiscal', 'email_facturacion', 'grupo_id', 'odoo_partner_id'];
+    const completar = {};
+    campos.forEach(k => { if(!destino[k] && origen[k]) completar[k] = origen[k]; });
+    if(origen.notas) completar.notas = [destino.notas, origen.notas].filter(Boolean).join(' / ');
+
+    let r = await supabaseClient.from('clientes').update({ empresa_id: destinoId }).eq('empresa_id', origenId);
+    if(!r.error) r = await supabaseClient.from('contactos_cliente').update({ empresa_id: destinoId }).eq('empresa_id', origenId);
+    if(!r.error && Object.keys(completar).length) r = await supabaseClient.from('empresas').update(completar).eq('id', destinoId);
+    if(r.error){ alert('No se pudo terminar de juntar: ' + r.error.message + '\nNo se borró nada. Vuelve a abrir la pestaña para ver cómo quedó.'); await cargarCuentasModulo(); return; }
+    const del = await supabaseClient.from('empresas').delete().eq('id', origenId);
+    if(del.error) console.error('No se pudo quitar la empresa vacia:', del.error);
+
+    sucs.forEach(s => { s.empresa_id = destinoId; });
+    conts.forEach(c => { c.empresa_id = destinoId; });
+    Object.assign(destino, completar);
+    if(!del.error) ceEstado.empresas = ceEstado.empresas.filter(e => e.id !== origenId);
+    mostrarToast(`Listo: quedó todo en "${destino.nombre}"`);
+    ceAbrirEmpresa(destinoId);
+  }
+
+  function ceConectarSucursales(emp){
+    ceDetalle.querySelectorAll('.ce-fila[data-suc]').forEach(fila => {
+      const suc = ceEstado.sucursales.find(s => s.id === fila.dataset.suc);
+      if(!suc) return;
+      const chk = fila.querySelector('[data-accion="aparte"]');
+      if(chk) chk.addEventListener('change', async () => {
+        const valor = chk.checked;
+        const { error } = await supabaseClient.from('clientes').update({ facturar_aparte: valor }).eq('id', suc.id);
+        if(error){ chk.checked = !valor; alert('No se pudo guardar: ' + error.message); return; }
+        suc.facturar_aparte = valor;
+        mostrarToast(valor ? 'Esta sucursal se factura aparte' : 'Esta sucursal entra en la factura de la empresa');
+      });
+      const btnMover = fila.querySelector('[data-accion="mover"]');
+      if(btnMover) btnMover.addEventListener('click', () => {
+        const zona = fila.querySelector('.ce-mover');
+        zona.classList.remove('hidden');
+        zona.style.padding = '0'; zona.style.background = 'none';
+        ceSelector(zona, ceOpcionesEmpresas(emp.id), 'Pasar aquí', async destinoId => {
+          const destino = ceEmpresa(destinoId);
+          if(!confirm(`¿Pasar la sucursal "${suc.nombre}" a la empresa "${destino.nombre}"? Su plan, reportes y certificados se quedan igual; solo cambia a quién se le factura.`)) return;
+          const { error } = await supabaseClient.from('clientes').update({ empresa_id: destinoId, facturar_aparte: false }).eq('id', suc.id);
+          if(error){ alert('No se pudo mover: ' + error.message); return; }
+          suc.empresa_id = destinoId; suc.facturar_aparte = false;
+          // Los contactos que eran solo de esa sucursal se van con ella.
+          const deSuc = ceEstado.contactos.filter(c => c.cliente_id === suc.id && c.empresa_id === emp.id);
+          if(deSuc.length){
+            const r = await supabaseClient.from('contactos_cliente').update({ empresa_id: destinoId }).eq('cliente_id', suc.id);
+            if(!r.error) deSuc.forEach(c => { c.empresa_id = destinoId; });
+          }
+          mostrarToast(`"${suc.nombre}" ahora es de "${destino.nombre}"`);
+          ceRenderDetalle();
+        });
+      });
+    });
+
+    document.getElementById('ceBtnTraerSucursal').addEventListener('click', () => {
+      const opciones = ceEstado.sucursales.filter(s => s.empresa_id !== emp.id).map(s => {
+        const e = ceEmpresa(s.empresa_id);
+        return { id: s.id, texto: `${s.nombre}${e && ceTxt(e.nombre) !== ceTxt(s.nombre) ? ' (hoy en ' + e.nombre + ')' : ''}${s.direccion ? ' · ' + s.direccion : ''}` };
+      });
+      ceSelector(document.getElementById('ceZonaSucursal'), opciones, 'Agregar a esta empresa', async sucId => {
+        const suc = ceEstado.sucursales.find(s => s.id === sucId);
+        const anterior = ceEmpresa(suc.empresa_id);
+        const { error } = await supabaseClient.from('clientes').update({ empresa_id: emp.id, facturar_aparte: false }).eq('id', sucId);
+        if(error){ alert('No se pudo agregar: ' + error.message); return; }
+        suc.empresa_id = emp.id; suc.facturar_aparte = false;
+        const r = await supabaseClient.from('contactos_cliente').update({ empresa_id: emp.id }).eq('cliente_id', sucId);
+        if(!r.error) ceEstado.contactos.filter(c => c.cliente_id === sucId).forEach(c => { c.empresa_id = emp.id; });
+        ceRenderDetalle();
+        // Si la empresa de donde salio quedo vacia y era la que se creo sola
+        // con el mismo nombre de la sucursal, se ofrece juntarla de una vez.
+        if(anterior && !ceSucursalesDe(anterior.id).length && !ceContactosDe(anterior.id).length){
+          const sinDatos = !anterior.rfc && !anterior.razon_social && !anterior.email_facturacion;
+          if(sinDatos || confirm(`"${anterior.nombre}" quedó sin sucursales. ¿Pasar sus datos fiscales que falten a "${emp.nombre}" y quitarla de la lista?`)){
+            const campos = ['razon_social', 'rfc', 'tipo_persona', 'regimen_fiscal', 'uso_cfdi', 'cp_fiscal', 'email_facturacion', 'grupo_id', 'odoo_partner_id'];
+            const completar = {};
+            campos.forEach(k => { if(!emp[k] && anterior[k]) completar[k] = anterior[k]; });
+            if(Object.keys(completar).length){
+              const u = await supabaseClient.from('empresas').update(completar).eq('id', emp.id);
+              if(!u.error) Object.assign(emp, completar);
+            }
+            const d = await supabaseClient.from('empresas').delete().eq('id', anterior.id);
+            if(!d.error) ceEstado.empresas = ceEstado.empresas.filter(e => e.id !== anterior.id);
+            ceRenderDetalle();
+          }
+        }
+        mostrarToast(`"${suc.nombre}" agregada a "${emp.nombre}"`);
+      });
+    });
+
+    document.getElementById('ceBtnNuevaSucursal').addEventListener('click', () => {
+      const zona = document.getElementById('ceZonaSucursal');
+      zona.innerHTML = `<div class="ce-mover"><div class="grid">
+          <div class="field"><label for="ceSNombre">Nombre de la sucursal</label><input type="text" id="ceSNombre" placeholder="Ej. Quita Kilos Cumbres"></div>
+          <div class="field"><label for="ceSDir">Dirección</label><input type="text" id="ceSDir"></div>
+          <div class="field"><label for="ceSTel">Teléfono</label><input type="tel" id="ceSTel"></div>
+          <div class="field" style="display:flex;gap:6px;"><button type="button" class="btn small" id="ceSOk">Dar de alta</button><button type="button" class="btn secondary small" id="ceSNo">Cancelar</button></div>
+        </div></div>`;
+      document.getElementById('ceSNombre').focus();
+      document.getElementById('ceSNo').addEventListener('click', () => { zona.innerHTML = ''; });
+      document.getElementById('ceSOk').addEventListener('click', async () => {
+        const nombre = document.getElementById('ceSNombre').value.trim();
+        if(!nombre){ alert('Escribe el nombre de la sucursal.'); return; }
+        const repetida = ceEstado.sucursales.find(s => normalizarNombreCliente(s.nombre) === normalizarNombreCliente(nombre));
+        if(repetida){
+          const e = ceEmpresa(repetida.empresa_id);
+          alert(`Ya existe una sucursal llamada "${repetida.nombre}"${e ? ' (en ' + e.nombre + ')' : ''}. Usa "Agregar una sucursal que ya existe" para traerla, o cambia el nombre (ej. agrega la colonia).`);
+          return;
+        }
+        const nueva = {
+          nombre,
+          direccion: document.getElementById('ceSDir').value.trim() || null,
+          telefono: document.getElementById('ceSTel').value.trim() || null,
+          empresa_id: emp.id,
+          creado_por: (usuarioActual && usuarioActual.id) || null,
+        };
+        const { data, error } = await supabaseClient.from('clientes').insert(nueva)
+          .select('id, nombre, telefono, direccion, contacto, empresa_id, facturar_aparte').single();
+        if(error){
+          alert(error.code === '23505'
+            ? 'Ya existe un cliente con ese nombre. Usa "Agregar una sucursal que ya existe".'
+            : 'No se pudo dar de alta: ' + error.message);
+          return;
+        }
+        ceEstado.sucursales.push(data);
+        mostrarToast(`Sucursal "${nombre}" dada de alta`);
+        ceRenderDetalle();
+      });
+    });
+  }
+
+  function ceConectarContactos(emp){
+    const limpiar = () => {
+      ceEstado.contactoEditandoId = null;
+      ['ceCNombre', 'ceCPuesto', 'ceCTel', 'ceCEmail', 'ceCNotas'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('ceCSuc').value = '';
+      document.getElementById('ceCCert').checked = false;
+      document.getElementById('ceCFact').checked = false;
+      document.getElementById('ceCTitulo').textContent = 'Agregar contacto';
+      document.getElementById('ceBtnCancelarCont').classList.add('hidden');
+    };
+    document.getElementById('ceBtnCancelarCont').addEventListener('click', limpiar);
+
+    ceDetalle.querySelectorAll('.ce-fila[data-cont]').forEach(fila => {
+      const c = ceEstado.contactos.find(x => x.id === fila.dataset.cont);
+      if(!c) return;
+      fila.querySelector('[data-accion="editarCont"]').addEventListener('click', () => {
+        ceEstado.contactoEditandoId = c.id;
+        document.getElementById('ceCNombre').value = c.nombre || '';
+        document.getElementById('ceCPuesto').value = c.puesto || '';
+        document.getElementById('ceCTel').value = c.telefono || '';
+        document.getElementById('ceCEmail').value = c.email || '';
+        document.getElementById('ceCNotas').value = c.notas || '';
+        document.getElementById('ceCSuc').value = c.cliente_id || '';
+        document.getElementById('ceCCert').checked = !!c.recibe_certificados;
+        document.getElementById('ceCFact').checked = !!c.recibe_facturas;
+        document.getElementById('ceCTitulo').textContent = 'Editando a ' + c.nombre;
+        document.getElementById('ceBtnCancelarCont').classList.remove('hidden');
+        document.getElementById('ceCNombre').focus();
+      });
+      fila.querySelector('[data-accion="quitarCont"]').addEventListener('click', async () => {
+        if(!confirm(`¿Quitar a ${c.nombre} de los contactos de ${emp.nombre}?`)) return;
+        const { error } = await supabaseClient.from('contactos_cliente').delete().eq('id', c.id);
+        if(error){ alert('No se pudo quitar: ' + error.message); return; }
+        ceEstado.contactos = ceEstado.contactos.filter(x => x.id !== c.id);
+        ceRenderDetalle();
+      });
+    });
+
+    document.getElementById('ceBtnGuardarCont').addEventListener('click', async () => {
+      const nombre = document.getElementById('ceCNombre').value.trim();
+      const email = document.getElementById('ceCEmail').value.trim();
+      const recibeCert = document.getElementById('ceCCert').checked;
+      const recibeFact = document.getElementById('ceCFact').checked;
+      if(!nombre){ alert('Escribe el nombre del contacto.'); return; }
+      if(email && !validarEmailBasico(email)){ alert('El correo no parece válido.'); return; }
+      if((recibeCert || recibeFact) && !email){ alert('Para mandarle certificados o facturas, captura su correo.'); return; }
+      const datos = {
+        empresa_id: emp.id,
+        cliente_id: document.getElementById('ceCSuc').value || null,
+        nombre,
+        puesto: document.getElementById('ceCPuesto').value.trim() || null,
+        telefono: document.getElementById('ceCTel').value.trim() || null,
+        email: email || null,
+        recibe_certificados: recibeCert,
+        recibe_facturas: recibeFact,
+        notas: document.getElementById('ceCNotas').value.trim() || null,
+      };
+      const btn = document.getElementById('ceBtnGuardarCont');
+      btn.disabled = true;
+      const editId = ceEstado.contactoEditandoId;
+      const r = editId
+        ? await supabaseClient.from('contactos_cliente').update(datos).eq('id', editId)
+        : await supabaseClient.from('contactos_cliente').insert(datos).select('*').single();
+      btn.disabled = false;
+      if(r.error){ alert('No se pudo guardar el contacto: ' + r.error.message); return; }
+      if(editId){
+        Object.assign(ceEstado.contactos.find(x => x.id === editId) || {}, datos);
+      } else {
+        ceEstado.contactos.push(r.data);
+      }
+      ceEstado.contactoEditandoId = null;
+      mostrarToast('Contacto guardado');
+      ceRenderDetalle();
+    });
+  }
+
+  // Empresa a la que pertenece una sucursal (para el panel de facturacion
+  // de Estaciones). Si la base todavia no tiene empresas, regresa null y el
+  // panel sigue funcionando como antes, con los datos del cliente.
+  async function ceEmpresaDeSucursal(clienteId){
+    const r1 = await supabaseClient.from('clientes').select('empresa_id').eq('id', clienteId).maybeSingle();
+    if(r1.error || !r1.data || !r1.data.empresa_id) return null;
+    const empresaId = r1.data.empresa_id;
+    const [r2, r3] = await Promise.all([
+      supabaseClient.from('empresas').select('*').eq('id', empresaId).maybeSingle(),
+      supabaseClient.from('clientes').select('id').eq('empresa_id', empresaId),
+    ]);
+    if(r2.error || !r2.data) return null;
+    return { empresa: r2.data, sucursales: (r3.data || []).length };
+  }
 
   let clientesCache = [];
   let estacionesClienteActualId = '';
