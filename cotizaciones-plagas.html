@@ -1714,6 +1714,7 @@
   <button class="tab-btn hidden" data-tab="cuentas" id="tabBtnCuentas">Clientes</button>
   <button class="tab-btn hidden" data-tab="perdidos" id="tabBtnPerdidos">Clientes perdidos <span class="tab-contador hidden" id="tabPerdidosContador">0</span></button>
   <button class="tab-btn hidden" data-tab="ocasionales" id="tabBtnOcasionales">Clientes ocasionales <span class="tab-contador hidden" id="tabOcasionalesContador">0</span></button>
+  <button class="tab-btn hidden" data-tab="porEnviar" id="tabBtnPorEnviar">Certificados por enviar <span class="tab-contador hidden" id="tabPorEnviarContador">0</span></button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
@@ -2741,6 +2742,18 @@
       <div id="ocForm" class="hidden"></div>
       <div id="ocResumen" class="hint" style="margin-bottom:8px;"></div>
       <div id="ocLista"></div>
+    </div>
+  </section>
+
+  <section id="tab-porEnviar" class="hidden">
+    <div class="panel">
+      <h2>Certificados por enviar</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">
+        Los técnicos guardan el certificado en el servicio; aquí oficina lo revisa y decide cuándo mandarlo al cliente.
+        Ningún certificado le llega al cliente sin pasar por aquí.
+      </p>
+      <div id="peResumen" class="hint" style="margin-bottom:8px;"></div>
+      <div id="peLista"></div>
     </div>
   </section>
 
@@ -4617,6 +4630,9 @@
     if(veePerdidos) refrescarContadorPerdidos();
     document.getElementById('tabBtnOcasionales').classList.toggle('hidden', !veePerdidos);
     if(veePerdidos) refrescarContadorOcasionales();
+    const veePorEnviar = ['dueño', 'asistente'].includes(usuarioActual.rol);
+    document.getElementById('tabBtnPorEnviar').classList.toggle('hidden', !veePorEnviar);
+    if(veePorEnviar) refrescarContadorPorEnviar();
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
     document.getElementById('tabBtnVentaMostrador').classList.toggle('hidden',
@@ -5464,6 +5480,7 @@
     cuentas: document.getElementById('tab-cuentas'),
     perdidos: document.getElementById('tab-perdidos'),
     ocasionales: document.getElementById('tab-ocasionales'),
+    porEnviar: document.getElementById('tab-porEnviar'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     prospectos: document.getElementById('tab-prospectos'),
@@ -5639,6 +5656,7 @@
     if(nombre === 'cuentas') cargarCuentasModulo();
     if(nombre === 'perdidos') cargarPerdidosModulo();
     if(nombre === 'ocasionales') cargarOcasionalesModulo();
+    if(nombre === 'porEnviar') cargarPorEnviar();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'prospectos') cargarProspectos();
@@ -5688,6 +5706,7 @@
     dispositivos:   { n: 'Dispositivos', c: '#5D6D7E', d: '<rect x="14" y="5" width="20" height="38" rx="4" fill="#5D6D7E"/><rect x="17" y="10" width="14" height="25" rx="1.5" fill="#d6eaf8"/><circle cx="24" cy="39" r="1.8" fill="#fff"/>' },
     perdidos:       { n: 'Clientes perdidos', c: '#6C5CE7', d: '<circle cx="19" cy="16" r="8" fill="#6C5CE7"/><path d="M4 41c0-9 7-15 15-15s15 6 15 15z" fill="#6C5CE7"/><circle cx="36" cy="32" r="10" fill="#fff" stroke="#E74C3C" stroke-width="3"/><path d="M31 32h10" stroke="#E74C3C" stroke-width="3.5" stroke-linecap="round"/>' },
     ocasionales:    { n: 'Clientes ocasionales', c: '#00897B', d: '<circle cx="24" cy="26" r="16" fill="#00897B"/><path d="M24 16v10l7 4" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10l5-4M40 10l-5-4" stroke="#00897B" stroke-width="3.5" stroke-linecap="round"/><circle cx="37" cy="37" r="7" fill="#F39C12" stroke="#fff" stroke-width="2"/><path d="M37 34v4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="37" cy="40.5" r="1.2" fill="#fff"/>' },
+    porEnviar:      { n: 'Certificados por enviar', c: '#1E88E5', d: '<rect x="9" y="5" width="24" height="32" rx="3" fill="#fff" stroke="#1E88E5" stroke-width="3"/><path d="M14 14h14M14 20h14M14 26h9" stroke="#1E88E5" stroke-width="2.5" stroke-linecap="round"/><path d="M24 33l18-8-6 18-4-7z" fill="#1E88E5"/><path d="M32 36l10-11" stroke="#fff" stroke-width="1.5"/>' },
     hoteles:        { n: 'Hoteles', c: '#B03A2E', d: '<path d="M6 41V20h36v21" fill="none" stroke="#B03A2E" stroke-width="3.5" stroke-linejoin="round"/><rect x="6" y="28" width="36" height="7" fill="#B03A2E"/><circle cx="14" cy="24" r="4" fill="#B03A2E"/><path d="M20 28v-6h18a4 4 0 0 1 4 4v2z" fill="#e6b0aa"/>' },
   };
 
@@ -5736,7 +5755,7 @@
   });
   // Los contadores (prospectos y pendientes) llegan despues de cargar:
   // si cambian mientras se ve Inicio, se repintan los globos rojos.
-  ['tabProspectosContador', 'tabPendientesContador', 'tabPerdidosContador', 'tabOcasionalesContador'].forEach(id => {
+  ['tabProspectosContador', 'tabPendientesContador', 'tabPerdidosContador', 'tabOcasionalesContador', 'tabPorEnviarContador'].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
     new MutationObserver(() => {
@@ -14829,6 +14848,7 @@
     certificadoNombreArchivoActual = `Certificado-${cert.folio}-${cliente.nombre || 'cliente'}`
       .replace(/[^a-zA-Z0-9_\-]+/g, '_');
     certEnvioActual = { cert, clienteNombre: cliente.nombre || '' };
+    document.getElementById('btnEnviarCertificado').classList.toggle('hidden', !esOficinaFacturacion());
     document.getElementById('certEnvioPanel').classList.add('hidden');
     document.getElementById('certEnvioPanel').innerHTML = '';
     certificadoPrintOverlay.classList.remove('hidden');
@@ -15077,7 +15097,12 @@
         supabaseClient.from('certificados_visita').update({
           pdf_path: ruta, enviado_en: new Date().toISOString(), enviado_via: a.dataset.via,
           enviado_por: (usuarioActual && usuarioActual.id) || null,
-        }).eq('visita_id', cert.visita_id).then(({ error }) => { if(error) console.error('No se pudo marcar el envío:', error); });
+        }).eq('visita_id', cert.visita_id).then(({ error }) => {
+          if(error){ console.error('No se pudo marcar el envío:', error); return; }
+          cert.enviado_en = new Date().toISOString();
+          refrescarContadorPorEnviar();
+          if(!tabs.porEnviar.classList.contains('hidden')) cargarPorEnviar();
+        });
       }));
     }catch(e){
       console.error('Envío de certificado:', e);
@@ -15085,6 +15110,75 @@
     }finally{
       btn.disabled = false;
     }
+  });
+
+  // ---------- Bandeja "Certificados por enviar" (oficina autoriza) ----------
+  const PE_DIAS = 60;
+  function peDesdeISO(){ const d = new Date(); d.setDate(d.getDate() - PE_DIAS); return fechaALocalISO(d); }
+
+  async function refrescarContadorPorEnviar(){
+    const el = document.getElementById('tabPorEnviarContador');
+    if(!el) return;
+    const { data, error } = await supabaseClient.from('certificados_visita').select('id, enviado_en').gte('fecha', peDesdeISO());
+    if(error){ el.classList.add('hidden'); return; }
+    const n = (data || []).filter(c => !c.enviado_en).length;
+    el.textContent = String(n);
+    el.classList.toggle('hidden', !n);
+  }
+
+  async function cargarPorEnviar(){
+    const lista = document.getElementById('peLista');
+    lista.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    const { data, error } = await supabaseClient.from('certificados_visita').select('*').gte('fecha', peDesdeISO()).order('fecha', { ascending: false });
+    if(error){
+      lista.innerHTML = `<div class="hint" style="color:#8a6100;">No se pudo cargar la bandeja: ${escapeHtml(error.message)}. Si dice que falta la columna "enviado_en", hay que correr certificados_envio.sql en Supabase.</div>`;
+      return;
+    }
+    const pendientes = (data || []).filter(c => !c.enviado_en);
+    const enviados = (data || []).filter(c => c.enviado_en).length;
+    document.getElementById('peResumen').textContent = `${pendientes.length} por enviar · ${enviados} ya enviados en los últimos ${PE_DIAS} días`;
+    if(!pendientes.length){ lista.innerHTML = '<div class="empty-msg">No hay certificados pendientes de enviar.</div>'; return; }
+    const idsCli = [...new Set(pendientes.map(c => c.cliente_id).filter(Boolean))];
+    const idsTec = [...new Set(pendientes.map(c => c.tecnico_id).filter(Boolean))];
+    const [cl, tc] = await Promise.all([
+      idsCli.length ? supabaseClient.from('clientes').select('id, nombre').in('id', idsCli) : Promise.resolve({ data: [] }),
+      idsTec.length ? supabaseClient.from('perfiles_usuario').select('id, nombre').in('id', idsTec) : Promise.resolve({ data: [] }),
+    ]);
+    const nomCli = {}; (cl.data || []).forEach(x => { nomCli[x.id] = x.nombre; });
+    const nomTec = {}; (tc.data || []).forEach(x => { nomTec[x.id] = x.nombre; });
+    lista.innerHTML = pendientes.map(c => `<div class="cp-tarjeta cp-confirmar" data-visita="${c.visita_id}">
+      <div class="cp-cab"><span class="cp-nombre">${escapeHtml(nomCli[c.cliente_id] || 'Cliente')}</span><span class="cp-estado e-confirmar">Folio ${escapeHtml(String(c.folio || ''))}</span></div>
+      <div class="cp-datos">Servicio del ${formatDate(c.fecha)}${nomTec[c.tecnico_id] ? ' · Técnico: ' + escapeHtml(nomTec[c.tecnico_id]) : ''}
+        ${c.servicios && c.servicios.nivel_actividad ? '<br>Nivel de actividad: ' + escapeHtml(c.servicios.nivel_actividad) : ''}
+        ${c.ingrediente_dosis ? '<br>Productos: ' + escapeHtml(c.ingrediente_dosis).replace(/\n/g, ', ') : '<br><span class="cp-vencido">Sin productos anotados</span>'}</div>
+      <div class="cp-acc">
+        <button type="button" class="btn small" data-pe="revisar">Revisar y enviar</button>
+        <button type="button" class="btn secondary small" data-pe="manual">Ya se mandó por otro medio</button>
+      </div></div>`).join('');
+  }
+
+  document.getElementById('peLista').addEventListener('click', async ev => {
+    const btn = ev.target.closest('[data-pe]');
+    if(!btn) return;
+    const visitaId = btn.closest('[data-visita]').dataset.visita;
+    if(btn.dataset.pe === 'manual'){
+      if(!confirm('¿Marcar este certificado como ya enviado?')) return;
+      const { error } = await supabaseClient.from('certificados_visita').update({
+        enviado_en: new Date().toISOString(), enviado_via: 'manual', enviado_por: (usuarioActual && usuarioActual.id) || null,
+      }).eq('visita_id', visitaId);
+      if(error){ alert('No se pudo marcar: ' + error.message); return; }
+      refrescarContadorPorEnviar(); cargarPorEnviar();
+      return;
+    }
+    // La vista del certificado toma los datos del cliente de la visita: si
+    // la visita no esta en la memoria del calendario, se trae primero.
+    if(!calVisitasCache.find(v => v.id === visitaId)){
+      const { data: vis } = await supabaseClient.from('visitas_programadas')
+        .select('*, clientes(nombre, direccion, telefono, zona, semaforo, semaforo_nota, semaforo_actualizado_por, semaforo_actualizado_en), servicios_cliente(tipo_servicio, sede)')
+        .eq('id', visitaId).maybeSingle();
+      if(vis) calVisitasCache.push(vis);
+    }
+    await verCertificadoDesdeOficina(visitaId);
   });
 
   document.getElementById('btnGuardarCertificado').addEventListener('click', async ()=>{
@@ -15141,7 +15235,7 @@
       return;
     }
 
-    mostrarToast('Certificado guardado.');
+    mostrarToast(esOficinaFacturacion() ? 'Certificado guardado.' : 'Certificado guardado. Oficina lo revisa y se lo manda al cliente.');
     reporteOverlay.classList.add('hidden');
     abrirImpresionCertificado(payloadCertificado);
   });
