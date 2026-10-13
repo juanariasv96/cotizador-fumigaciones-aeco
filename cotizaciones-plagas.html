@@ -262,6 +262,21 @@
     gap:8px;
     margin-top:10px;
   }
+  #certificadoPrintOverlay .print-toolbar{flex-wrap:wrap;}
+  .cert-reco-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .cert-reco-chip{border:1px solid var(--verde-claro);background:#fff;color:var(--verde-oscuro);border-radius:18px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+  .cert-reco-chip:active{background:var(--verde-suave)}
+  .cert-envio{background:#f4f7f5;border:1px solid #dfe6e0;border-radius:10px;padding:12px 14px;margin:0 0 12px}
+  .cert-envio h4{margin:0 0 6px;color:var(--verde-oscuro)}
+  .cert-envio-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #e3e9e4}
+  .cert-envio-fila:first-of-type{border-top:0}
+  .cert-envio a.btn{text-decoration:none;display:inline-block}
+  .cal-hoy-tec{margin:0 0 16px}
+  .cal-hoy-tec h3{margin:0 0 8px;color:var(--verde-oscuro)}
+  .cal-hoy-item{display:block;width:100%;text-align:left;border:1px solid #dfe6e0;border-left:6px solid var(--verde);border-radius:10px;background:#fff;padding:12px 14px;margin-bottom:8px;font-family:inherit;font-size:15px;cursor:pointer}
+  .cal-hoy-item.realizada{border-left-color:#b9c4bb;opacity:.75}
+  .cal-hoy-item .h-hora{font-weight:700;color:var(--verde-oscuro);margin-right:6px}
+  .cal-hoy-item .h-sub{display:block;font-size:12px;color:#666;margin-top:3px}
   .area-tag{
     background:var(--verde-suave);
     color:var(--verde-oscuro);
@@ -3835,14 +3850,31 @@
         </div>
       </div>
 
+      <div class="panel" style="margin:14px 0;">
+        <h4 style="margin-top:0;">¿Qué encontraste?</h4>
+        <div class="field" style="max-width:320px;">
+          <label for="certificadoNivelActividad">Nivel de actividad de plaga</label>
+          <select id="certificadoNivelActividad">
+            <option value="">Selecciona...</option>
+            <option>Sin actividad</option>
+            <option>Baja</option>
+            <option>Media</option>
+            <option>Alta</option>
+          </select>
+        </div>
+        <div class="hint" style="margin:8px 0 4px;">Recomendaciones para el cliente (toca para agregarlas a los comentarios):</div>
+        <div class="cert-reco-chips" id="certRecoChips"></div>
+      </div>
       <div class="grid">
         <div class="field">
           <label for="certificadoComentarios">Comentarios</label>
           <textarea id="certificadoComentarios" rows="3"></textarea>
         </div>
         <div class="field">
-          <label for="certificadoIngredienteDosis">Ingrediente activo y dosis</label>
-          <textarea id="certificadoIngredienteDosis" rows="3" placeholder="Ej. Bifentrina + Imidacloprid, 5.0 ML"></textarea>
+          <label for="certificadoIngredienteDosis">Productos aplicados (cantidad real)</label>
+          <textarea id="certificadoIngredienteDosis" rows="3" placeholder="Ej. Fipronil — 15 ml"></textarea>
+          <button type="button" class="btn secondary small" id="btnCertDesdeConsumos" style="margin-top:6px;">Usar lo que registré en Consumos</button>
+          <div class="hint">Se llena solo con los productos y cantidades que registraste en "Consumos" del reporte. Escribe la cantidad que de verdad usaste.</div>
         </div>
       </div>
     </div>
@@ -3933,8 +3965,10 @@
     <div class="print-toolbar">
       <button class="btn secondary" id="btnCerrarCertificadoPreview">Cerrar</button>
       <button class="btn secondary" id="btnDescargarCertificadoPDF">Descargar PDF</button>
-      <button class="btn" id="btnImprimirCertificadoDoc">Imprimir</button>
+      <button class="btn secondary" id="btnImprimirCertificadoDoc">Imprimir</button>
+      <button class="btn" id="btnEnviarCertificado">Enviar al cliente</button>
     </div>
+    <div id="certEnvioPanel" class="cert-envio hidden"></div>
     <div class="doc" id="certificadoDocContent"><!-- contenido generado por JS --></div>
   </div>
 </div>
@@ -13242,7 +13276,43 @@
     });
   }
 
+  // Tecnico: "Mis servicios de hoy" hasta arriba, con botones grandes.
+  function renderHoyTecnico(){
+    let cont = document.getElementById('calHoyTecnico');
+    const esTec = usuarioActual && usuarioActual.rol === 'tecnico';
+    if(!esTec){ if(cont) cont.remove(); return; }
+    if(!cont){
+      cont = document.createElement('div');
+      cont.id = 'calHoyTecnico';
+      cont.className = 'cal-hoy-tec';
+      const panel = document.querySelector('#tab-calendario .panel');
+      const titulo = panel && panel.querySelector('h2');
+      if(titulo) titulo.insertAdjacentElement('afterend', cont); else if(panel) panel.prepend(cont);
+    }
+    const hoyISO = fechaALocalISO(new Date());
+    const deHoy = visitasFiltradas().filter(v => v.fecha_programada === hoyISO)
+      .sort((a, b) => String(a.hora || '99').localeCompare(String(b.hora || '99')));
+    const pendientes = deHoy.filter(v => v.estatus !== 'Realizada').length;
+    cont.innerHTML = `<h3>Mis servicios de hoy (${deHoy.length})</h3>` + (deHoy.length
+      ? deHoy.map(v => {
+          const cli = (v.clientes && v.clientes.nombre) || '';
+          const dir = (v.clientes && v.clientes.direccion) || '';
+          const hecha = v.estatus === 'Realizada';
+          return `<button type="button" class="cal-hoy-item${hecha ? ' realizada' : ''}" data-id="${v.id}">`
+            + (v.hora ? `<span class="h-hora">${v.hora.slice(0, 5)}</span>` : '')
+            + `${hecha ? '✓ ' : ''}${escapeHtml(cli)}`
+            + `<span class="h-sub">${escapeHtml(dir)}${hecha ? ' · Ya realizado' : ' · Toca para hacer el reporte y el certificado'}</span></button>`;
+        }).join('') + (pendientes ? '' : '<div class="hint">¡Listo! Ya no tienes servicios pendientes hoy.</div>')
+      : '<div class="hint">Hoy no tienes servicios asignados.</div>');
+  }
+
+  document.addEventListener('click', e => {
+    const it = e.target.closest('.cal-hoy-item');
+    if(it && usuarioActual && usuarioActual.rol === 'tecnico') abrirReporteVisita(it.dataset.id);
+  });
+
   function renderCalendarioMes(){
+    renderHoyTecnico();
     calMesLabel.textContent = `${MESES_NOMBRE[calMesActual]} ${calAnioActual}`;
 
     const primerDiaMes = new Date(calAnioActual, calMesActual, 1);
@@ -14659,10 +14729,17 @@
 
       comentarios = '';
 
-      const { insecticida: ingredienteInsecticida, rodenticida: ingredienteRodenticida } =
-        await obtenerIngredientesPlan(visita, reporteClienteActualId);
-      ingredienteDosis = [ingredienteInsecticida, ingredienteRodenticida].filter(Boolean).join(' + ');
+      const desdeConsumos = certTextoDesdeConsumos();
+      if(desdeConsumos){
+        ingredienteDosis = desdeConsumos;
+      } else {
+        const { insecticida: ingredienteInsecticida, rodenticida: ingredienteRodenticida } =
+          await obtenerIngredientesPlan(visita, reporteClienteActualId);
+        ingredienteDosis = [ingredienteInsecticida, ingredienteRodenticida].filter(Boolean).join(' + ');
+      }
     }
+    document.getElementById('certificadoNivelActividad').value = (servicios && servicios.nivel_actividad) || '';
+    certRenderRecomendaciones();
 
     document.getElementById('certificadoFecha').value = fecha;
     renderCertChecklist('certificadoServiciosLista', CERT_SERVICIOS_COLUMNAS, servicios);
@@ -14731,7 +14808,7 @@
 
       <table class="doc-comentarios-ingrediente">
         <thead><tr><th>Comentarios</th><th>Ingrediente activo y dosis para utilizar</th></tr></thead>
-        <tbody><tr><td style="white-space:pre-wrap;">${escapeHtml(cert.comentarios || '')}</td><td style="white-space:pre-wrap;">${escapeHtml(cert.ingrediente_dosis || '')}</td></tr></tbody>
+        <tbody><tr><td style="white-space:pre-wrap;">${cert.servicios && cert.servicios.nivel_actividad ? '<strong>Nivel de actividad observado:</strong> ' + escapeHtml(cert.servicios.nivel_actividad) + '\n' : ''}${escapeHtml(cert.comentarios || '')}</td><td style="white-space:pre-wrap;">${escapeHtml(cert.ingrediente_dosis || '')}</td></tr></tbody>
       </table>
 
       <div class="doc-section" style="margin-top:14px;page-break-inside:avoid;break-inside:avoid;">
@@ -14751,6 +14828,9 @@
     `;
     certificadoNombreArchivoActual = `Certificado-${cert.folio}-${cliente.nombre || 'cliente'}`
       .replace(/[^a-zA-Z0-9_\-]+/g, '_');
+    certEnvioActual = { cert, clienteNombre: cliente.nombre || '' };
+    document.getElementById('certEnvioPanel').classList.add('hidden');
+    document.getElementById('certEnvioPanel').innerHTML = '';
     certificadoPrintOverlay.classList.remove('hidden');
   }
 
@@ -14848,19 +14928,25 @@
         console.warn('Certificado: el contenido (' + altoNatural + 'px) supera el area imprimible de 1 hoja carta (' + AREA_ALTO_PX + 'px). Se genera el PDF igual, sin recortar ni escalar (para no arriesgar una captura en blanco); podria salir en 2 paginas en este caso.');
       }
 
-      await html2pdf()
+      const trabajo = html2pdf()
         .set({
           filename: certificadoNombreArchivoActual + '.pdf',
           margin: MARGEN_MM,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 3, backgroundColor: '#ffffff', useCORS: true },
+          image: { type: 'jpeg', quality: certPdfBlobResolver ? 0.85 : 0.98 },
+          html2canvas: { scale: certPdfBlobResolver ? 2 : 3, backgroundColor: '#ffffff', useCORS: true },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
           pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
         })
-        .from(certificadoDocContent)
-        .save();
+        .from(certificadoDocContent);
+      if(certPdfBlobResolver){
+        const blob = await trabajo.outputPdf('blob');
+        const r = certPdfBlobResolver; certPdfBlobResolver = null; r(blob);
+      } else {
+        await trabajo.save();
+      }
     }catch(e){
       console.error('No se pudo generar el PDF del certificado:', e);
+      if(certPdfBlobResolver){ const r = certPdfBlobResolver; certPdfBlobResolver = null; r(null); }
       alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
     }finally{
       certificadoDocContent.style.cssText = cssOriginal;
@@ -14871,8 +14957,146 @@
     }
   });
 
+  // ---------- Certificado: productos desde Consumos, recomendaciones y envio (oct 2026) ----------
+  const CERT_RECOMENDACIONES = [
+    'Retirar cajas y objetos del piso',
+    'Sellar grietas y orificios',
+    'Reparar fugas de agua',
+    'Mantener basura tapada y retirarla a diario',
+    'Limpiar restos de comida en cocina',
+    'No lavar ni trapear las áreas tratadas en 24 horas',
+    'Mantener puertas cerradas o con barredor',
+    'Podar y limpiar áreas verdes',
+  ];
+  function certRenderRecomendaciones(){
+    const cont = document.getElementById('certRecoChips');
+    if(!cont) return;
+    cont.innerHTML = CERT_RECOMENDACIONES.map(r => `<button type="button" class="cert-reco-chip">${escapeHtml(r)}</button>`).join('');
+  }
+  document.getElementById('certRecoChips').addEventListener('click', ev => {
+    const b = ev.target.closest('.cert-reco-chip');
+    if(!b) return;
+    const ta = document.getElementById('certificadoComentarios');
+    const texto = 'Se recomienda: ' + b.textContent + '.';
+    if(ta.value.includes(b.textContent)) return;
+    ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + texto;
+  });
+
+  // Texto "Producto — cantidad" con lo registrado en Consumos (ya guardado
+  // y por guardar) de esta visita. Vacio si no hay nada.
+  function certTextoDesdeConsumos(){
+    const lineas = [];
+    (reporteConsumosGuardadosCache || []).forEach(c => {
+      const nombre = (c.insumos && c.insumos.nombre) || c.nombre || '';
+      const unidad = (c.insumos && c.insumos.unidad_base) || c.unidadBase || '';
+      if(nombre) lineas.push(`${nombre} — ${formatCantidadBase(c.cantidad_base != null ? c.cantidad_base : c.cantidad, unidad)}`);
+    });
+    (reporteConsumosPendientes || []).forEach(c => {
+      lineas.push(`${c.nombre} — ${formatCantidadBase(c.cantidad, c.unidadBase)}`);
+    });
+    return lineas.join('\n');
+  }
+  document.getElementById('btnCertDesdeConsumos').addEventListener('click', () => {
+    const texto = certTextoDesdeConsumos();
+    if(!texto){ alert('Todavía no registras productos en "Consumos" de este reporte. Regístralos ahí con la cantidad que usaste.'); return; }
+    document.getElementById('certificadoIngredienteDosis').value = texto;
+    mostrarToast('Productos tomados de Consumos');
+  });
+
+  // Envio al cliente: genera el PDF, lo guarda en el almacenamiento
+  // privado (bucket "certificados") y arma una liga que dura 1 año para
+  // mandarla por WhatsApp o correo a los contactos marcados con
+  // "Recibe certificados" (pestana Clientes).
+  let certEnvioActual = null;
+  let certPdfBlobResolver = null;
+  function certGenerarPdfBlob(){
+    return new Promise(resolve => {
+      certPdfBlobResolver = resolve;
+      document.getElementById('btnDescargarCertificadoPDF').click();
+    });
+  }
+
+  async function certDestinatarios(clienteId){
+    const { data: cli } = await supabaseClient.from('clientes').select('id, nombre, telefono, email, contacto, empresa_id').eq('id', clienteId).maybeSingle();
+    const lista = [];
+    if(cli && cli.empresa_id){
+      const { data: conts } = await supabaseClient.from('contactos_cliente')
+        .select('nombre, telefono, email, cliente_id, recibe_certificados').eq('empresa_id', cli.empresa_id);
+      (conts || []).filter(c => c.recibe_certificados && (!c.cliente_id || c.cliente_id === clienteId))
+        .forEach(c => lista.push({ nombre: c.nombre, telefono: c.telefono, email: c.email }));
+    }
+    if(!lista.length && cli && (cli.telefono || cli.email)){
+      lista.push({ nombre: cli.contacto || cli.nombre, telefono: cli.telefono, email: cli.email, delCliente: true });
+    }
+    return { cliente: cli, lista };
+  }
+
+  document.getElementById('btnEnviarCertificado').addEventListener('click', async () => {
+    if(!certEnvioActual || !certEnvioActual.cert) return;
+    const cert = certEnvioActual.cert;
+    const panel = document.getElementById('certEnvioPanel');
+    const btn = document.getElementById('btnEnviarCertificado');
+    btn.disabled = true;
+    panel.classList.remove('hidden');
+    panel.innerHTML = '<div class="hint">Preparando el PDF para enviar...</div>';
+    try{
+      const blob = await certGenerarPdfBlob();
+      if(!blob) throw new Error('no se generó el PDF');
+      const clienteId = cert.cliente_id || reporteClienteActualId;
+      const ruta = `${clienteId || 'sin-cliente'}/certificado-${cert.folio}.pdf`;
+      const subida = await supabaseClient.storage.from('certificados').upload(ruta, blob, { contentType: 'application/pdf', upsert: true });
+      if(subida.error) throw new Error(subida.error.message);
+      const firmada = await supabaseClient.storage.from('certificados').createSignedUrl(ruta, 60 * 60 * 24 * 365);
+      if(firmada.error) throw new Error(firmada.error.message);
+      const liga = firmada.data.signedUrl;
+      const { cliente, lista } = await certDestinatarios(clienteId);
+      const nombreCli = (cliente && cliente.nombre) || certEnvioActual.clienteNombre || '';
+      const mensaje = `Hola, le compartimos el certificado de fumigación de ${nombreCli} (folio ${cert.folio}, ${formatDate(cert.fecha)}). Puede verlo y descargarlo aquí: ${liga}\n\nFumigaciones AECO`;
+      const correos = [...new Set(lista.map(d => (d.email || '').trim()).filter(e => validarEmailBasico(e)))];
+      const filas = lista.map(d => {
+        const tel = cpTel10(d.telefono);
+        return `<div class="cert-envio-fila"><span style="flex:1 1 180px;">${escapeHtml(d.nombre || '')}${d.delCliente ? ' <span class="hint">(datos del cliente)</span>' : ''}</span>
+          ${tel ? `<a class="btn small cp-wa" target="_blank" rel="noopener" data-via="whatsapp" href="https://wa.me/52${tel}?text=${encodeURIComponent(mensaje)}">WhatsApp ${escapeHtml(d.telefono)}</a>` : ''}
+          ${d.email && validarEmailBasico(d.email) ? `<span class="hint">${escapeHtml(d.email)}</span>` : ''}</div>`;
+      }).join('');
+      const asunto = `Certificado de fumigación ${nombreCli} - folio ${cert.folio}`;
+      panel.innerHTML = `<h4>Enviar certificado</h4>
+        ${lista.length ? filas : '<div class="hint">Este cliente no tiene contactos marcados con "Recibe certificados". Agrégalos en la pestaña Clientes, o mándalo desde aquí:</div>'}
+        <div class="cert-envio-fila">
+          ${correos.length ? `<a class="btn small" data-via="correo" href="mailto:${correos.map(encodeURIComponent).join(',')}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(mensaje)}">Correo ${correos.length === 1 ? 'al contacto' : 'a los ' + correos.length + ' contactos'}</a>` : ''}
+          <a class="btn secondary small" data-via="whatsapp" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensaje)}">WhatsApp (elegir contacto)</a>
+          <button type="button" class="btn secondary small" id="btnCopiarLigaCert">Copiar liga</button>
+        </div>
+        <div class="hint">La liga del PDF funciona por 1 año.</div>`;
+      document.getElementById('btnCopiarLigaCert').addEventListener('click', async () => {
+        try{ await navigator.clipboard.writeText(liga); mostrarToast('Liga copiada'); }
+        catch(e){ prompt('Copia la liga:', liga); }
+      });
+      panel.querySelectorAll('[data-via]').forEach(a => a.addEventListener('click', () => {
+        if(!cert.visita_id) return;
+        supabaseClient.from('certificados_visita').update({
+          pdf_path: ruta, enviado_en: new Date().toISOString(), enviado_via: a.dataset.via,
+          enviado_por: (usuarioActual && usuarioActual.id) || null,
+        }).eq('visita_id', cert.visita_id).then(({ error }) => { if(error) console.error('No se pudo marcar el envío:', error); });
+      }));
+    }catch(e){
+      console.error('Envío de certificado:', e);
+      panel.innerHTML = `<div class="hint" style="color:#b3261e;">No se pudo preparar el envío: ${escapeHtml(e.message || String(e))}. Puedes usar "Descargar PDF" y mandarlo a mano.</div>`;
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
   document.getElementById('btnGuardarCertificado').addEventListener('click', async ()=>{
     const btn = document.getElementById('btnGuardarCertificado');
+    // Producto aplicado con su cantidad real: sin esto el certificado no
+    // sirve de evidencia ni se descuenta del almacen.
+    const hayConsumos = (reporteConsumosGuardadosCache.length + reporteConsumosPendientes.length) > 0;
+    if(!document.getElementById('certificadoIngredienteDosis').value.trim()){
+      alert('Escribe los productos que aplicaste y la cantidad (o regístralos en "Consumos" y toca "Usar lo que registré en Consumos").');
+      return;
+    }
+    if(!hayConsumos && !confirm('No registraste en "Consumos" los productos que usaste, así que no se descontarán del almacén. ¿Guardar el certificado de todos modos?')) return;
     btn.disabled = true;
 
     // Guarda primero el reporte de visita (estaciones/avisos/consumos y las
@@ -14886,6 +15110,7 @@
 
     const servicios = leerCertChecklist('certificadoServiciosLista');
     servicios.otros = document.getElementById('certificadoServiciosOtros').value.trim();
+    servicios.nivel_actividad = document.getElementById('certificadoNivelActividad').value || '';
     const areas = leerCertChecklist('certificadoAreasLista');
     areas.otros = document.getElementById('certificadoAreasOtros').value.trim();
 
