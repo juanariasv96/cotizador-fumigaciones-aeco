@@ -1715,6 +1715,7 @@
   <button class="tab-btn hidden" data-tab="perdidos" id="tabBtnPerdidos">Clientes perdidos <span class="tab-contador hidden" id="tabPerdidosContador">0</span></button>
   <button class="tab-btn hidden" data-tab="ocasionales" id="tabBtnOcasionales">Clientes ocasionales <span class="tab-contador hidden" id="tabOcasionalesContador">0</span></button>
   <button class="tab-btn hidden" data-tab="porEnviar" id="tabBtnPorEnviar">Certificados por enviar <span class="tab-contador hidden" id="tabPorEnviarContador">0</span></button>
+  <button class="tab-btn hidden" data-tab="porFacturar" id="tabBtnPorFacturar">Por facturar</button>
   <button class="tab-btn" data-tab="servicios" id="tabBtnServicios">Servicios</button>
   <button class="tab-btn" data-tab="calendario" id="tabBtnCalendario">Calendario</button>
   <button class="tab-btn hidden" data-tab="prospectos" id="tabBtnProspectos">Prospectos web <span class="tab-contador hidden" id="tabProspectosContador">0</span></button>
@@ -2755,6 +2756,36 @@
       <div id="peResumen" class="hint" style="margin-bottom:8px;"></div>
       <div id="peLista"></div>
     </div>
+  </section>
+
+  <section id="tab-porFacturar" class="hidden">
+    <div class="panel">
+      <h2>Por facturar</h2>
+      <p style="font-size:12px;color:#777;margin-top:0;">
+        Servicios del mes agrupados como se le factura a cada empresa (pestaña Clientes: "¿Cómo se le factura?" y "Se factura aparte").
+        Haz la factura como siempre y aquí márcala como facturada con su folio, para que nada se quede sin cobrar.
+      </p>
+      <div id="pfAviso" class="hint hidden" style="margin-bottom:12px;color:#8a6100;"></div>
+      <div class="grid" style="margin-bottom:12px;align-items:end;">
+        <div class="field" style="max-width:200px;"><label for="pfMes">Mes</label><input type="month" id="pfMes"></div>
+        <div class="field" style="max-width:240px;"><label for="pfFiltro">Mostrar</label>
+          <select id="pfFiltro"><option value="pendientes">Solo lo que falta facturar</option><option value="todos">Todo el mes</option></select></div>
+        <div class="field"><label for="pfBuscar">Buscar</label><input type="text" id="pfBuscar" placeholder="Empresa o sucursal"></div>
+      </div>
+      <div id="pfResumen" class="hint" style="margin-bottom:10px;font-size:14px;"></div>
+      <div id="pfLista"></div>
+    </div>
+    <style>
+      .pf-grupo{border:1px solid #dfe6e0;border-left:5px solid #1E88E5;border-radius:8px;padding:12px 14px;margin-bottom:12px;background:#fff}
+      .pf-tabla{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+      .pf-tabla th{background:#f4f7f5;color:#555;font-weight:600;text-align:left;padding:6px}
+      .pf-tabla td{padding:6px;border-top:1px solid #eef1ef;vertical-align:middle}
+      .pf-tabla input[type=checkbox]{width:auto;margin:0}
+      .pf-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}
+      .pf-ok{background:#e3f0e8;color:#016937}.pf-ok2{background:#e3f0fb;color:#1f5f99}
+      .pf-alerta{background:#fff3cd;color:#8a6100}.pf-gris{background:#eef1ef;color:#666}
+      .pf-pie{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px dashed #dfe6e0}
+    </style>
   </section>
 
   <section id="tab-servicios" class="hidden">
@@ -4632,6 +4663,7 @@
     if(veePerdidos) refrescarContadorOcasionales();
     const veePorEnviar = ['dueño', 'asistente'].includes(usuarioActual.rol);
     document.getElementById('tabBtnPorEnviar').classList.toggle('hidden', !veePorEnviar);
+    document.getElementById('tabBtnPorFacturar').classList.toggle('hidden', !veePorEnviar);
     if(veePorEnviar) refrescarContadorPorEnviar();
     document.getElementById('tabBtnAlmacen').classList.toggle('hidden',
       !['dueño', 'asistente'].includes(usuarioActual.rol));
@@ -5481,6 +5513,7 @@
     perdidos: document.getElementById('tab-perdidos'),
     ocasionales: document.getElementById('tab-ocasionales'),
     porEnviar: document.getElementById('tab-porEnviar'),
+    porFacturar: document.getElementById('tab-porFacturar'),
     servicios: document.getElementById('tab-servicios'),
     calendario: document.getElementById('tab-calendario'),
     prospectos: document.getElementById('tab-prospectos'),
@@ -5657,6 +5690,7 @@
     if(nombre === 'perdidos') cargarPerdidosModulo();
     if(nombre === 'ocasionales') cargarOcasionalesModulo();
     if(nombre === 'porEnviar') cargarPorEnviar();
+    if(nombre === 'porFacturar') cargarPorFacturar();
     if(nombre === 'calendario') inicializarCalendario();
     if(nombre === 'pendientes') cargarPendientes();
     if(nombre === 'prospectos') cargarProspectos();
@@ -5707,6 +5741,7 @@
     perdidos:       { n: 'Clientes perdidos', c: '#6C5CE7', d: '<circle cx="19" cy="16" r="8" fill="#6C5CE7"/><path d="M4 41c0-9 7-15 15-15s15 6 15 15z" fill="#6C5CE7"/><circle cx="36" cy="32" r="10" fill="#fff" stroke="#E74C3C" stroke-width="3"/><path d="M31 32h10" stroke="#E74C3C" stroke-width="3.5" stroke-linecap="round"/>' },
     ocasionales:    { n: 'Clientes ocasionales', c: '#00897B', d: '<circle cx="24" cy="26" r="16" fill="#00897B"/><path d="M24 16v10l7 4" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10l5-4M40 10l-5-4" stroke="#00897B" stroke-width="3.5" stroke-linecap="round"/><circle cx="37" cy="37" r="7" fill="#F39C12" stroke="#fff" stroke-width="2"/><path d="M37 34v4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="37" cy="40.5" r="1.2" fill="#fff"/>' },
     porEnviar:      { n: 'Certificados por enviar', c: '#1E88E5', d: '<rect x="9" y="5" width="24" height="32" rx="3" fill="#fff" stroke="#1E88E5" stroke-width="3"/><path d="M14 14h14M14 20h14M14 26h9" stroke="#1E88E5" stroke-width="2.5" stroke-linecap="round"/><path d="M24 33l18-8-6 18-4-7z" fill="#1E88E5"/><path d="M32 36l10-11" stroke="#fff" stroke-width="1.5"/>' },
+    porFacturar:    { n: 'Por facturar', c: '#2E7D32', d: '<rect x="8" y="5" width="28" height="38" rx="3" fill="#2E7D32"/><path d="M14 14h16M14 20h16M14 26h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="35" cy="35" r="9" fill="#F9A825" stroke="#fff" stroke-width="2"/><path d="M35 30v10M32.5 32.5c0-1.5 5-1.5 5 0s-5 1.5-5 3 5 1.5 5 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>' },
     hoteles:        { n: 'Hoteles', c: '#B03A2E', d: '<path d="M6 41V20h36v21" fill="none" stroke="#B03A2E" stroke-width="3.5" stroke-linejoin="round"/><rect x="6" y="28" width="36" height="7" fill="#B03A2E"/><circle cx="14" cy="24" r="4" fill="#B03A2E"/><path d="M20 28v-6h18a4 4 0 0 1 4 4v2z" fill="#e6b0aa"/>' },
   };
 
@@ -10071,6 +10106,220 @@
       alGuardar: () => cpGuardarSeguimiento(perdido, 'Es cliente ocasional: pasó a Clientes ocasionales.', 'Descartado', null),
     });
   }
+
+  // ---------- Por facturar (oct 2026) ----------
+  // Servicios del mes agrupados como se le factura a cada empresa
+  // (empresas.modo_facturacion + clientes.facturar_aparte). Nora marca cada
+  // grupo como facturado (folio/UUID) o un servicio como "no se cobra".
+  // Tablas: facturas_cliente, visitas_programadas.factura_id/no_facturar
+  // (ver sql/por_facturar_setup.sql).
+  const pfEstado = { visitas: [], empresas: {}, facturas: {}, grupos: [], baseLista: false };
+  const PF_MODOS = { por_sucursal: 'Una factura por sucursal', consolidada: 'Una sola factura por todo', variable: 'Varía (se decide cada vez)' };
+
+  function pfMesActual(){
+    const sel = document.getElementById('pfMes');
+    if(!sel.value){ const d = new Date(); sel.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+    return sel.value;
+  }
+  function pfRango(mes){
+    const [a, m] = mes.split('-').map(Number);
+    const fin = new Date(a, m, 0).getDate();
+    return [`${mes}-01`, `${mes}-${String(fin).padStart(2, '0')}`];
+  }
+  function pfImporte(v){
+    if(v.tipo === 'Refuerzo') return 0;
+    const c = v.servicios_cliente && v.servicios_cliente.costo_sin_iva;
+    return c != null ? Number(c) : 0;
+  }
+
+  async function cargarPorFacturar(){
+    const lista = document.getElementById('pfLista');
+    lista.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    const [desde, hasta] = pfRango(pfMesActual());
+    const v = await supabaseClient.from('visitas_programadas')
+      .select('id, cliente_id, servicio_id, fecha_programada, fecha_realizada, estatus, tipo, factura_id, no_facturar, motivo_no_facturar, clientes(nombre, empresa_id, facturar_aparte), servicios_cliente(tipo_servicio, sede, costo_sin_iva, frecuencia)')
+      .gte('fecha_programada', desde).lte('fecha_programada', hasta).order('fecha_programada');
+    const aviso = document.getElementById('pfAviso');
+    if(v.error){
+      pfEstado.baseLista = false;
+      aviso.textContent = 'Esta sección todavía no está activada en la base de datos (falta correr por_facturar_setup.sql en Supabase).';
+      aviso.classList.remove('hidden');
+      lista.innerHTML = '';
+      document.getElementById('pfResumen').textContent = '';
+      console.error('Por facturar:', v.error);
+      return;
+    }
+    aviso.classList.add('hidden');
+    pfEstado.baseLista = true;
+    pfEstado.visitas = (v.data || []).filter(x => x.estatus !== 'Reprogramada');
+    const idsEmp = [...new Set(pfEstado.visitas.map(x => x.clientes && x.clientes.empresa_id).filter(Boolean))];
+    const idsFac = [...new Set(pfEstado.visitas.map(x => x.factura_id).filter(Boolean))];
+    const [e, f] = await Promise.all([
+      idsEmp.length ? supabaseClient.from('empresas').select('id, nombre, rfc, modo_facturacion').in('id', idsEmp) : Promise.resolve({ data: [] }),
+      idsFac.length ? supabaseClient.from('facturas_cliente').select('id, folio, uuid_fiscal, fecha, subtotal').in('id', idsFac) : Promise.resolve({ data: [] }),
+    ]);
+    pfEstado.empresas = {}; (e.data || []).forEach(x => { pfEstado.empresas[x.id] = x; });
+    pfEstado.facturas = {}; (f.data || []).forEach(x => { pfEstado.facturas[x.id] = x; });
+    pfRender();
+  }
+
+  // Arma los grupos de factura: consolidada = 1 por empresa (las sucursales
+  // "facturar aparte" van solas); por sucursal = 1 por sucursal.
+  function pfArmarGrupos(){
+    const grupos = {};
+    pfEstado.visitas.forEach(v => {
+      const cli = v.clientes || {};
+      const emp = pfEstado.empresas[cli.empresa_id] || null;
+      const modo = (emp && emp.modo_facturacion) || 'por_sucursal';
+      const juntar = (modo === 'consolidada' || modo === 'variable') && !cli.facturar_aparte;
+      const clave = juntar ? 'E:' + (cli.empresa_id || v.cliente_id) : 'S:' + v.cliente_id;
+      if(!grupos[clave]){
+        grupos[clave] = {
+          clave, empresa: emp, modo, juntar,
+          titulo: juntar ? ((emp && emp.nombre) || cli.nombre || 'Cliente') : (cli.nombre || 'Cliente'),
+          subtitulo: juntar ? '' : (emp && emp.nombre && cpTxt(emp.nombre) !== cpTxt(cli.nombre) ? 'Empresa: ' + emp.nombre : ''),
+          visitas: [],
+        };
+      }
+      grupos[clave].visitas.push(v);
+    });
+    return Object.values(grupos).sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+  }
+
+  function pfRender(){
+    const filtro = document.getElementById('pfFiltro').value;
+    const buscar = cpTxt(document.getElementById('pfBuscar').value).trim();
+    const hoy = fechaALocalISO(new Date());
+    let grupos = pfArmarGrupos();
+    const pendienteDe = g => g.visitas.filter(v => !v.factura_id && !v.no_facturar);
+    let totPend = 0, nPend = 0, totFact = 0, sinReporte = 0;
+    grupos.forEach(g => g.visitas.forEach(v => {
+      if(v.factura_id) totFact += pfImporte(v);
+      else if(!v.no_facturar && v.tipo !== 'Refuerzo'){ totPend += pfImporte(v); nPend++; if(v.estatus !== 'Realizada' && v.fecha_programada <= hoy) sinReporte++; }
+    }));
+    document.getElementById('pfResumen').innerHTML =
+      `<strong>${formatMoney(totPend)}</strong> por facturar (${nPend} servicios, sin IVA) · ${formatMoney(totFact)} ya facturado este mes`
+      + (sinReporte ? ` · <span class="cp-vencido">${sinReporte} sin reporte del técnico</span>` : '');
+    if(filtro === 'pendientes') grupos = grupos.filter(g => pendienteDe(g).length);
+    if(buscar) grupos = grupos.filter(g => cpTxt(g.titulo + ' ' + g.visitas.map(v => (v.clientes && v.clientes.nombre) || '').join(' ')).includes(buscar));
+    pfEstado.grupos = grupos;
+    const lista = document.getElementById('pfLista');
+    if(!grupos.length){ lista.innerHTML = `<div class="empty-msg">${filtro === 'pendientes' ? 'No hay servicios pendientes de facturar en este mes.' : 'No hay servicios en este mes.'}</div>`; return; }
+
+    lista.innerHTML = grupos.map((g, gi) => {
+      const pend = pendienteDe(g);
+      const sub = pend.reduce((s, v) => s + pfImporte(v), 0);
+      const filas = g.visitas.map(v => {
+        const cli = v.clientes || {};
+        const sc = v.servicios_cliente || {};
+        const fac = v.factura_id ? pfEstado.facturas[v.factura_id] : null;
+        let estado;
+        if(fac) estado = `<span class="pf-tag pf-ok">Facturado ${escapeHtml(fac.folio || '')}</span>`;
+        else if(v.no_facturar) estado = `<span class="pf-tag pf-gris">No se cobra${v.motivo_no_facturar ? ': ' + escapeHtml(v.motivo_no_facturar) : ''}</span>`;
+        else if(v.estatus === 'Realizada') estado = '<span class="pf-tag pf-ok2">Realizado</span>';
+        else if(v.fecha_programada <= hoy) estado = '<span class="pf-tag pf-alerta">Sin reporte</span>';
+        else estado = '<span class="pf-tag pf-gris">Programado</span>';
+        const editable = !v.factura_id && !v.no_facturar;
+        return `<tr data-v="${v.id}">
+          <td>${editable ? `<input type="checkbox" class="pf-chk" data-g="${gi}" data-v="${v.id}" ${v.tipo === 'Refuerzo' ? '' : 'checked'}>` : ''}</td>
+          <td>${formatDate(v.fecha_programada)}</td>
+          <td>${g.juntar ? escapeHtml(cli.nombre || '') + '<br>' : ''}<span class="ce-mini">${escapeHtml(v.tipo === 'Refuerzo' ? 'Refuerzo (sin costo)' : (sc.tipo_servicio || 'Servicio'))}${sc.sede ? ' · ' + escapeHtml(sc.sede) : ''}</span></td>
+          <td>${estado}</td>
+          <td style="text-align:right;">${formatMoney(pfImporte(v))}</td>
+          <td>${editable ? `<button type="button" class="btn secondary small" data-pf="nocobra" data-v="${v.id}">No se cobra</button>` : (v.no_facturar ? `<button type="button" class="btn secondary small" data-pf="sicobra" data-v="${v.id}">Sí se cobra</button>` : '')}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="pf-grupo" data-g="${gi}">
+        <div class="cp-cab"><span class="cp-nombre">${escapeHtml(g.titulo)}</span>
+          <span class="ce-mini">${g.empresa && g.empresa.rfc ? 'RFC ' + escapeHtml(g.empresa.rfc) + ' · ' : '<span class="cp-vencido">Sin RFC</span> · '}${escapeHtml(!g.juntar && g.modo !== 'por_sucursal' ? 'Se factura aparte' : (PF_MODOS[g.modo] || ''))}</span></div>
+        ${g.subtitulo ? `<div class="ce-mini">${escapeHtml(g.subtitulo)}</div>` : ''}
+        <div style="overflow-x:auto;"><table class="pf-tabla"><thead><tr><th></th><th>Fecha</th><th>Servicio</th><th>Estado</th><th style="text-align:right;">Importe</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
+        ${pend.length ? `<div class="pf-pie">
+          <span>Seleccionado: <strong class="pf-sub" data-g="${gi}">${formatMoney(sub)}</strong> + IVA = <strong class="pf-tot" data-g="${gi}">${formatMoney(sub * (1 + IVA_TASA))}</strong></span>
+          <button type="button" class="btn small" data-pf="facturar" data-g="${gi}">Marcar como facturado</button>
+        </div><div class="pf-zona" data-g="${gi}"></div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function pfSeleccion(gi){
+    return [...document.querySelectorAll(`.pf-chk[data-g="${gi}"]:checked`)].map(c => c.dataset.v);
+  }
+  function pfActualizarTotales(gi){
+    const ids = pfSeleccion(gi);
+    const sub = pfEstado.visitas.filter(v => ids.includes(v.id)).reduce((s, v) => s + pfImporte(v), 0);
+    const a = document.querySelector(`.pf-sub[data-g="${gi}"]`), b = document.querySelector(`.pf-tot[data-g="${gi}"]`);
+    if(a) a.textContent = formatMoney(sub);
+    if(b) b.textContent = formatMoney(sub * (1 + IVA_TASA));
+    return sub;
+  }
+
+  document.getElementById('pfLista').addEventListener('change', ev => {
+    const c = ev.target.closest('.pf-chk');
+    if(c) pfActualizarTotales(c.dataset.g);
+  });
+
+  document.getElementById('pfLista').addEventListener('click', async ev => {
+    const btn = ev.target.closest('[data-pf]');
+    if(!btn) return;
+    const acc = btn.dataset.pf;
+    if(acc === 'nocobra' || acc === 'sicobra'){
+      const v = pfEstado.visitas.find(x => x.id === btn.dataset.v);
+      if(!v) return;
+      let motivo = null;
+      if(acc === 'nocobra'){
+        motivo = prompt('¿Por qué no se cobra este servicio? (ej. garantía, cortesía, incluido en otro servicio)');
+        if(motivo === null) return;
+      }
+      const cambios = { no_facturar: acc === 'nocobra', motivo_no_facturar: acc === 'nocobra' ? (motivo.trim() || null) : null };
+      const { error } = await supabaseClient.from('visitas_programadas').update(cambios).eq('id', v.id);
+      if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      Object.assign(v, cambios);
+      pfRender();
+      return;
+    }
+    if(acc === 'facturar'){
+      const gi = btn.dataset.g;
+      const ids = pfSeleccion(gi);
+      if(!ids.length){ alert('Selecciona al menos un servicio.'); return; }
+      const sub = pfActualizarTotales(gi);
+      const zona = document.querySelector(`.pf-zona[data-g="${gi}"]`);
+      zona.innerHTML = `<div class="cp-caja"><div class="grid" style="align-items:end;">
+          <div class="field"><label>Folio de la factura</label><input type="text" class="pf-folio" placeholder="Ej. A-1234"></div>
+          <div class="field"><label>UUID (opcional)</label><input type="text" class="pf-uuid" placeholder="Del XML o PDF de la factura"></div>
+          <div class="field"><label>Fecha</label><input type="date" class="pf-fecha" value="${fechaALocalISO(new Date())}"></div>
+          <div class="field"><label>Subtotal sin IVA</label><input type="number" step="0.01" class="pf-subtotal" value="${sub.toFixed(2)}"></div>
+        </div>
+        <div class="actions-row" style="margin-top:8px;"><button type="button" class="btn secondary small pf-no">Cancelar</button><button type="button" class="btn small pf-ok">Guardar factura (${ids.length} servicio${ids.length === 1 ? '' : 's'})</button></div></div>`;
+      zona.querySelector('.pf-folio').focus();
+      zona.querySelector('.pf-no').addEventListener('click', () => { zona.innerHTML = ''; });
+      zona.querySelector('.pf-ok').addEventListener('click', async () => {
+        const folio = zona.querySelector('.pf-folio').value.trim();
+        const uuidF = zona.querySelector('.pf-uuid').value.trim();
+        if(!folio && !uuidF){ alert('Escribe el folio o el UUID de la factura.'); return; }
+        const g = pfEstado.grupos[gi];
+        const primera = pfEstado.visitas.find(v => v.id === ids[0]);
+        const empresaId = (g && g.empresa && g.empresa.id) || (primera && primera.clientes && primera.clientes.empresa_id) || null;
+        const subtotal = Number(zona.querySelector('.pf-subtotal').value) || 0;
+        const r = await supabaseClient.from('facturas_cliente').insert({
+          empresa_id: empresaId, folio: folio || null, uuid_fiscal: uuidF || null,
+          fecha: zona.querySelector('.pf-fecha').value || fechaALocalISO(new Date()), subtotal,
+          creado_por: (usuarioActual && usuarioActual.id) || null,
+        }).select('*').single();
+        if(r.error){ alert('No se pudo guardar la factura: ' + r.error.message); return; }
+        const u = await supabaseClient.from('visitas_programadas').update({ factura_id: r.data.id }).in('id', ids);
+        if(u.error){ alert('La factura se guardó pero no se pudieron ligar los servicios: ' + u.error.message); }
+        pfEstado.facturas[r.data.id] = r.data;
+        pfEstado.visitas.forEach(v => { if(ids.includes(v.id)) v.factura_id = r.data.id; });
+        mostrarToast('Factura registrada');
+        pfRender();
+      });
+    }
+  });
+
+  document.getElementById('pfMes').addEventListener('change', () => cargarPorFacturar());
+  document.getElementById('pfFiltro').addEventListener('change', () => { if(pfEstado.baseLista) pfRender(); });
+  document.getElementById('pfBuscar').addEventListener('input', () => { if(pfEstado.baseLista) pfRender(); });
 
   let clientesCache = [];
   let estacionesClienteActualId = '';
