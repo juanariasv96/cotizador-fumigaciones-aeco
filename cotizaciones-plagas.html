@@ -2976,6 +2976,7 @@
         <h3 id="calMesLabel">Enero 2026</h3>
         <button type="button" class="btn secondary small" id="btnCalMesSiguiente">Mes siguiente →</button>
         <button type="button" class="btn secondary small" id="btnCalHoy">Hoy</button>
+        <button type="button" class="btn small" id="btnAgendarUnico">+ Agendar servicio único</button>
         <button type="button" class="btn secondary small" id="btnAgendarRefuerzo">+ Agendar refuerzo</button>
       </div>
 
@@ -4093,6 +4094,99 @@
     </div>
   </div>
 </div>
+<div id="unicoOverlay" class="hidden">
+  <div id="unicoPanel">
+    <h3 style="margin-top:0;">Agendar servicio único</h3>
+    <p style="font-size:12px;color:#777;margin-top:0;">Servicio de una sola vez (casa, negocio que llama de vez en cuando, cucaracha alemana, termitas...). Queda en el calendario del técnico, sale en "Por facturar" y lleva su certificado como cualquier visita.</p>
+
+    <div class="field">
+      <label for="unicoCotizacion">¿Viene de una cotización cerrada? (opcional)</label>
+      <select id="unicoCotizacion"><option value="">No, lo capturo a mano</option></select>
+      <div class="hint" id="unicoCotizacionInfo"></div>
+    </div>
+
+    <div class="un-bloque">
+      <div class="un-tabs">
+        <button type="button" class="chip-opcion activo" data-un-modo="existente">Cliente que ya existe</button>
+        <button type="button" class="chip-opcion" data-un-modo="nuevo">+ Cliente nuevo</button>
+      </div>
+      <div id="unicoExistente">
+        <input type="text" id="unicoClienteBuscar" placeholder="Buscar por nombre, teléfono o dirección..." style="margin-bottom:6px;">
+        <select id="unicoCliente"><option value="">Selecciona...</option></select>
+      </div>
+      <div id="unicoNuevo" class="hidden">
+        <div class="field"><label for="unicoNombre">Nombre *</label><input type="text" id="unicoNombre" placeholder="Ej. Laura Garza / Taller Hernández"></div>
+        <div class="grid">
+          <div class="field"><label for="unicoTelefono">Teléfono</label><input type="tel" id="unicoTelefono" placeholder="10 dígitos"></div>
+          <div class="field"><label for="unicoCategoria">Tipo de cliente</label>
+            <select id="unicoCategoria"><option value="Residencial">Residencial (casa)</option><option value="Empresarial">Empresarial</option><option value="Industrial">Industrial</option></select></div>
+        </div>
+        <div class="field"><label for="unicoDireccion">Dirección</label><input type="text" id="unicoDireccion" placeholder="Calle, número, colonia"></div>
+        <div class="field"><label for="unicoZona">Municipio</label><select id="unicoZona"></select></div>
+        <div class="hint" id="unicoDuplicado" style="color:#8a6100;"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="unicoTipo">Servicio / plaga *</label>
+      <input type="text" id="unicoTipo" list="unicoTiposLista" placeholder="Ej. Insecto rastrero">
+      <datalist id="unicoTiposLista">
+        <option value="Fumigación general"></option>
+        <option value="Insecto rastrero"></option>
+        <option value="Rastrero y roedor"></option>
+        <option value="Roedor"></option>
+        <option value="Cucaracha alemana"></option>
+        <option value="Termitas"></option>
+        <option value="Chinches"></option>
+        <option value="Garrapatas y pulgas"></option>
+        <option value="Alacranes"></option>
+        <option value="Abejas / avispas"></option>
+        <option value="Murciélagos"></option>
+        <option value="Volador (moscas / mosquitos)"></option>
+        <option value="Sanitización"></option>
+      </datalist>
+    </div>
+    <div class="grid" style="align-items:end;">
+      <div class="field"><label for="unicoPrecio">Precio por visita sin IVA *</label><input type="number" id="unicoPrecio" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label for="unicoFactura">¿Pide factura?</label>
+        <select id="unicoFactura"><option value="si">Sí, va a "Por facturar"</option><option value="no">No (paga sin factura)</option></select></div>
+    </div>
+    <div class="hint" id="unicoPrecioIva"></div>
+    <div class="field"><label for="unicoSede">Sede / sucursal (opcional)</label><input type="text" id="unicoSede" placeholder="Solo si el cliente tiene varias"></div>
+
+    <div class="grid" style="align-items:end;">
+      <div class="field"><label for="unicoFecha">Fecha *</label><input type="date" id="unicoFecha"></div>
+      <div class="field"><label for="unicoHora">Hora</label><input type="time" id="unicoHora" style="width:100%;"></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 8px;">
+      <input type="checkbox" id="unicoSegunda" style="width:auto;margin:0;"> Lleva 2ª aplicación (ej. cucaracha alemana)
+    </label>
+    <div class="grid hidden" id="unicoSegundaFila" style="align-items:end;">
+      <div class="field"><label for="unicoFecha2">Fecha 2ª aplicación</label><input type="date" id="unicoFecha2"></div>
+      <div class="field"><div class="hint">Se sugiere a 15 días. Cada aplicación se cobra al precio por visita.</div></div>
+    </div>
+
+    <div class="field">
+      <label>Técnicos</label>
+      <div class="chips-grupo" id="unicoTecnicosChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
+    <div class="field">
+      <label for="unicoNotas">Indicaciones para el técnico</label>
+      <textarea id="unicoNotas" rows="2" placeholder="Ej. Tocar en la puerta verde, hay mascotas, preguntar por la Sra. Laura"></textarea>
+    </div>
+    <div class="actions-row" style="margin-top:14px;justify-content:flex-end;">
+      <button type="button" class="btn secondary small" id="btnCerrarUnico">Cancelar</button>
+      <button type="button" class="btn" id="btnGuardarUnico">Agendar servicio</button>
+    </div>
+  </div>
+</div>
+<style>
+  #unicoOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:30px 15px;overflow:auto;z-index:999;}
+  #unicoPanel{background:var(--blanco);width:100%;max-width:520px;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;}
+  .un-bloque{border:1px solid #dfe6e0;border-radius:8px;padding:10px 12px;margin:6px 0 12px;background:#fafcfa}
+  .un-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .cal-chip.unico{border-left:3px solid #6a1b9a;}
+</style>
 
 <!-- ================= OVERLAY DE REGISTRAR SEGUIMIENTO ================= -->
 <div id="seguimientoOverlay" class="hidden">
@@ -4693,6 +4787,7 @@
     }
     // Agendar un refuerzo/garantia es funcion de oficina, no del tecnico.
     document.getElementById('btnAgendarRefuerzo').classList.toggle('hidden', usuarioActual.rol === 'tecnico');
+    document.getElementById('btnAgendarUnico').classList.toggle('hidden', usuarioActual.rol === 'tecnico');
 
     // Pre-llenar (sin forzar) quién genera la cotización con el usuario logueado
     const nombreInput = document.getElementById('generadoPorNombre');
@@ -10223,7 +10318,7 @@
         return `<tr data-v="${v.id}">
           <td>${editable ? `<input type="checkbox" class="pf-chk" data-g="${gi}" data-v="${v.id}" ${v.tipo === 'Refuerzo' ? '' : 'checked'}>` : ''}</td>
           <td>${formatDate(v.fecha_programada)}</td>
-          <td>${g.juntar ? escapeHtml(cli.nombre || '') + '<br>' : ''}<span class="ce-mini">${escapeHtml(v.tipo === 'Refuerzo' ? 'Refuerzo (sin costo)' : (sc.tipo_servicio || 'Servicio'))}${sc.sede ? ' · ' + escapeHtml(sc.sede) : ''}</span></td>
+          <td>${g.juntar ? escapeHtml(cli.nombre || '') + '<br>' : ''}<span class="ce-mini">${escapeHtml(v.tipo === 'Refuerzo' ? 'Refuerzo (sin costo)' : (v.tipo === 'Único' ? 'Servicio único · ' : '') + (sc.tipo_servicio || 'Servicio'))}${sc.sede ? ' · ' + escapeHtml(sc.sede) : ''}</span></td>
           <td>${estado}</td>
           <td style="text-align:right;">${formatMoney(pfImporte(v))}</td>
           <td>${editable ? `<button type="button" class="btn secondary small" data-pf="nocobra" data-v="${v.id}">No se cobra</button>` : (v.no_facturar ? `<button type="button" class="btn secondary small" data-pf="sicobra" data-v="${v.id}">Sí se cobra</button>` : '')}</td>
@@ -13621,9 +13716,10 @@
         const nombresTecnicos = tecnicosDeVisita(v)
           .map(tecnicoId => (calTecnicosCache.find(t => t.id === tecnicoId) || {}).nombre)
           .filter(Boolean);
-        const etiqueta = (esRefuerzo ? '⚠ ' : '') + clienteNombre + (sedeServicio ? ' · ' + sedeServicio : '') + (nombresTecnicos.length > 1 ? ' (2)' : '');
+        const esUnico = v.tipo === 'Único';
+        const etiqueta = (esRefuerzo ? '⚠ ' : '') + (esUnico ? '★ ' : '') + clienteNombre + (sedeServicio ? ' · ' + sedeServicio : '') + (nombresTecnicos.length > 1 ? ' (2)' : '');
         const tituloTecnicos = nombresTecnicos.length > 0 ? nombresTecnicos.join(' + ') : 'Sin asignar';
-        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)}${sedeServicio ? ' — ' + escapeHtml(sedeServicio) : ''} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')}) · Técnico(s): ${escapeHtml(tituloTecnicos)}">${escapeHtml(etiqueta)}</button>`;
+        return `<button type="button" class="cal-chip ${estatusClase}${esRefuerzo ? ' refuerzo' : ''}${esUnico ? ' unico' : ''}" data-id="${v.id}" title="${escapeHtml(clienteNombre)}${sedeServicio ? ' — ' + escapeHtml(sedeServicio) : ''} — ${escapeHtml(tipoServicio)} (${escapeHtml(v.tipo || 'Mantenimiento')}, ${escapeHtml(v.estatus || 'Programada')}) · Técnico(s): ${escapeHtml(tituloTecnicos)}">${escapeHtml(etiqueta)}</button>`;
       }).join('');
 
       celdas += `
@@ -13664,9 +13760,10 @@
           .map(tecnicoId => (calTecnicosCache.find(t => t.id === tecnicoId) || {}).nombre)
           .filter(Boolean);
         const hora = v.hora ? v.hora.slice(0, 5) : '';
-        return '<button type="button" class="cal-chip ' + estatusClase + (esRefuerzo ? ' refuerzo' : '') + '" data-id="' + v.id + '">'
+        const esUnico = v.tipo === 'Único';
+        return '<button type="button" class="cal-chip ' + estatusClase + (esRefuerzo ? ' refuerzo' : '') + (esUnico ? ' unico' : '') + '" data-id="' + v.id + '">'
           + (hora ? '<span class="cal-agenda-hora">' + hora + '</span> ' : '')
-          + (esRefuerzo ? 'Refuerzo: ' : '')
+          + (esRefuerzo ? 'Refuerzo: ' : '') + (esUnico ? 'Servicio único: ' : '')
           + escapeHtml(clienteNombre)
           + (sedeServicio ? ' &middot; ' + escapeHtml(sedeServicio) : '')
           + '<br><span class="cal-agenda-tec">' + (nombresTecnicos.length ? escapeHtml(nombresTecnicos.join(' + ')) : 'Sin asignar') + '</span>'
@@ -13883,6 +13980,243 @@
     renderCalendarioMes();
   });
 
+
+  // ---------- Agendar servicio único (oficina) ----------
+  // Un servicio de una sola vez = un servicios_cliente inactivo (no es
+  // póliza) con su precio + una o dos visitas tipo "Único". Así sale en el
+  // calendario del técnico, en Por facturar y con su certificado.
+  const unicoOverlay = document.getElementById('unicoOverlay');
+  const unicoTecnicosChips = document.getElementById('unicoTecnicosChips');
+  let unicoModo = 'existente';
+  unicoTecnicosChips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip-opcion');
+    if(chip) chip.classList.toggle('activo');
+  });
+  let unicoCotizaciones = [];
+
+  function unicoSetModo(modo){
+    unicoModo = modo;
+    document.querySelectorAll('[data-un-modo]').forEach(b => b.classList.toggle('activo', b.dataset.unModo === modo));
+    document.getElementById('unicoExistente').classList.toggle('hidden', modo !== 'existente');
+    document.getElementById('unicoNuevo').classList.toggle('hidden', modo !== 'nuevo');
+  }
+  document.querySelectorAll('[data-un-modo]').forEach(b => b.addEventListener('click', () => unicoSetModo(b.dataset.unModo)));
+
+  function unicoSumarDias(iso, n){
+    const [y, m, d] = iso.split('-').map(Number);
+    return fechaALocalISO(new Date(y, m - 1, d + n));
+  }
+
+  function unicoPintarIva(){
+    const p = Number(document.getElementById('unicoPrecio').value || 0);
+    const veces = document.getElementById('unicoSegunda').checked ? 2 : 1;
+    document.getElementById('unicoPrecioIva').textContent = p > 0
+      ? `Con IVA: ${formatMoney(p * (1 + IVA_TASA))} por visita` + (veces > 1 ? ` · Total 2 aplicaciones: ${formatMoney(p * 2 * (1 + IVA_TASA))}` : '')
+      : '';
+  }
+  document.getElementById('unicoPrecio').addEventListener('input', unicoPintarIva);
+  document.getElementById('unicoSegunda').addEventListener('change', () => {
+    const on = document.getElementById('unicoSegunda').checked;
+    document.getElementById('unicoSegundaFila').classList.toggle('hidden', !on);
+    const f1 = document.getElementById('unicoFecha').value;
+    if(on && f1 && !document.getElementById('unicoFecha2').value) document.getElementById('unicoFecha2').value = unicoSumarDias(f1, 15);
+    unicoPintarIva();
+  });
+
+  document.getElementById('unicoClienteBuscar').addEventListener('input', () => {
+    filtrarSelectClientes(document.getElementById('unicoCliente'), calClientesCache, document.getElementById('unicoClienteBuscar').value, 'Selecciona...');
+  });
+
+  document.getElementById('unicoNombre').addEventListener('blur', () => {
+    const n = normalizarNombreCliente(document.getElementById('unicoNombre').value);
+    const ya = n ? calClientesCache.find(c => normalizarNombreCliente(c.nombre) === n) : null;
+    const aviso = document.getElementById('unicoDuplicado');
+    aviso.innerHTML = ya ? `Ya existe un cliente "${escapeHtml(ya.nombre)}"${ya.telefono ? ' (' + escapeHtml(ya.telefono) + ')' : ''}. <button type="button" class="btn secondary small" id="btnUnicoUsarExistente">Usar ese cliente</button>` : '';
+    const b = document.getElementById('btnUnicoUsarExistente');
+    if(b) b.addEventListener('click', () => {
+      unicoSetModo('existente');
+      document.getElementById('unicoClienteBuscar').value = '';
+      filtrarSelectClientes(document.getElementById('unicoCliente'), calClientesCache, '', 'Selecciona...');
+      document.getElementById('unicoCliente').value = ya.id;
+      aviso.innerHTML = '';
+    });
+  });
+
+  // Cotizaciones cerradas de servicio único de los últimos 120 días que
+  // todavía no se han agendado.
+  async function unicoCargarCotizaciones(){
+    const sel = document.getElementById('unicoCotizacion');
+    sel.innerHTML = '<option value="">No, lo capturo a mano</option>';
+    unicoCotizaciones = [];
+    const desde = new Date(Date.now() - 120 * 864e5).toISOString();
+    const [c, s] = await Promise.all([
+      supabaseClient.from('cotizaciones').select('id, folio, cliente_id, datos, fecha_creacion, clientes(nombre)')
+        .eq('estado', 'Cerrada').gte('fecha_creacion', desde).order('fecha_creacion', { ascending: false }),
+      supabaseClient.from('servicios_cliente').select('cotizacion_id').not('cotizacion_id', 'is', null),
+    ]);
+    if(c.error){ console.error('Cotizaciones para agendar:', c.error); return; }
+    const yaAgendadas = new Set(((s && s.data) || []).map(x => x.cotizacion_id));
+    unicoCotizaciones = (c.data || []).filter(x => !yaAgendadas.has(x.id) && (x.datos || {}).tipoContratacion !== 'Póliza');
+    sel.innerHTML += unicoCotizaciones.map(x => {
+      const d = x.datos || {};
+      const nom = (x.clientes && x.clientes.nombre) || (d.cliente && d.cliente.nombre) || 'Cliente';
+      const sub = d.subtotal != null ? ' · ' + formatMoney(d.subtotal) + ' s/IVA' : '';
+      return `<option value="${x.id}">#${x.folio} · ${escapeHtml(nom)}${sub}</option>`;
+    }).join('');
+    document.getElementById('unicoCotizacionInfo').textContent = unicoCotizaciones.length
+      ? `${unicoCotizaciones.length} cotización(es) cerrada(s) de servicio único sin agendar.`
+      : 'No hay cotizaciones cerradas pendientes de agendar.';
+  }
+
+  document.getElementById('unicoCotizacion').addEventListener('change', () => {
+    const cot = unicoCotizaciones.find(x => x.id === document.getElementById('unicoCotizacion').value);
+    if(!cot) return;
+    const d = cot.datos || {};
+    const plagas = d.plagas || [];
+    const dosAplic = plagas.some(p => p.esCucarachaAlemana);
+    if(cot.cliente_id && calClientesCache.some(c => c.id === cot.cliente_id)){
+      unicoSetModo('existente');
+      document.getElementById('unicoClienteBuscar').value = '';
+      filtrarSelectClientes(document.getElementById('unicoCliente'), calClientesCache, '', 'Selecciona...');
+      document.getElementById('unicoCliente').value = cot.cliente_id;
+    } else {
+      unicoSetModo('nuevo');
+      const cl = d.cliente || {};
+      document.getElementById('unicoNombre').value = cl.nombre || '';
+      document.getElementById('unicoTelefono').value = cl.telefono || '';
+      document.getElementById('unicoDireccion').value = cl.direccion || '';
+      document.getElementById('unicoZona').value = cl.zona || '';
+      if(d.categoriaServicio) document.getElementById('unicoCategoria').value = d.categoriaServicio;
+    }
+    document.getElementById('unicoTipo').value = plagas.map(p => p.tipoPlaga).filter(Boolean).join(' + ');
+    const sub = Number(d.subtotal || 0);
+    document.getElementById('unicoPrecio').value = sub ? Math.round((dosAplic ? sub / 2 : sub) * 100) / 100 : '';
+    document.getElementById('unicoSegunda').checked = dosAplic;
+    document.getElementById('unicoSegunda').dispatchEvent(new Event('change'));
+    if(d.notas) document.getElementById('unicoNotas').value = d.notas;
+    unicoPintarIva();
+  });
+
+  async function abrirAgendarUnico(fechaInicial){
+    if(!calClientesCache.length) await cargarClientesParaCalendarioFiltro();
+    unicoSetModo('existente');
+    ['unicoClienteBuscar', 'unicoNombre', 'unicoTelefono', 'unicoDireccion', 'unicoTipo', 'unicoPrecio', 'unicoSede', 'unicoHora', 'unicoFecha2', 'unicoNotas']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('unicoFecha').value = fechaInicial || '';
+    document.getElementById('unicoCategoria').value = 'Residencial';
+    document.getElementById('unicoFactura').value = 'si';
+    document.getElementById('unicoSegunda').checked = false;
+    document.getElementById('unicoSegundaFila').classList.add('hidden');
+    document.getElementById('unicoDuplicado').innerHTML = '';
+    document.getElementById('unicoPrecioIva').textContent = '';
+    const zonaSrc = document.getElementById('clienteZona');
+    document.getElementById('unicoZona').innerHTML = zonaSrc ? zonaSrc.innerHTML : '<option value="">Selecciona...</option>';
+    document.getElementById('unicoZona').value = '';
+    document.getElementById('unicoCliente').value = '';
+    filtrarSelectClientes(document.getElementById('unicoCliente'), calClientesCache, '', 'Selecciona...');
+    renderTecnicosChips(unicoTecnicosChips, []);
+    unicoOverlay.classList.remove('hidden');
+    unicoCargarCotizaciones();
+  }
+
+  document.getElementById('btnAgendarUnico').addEventListener('click', () => abrirAgendarUnico(''));
+  document.getElementById('btnCerrarUnico').addEventListener('click', () => unicoOverlay.classList.add('hidden'));
+
+  document.getElementById('btnGuardarUnico').addEventListener('click', async () => {
+    const tipo = document.getElementById('unicoTipo').value.trim();
+    const precioTxt = document.getElementById('unicoPrecio').value;
+    const fecha = document.getElementById('unicoFecha').value;
+    const segunda = document.getElementById('unicoSegunda').checked;
+    const fecha2 = document.getElementById('unicoFecha2').value;
+    const cotizacionId = document.getElementById('unicoCotizacion').value || null;
+    let clienteId = unicoModo === 'existente' ? document.getElementById('unicoCliente').value : null;
+    const nombreNuevo = document.getElementById('unicoNombre').value.trim();
+
+    if(unicoModo === 'existente' && !clienteId){ alert('Selecciona el cliente (o usa "+ Cliente nuevo").'); return; }
+    if(unicoModo === 'nuevo' && !nombreNuevo){ alert('Escribe el nombre del cliente nuevo.'); return; }
+    if(!tipo){ alert('Escribe qué servicio o plaga se va a atender.'); return; }
+    if(!fecha){ alert('Selecciona la fecha del servicio.'); return; }
+    if(segunda && !fecha2){ alert('Pon la fecha de la 2ª aplicación (o quita la palomita).'); return; }
+    if(segunda && fecha2 <= fecha){ alert('La 2ª aplicación debe ser después de la primera.'); return; }
+    if(precioTxt === '' && !confirm('No pusiste precio. Sin precio no se va a poder cobrar desde "Por facturar". ¿Agendar así?')) return;
+
+    const btn = document.getElementById('btnGuardarUnico');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    const fallo = (msg) => { btn.disabled = false; btn.textContent = 'Agendar servicio'; alert(msg); };
+
+    // 1) Cliente nuevo (si ya existe con el mismo nombre, se reusa)
+    if(unicoModo === 'nuevo'){
+      const norm = normalizarNombreCliente(nombreNuevo);
+      const { data: ya } = await supabaseClient.from('clientes').select('id').eq('nombre_norm', norm).limit(1);
+      if(ya && ya.length){
+        if(!confirm(`Ya hay un cliente llamado "${nombreNuevo}". ¿Agendar el servicio a ese mismo cliente?`)){ fallo('No se agendó. Cambia el nombre o elige el cliente existente.'); return; }
+        clienteId = ya[0].id;
+      } else {
+        const ins = await supabaseClient.from('clientes').insert({
+          nombre: nombreNuevo,
+          telefono: document.getElementById('unicoTelefono').value.trim() || null,
+          direccion: document.getElementById('unicoDireccion').value.trim() || null,
+          zona: document.getElementById('unicoZona').value || null,
+          categoria: document.getElementById('unicoCategoria').value || null,
+          creado_por: (usuarioActual && usuarioActual.id) || null,
+        }).select('id').single();
+        if(ins.error){ fallo('No se pudo dar de alta el cliente: ' + ins.error.message); return; }
+        clienteId = ins.data.id;
+      }
+    }
+
+    // 2) El servicio (no es póliza: queda inactivo para no contar como contrato)
+    const precio = precioTxt === '' ? null : Number(precioTxt);
+    const servicio = {
+      cliente_id: clienteId,
+      tipo_servicio: tipo,
+      sede: document.getElementById('unicoSede').value.trim() || null,
+      frecuencia: 'Servicio único',
+      costo_sin_iva: precio,
+      costo_con_iva: precio == null ? null : Math.round(precio * (1 + IVA_TASA) * 100) / 100,
+      estatus: 'Único',
+      activo: false,
+      fecha_inicio: fecha,
+      notas: segunda ? '2 aplicaciones' : null,
+    };
+    if(cotizacionId) servicio.cotizacion_id = cotizacionId;
+    const sv = await supabaseClient.from('servicios_cliente').insert(servicio).select('id').single();
+    if(sv.error){
+      const msg = /cotizacion_id/.test(sv.error.message) ? 'Falta correr servicio_unico_setup.sql en Supabase.' : sv.error.message;
+      fallo('No se pudo guardar el servicio: ' + msg); return;
+    }
+
+    // 3) La(s) visita(s)
+    const tecnicos = tecnicosSeleccionadosDe(unicoTecnicosChips);
+    const sinFactura = document.getElementById('unicoFactura').value === 'no';
+    const notas = document.getElementById('unicoNotas').value.trim();
+    const base = {
+      servicio_id: sv.data.id, cliente_id: clienteId, tipo: 'Único',
+      tecnico_asignado: tecnicos[0] || null,
+      ...(sinFactura ? { no_facturar: true, motivo_no_facturar: 'Paga sin factura' } : {}),
+    };
+    const filas = [{ ...base, fecha_programada: fecha, hora: document.getElementById('unicoHora').value || null, notas: notas || null }];
+    if(segunda) filas.push({ ...base, fecha_programada: fecha2, notas: ('2ª aplicación. ' + notas).trim() });
+    const vs = await supabaseClient.from('visitas_programadas').insert(filas).select('id');
+    if(vs.error){
+      // Sin visitas el servicio quedaría huérfano: se quita.
+      await supabaseClient.from('servicios_cliente').delete().eq('id', sv.data.id);
+      const msg = /tipo_check|check constraint/.test(vs.error.message) ? 'Falta correr servicio_unico_setup.sql en Supabase.' : vs.error.message;
+      fallo('No se pudo agendar: ' + msg); return;
+    }
+    let errTec = null;
+    if(tecnicos.length) for(const v of vs.data){ const e = await guardarTecnicosDeVisita(v.id, tecnicos); if(e) errTec = e; }
+
+    btn.disabled = false; btn.textContent = 'Agendar servicio';
+    unicoOverlay.classList.add('hidden');
+    if(unicoModo === 'nuevo') await cargarClientesParaCalendarioFiltro();
+    mostrarToast(segunda ? 'Servicio agendado (2 aplicaciones).' : 'Servicio agendado.');
+    if(errTec) alert('Se agendó, pero no se pudieron guardar los técnicos: ' + errTec.message);
+    const [y, m] = fecha.split('-').map(Number);
+    calAnioActual = y; calMesActual = m - 1;
+    await cargarVisitasDelAnio();
+    renderCalendarioMes();
+  });
 
   // ---------- Agendar refuerzo/garantia (oficina, fuera del plan normal) ----------
   const refuerzoOverlay = document.getElementById('refuerzoOverlay');
