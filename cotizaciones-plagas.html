@@ -1729,6 +1729,7 @@
   <button class="tab-btn hidden" data-tab="accesos" id="tabBtnAccesos">Accesos</button>
   <button class="tab-btn hidden" data-tab="dispositivos" id="tabBtnDispositivos">Dispositivos</button>
   <button class="tab-btn hidden" data-tab="hoteles" id="tabBtnHoteles">Hoteles</button>
+  <button class="tab-btn hidden" data-tab="kpis" id="tabBtnKpis">KPIs <span class="tab-contador hidden" id="tabKpisContador">0</span></button>
 </nav>
 
 <main>
@@ -3502,6 +3503,85 @@
     </div>
   </section>
 
+  <!-- ================= TAB: KPIs ISO (nov 2026) ================= -->
+  <section id="tab-kpis" class="hidden">
+    <style>
+      .kpi-wrap{max-width:1100px;margin:0 auto;}
+      .kpi-avance{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px;margin-bottom:6px;}
+      .kpi-tile{border:1px solid var(--gris-borde);border-radius:10px;padding:14px 16px;background:#fff;}
+      .kpi-tile .t{font-size:12px;color:#5c6b63;text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+      .kpi-tile .v{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;}
+      .kpi-tile .s{font-size:13px;color:#5c6b63;margin-top:4px;}
+      .kpi-barra{height:12px;border-radius:6px;background:#e8eeeb;overflow:hidden;margin-top:10px;position:relative;}
+      .kpi-barra > span{display:block;height:100%;border-radius:6px;}
+      .kpi-barra > i{position:absolute;top:-3px;bottom:-3px;width:2px;background:#1f2a24;opacity:.55;}
+      .kpi-ok{background:#2e9e4f;} .kpi-medio{background:#e0a100;} .kpi-mal{background:#c0392b;}
+      .kpi-txt-ok{color:#1e7a3a;} .kpi-txt-medio{color:#9a6b00;} .kpi-txt-mal{color:#b3261e;}
+      .kpi-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+      .kpi-chip{border:1px solid var(--gris-borde);border-radius:14px;padding:3px 10px;font-size:12px;background:#fafcfb;}
+      .kpi-semana-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
+      .kpi-semana-bar .btn.activo{background:var(--verde-oscuro);color:#fff;border-color:var(--verde-oscuro);}
+      .kpi-aviso{border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;border:1px solid;}
+      .kpi-aviso.info{background:#eef6ff;border-color:#b9d6f5;color:#1d4f80;}
+      .kpi-aviso.alerta{background:#fff6e0;border-color:#f0d58a;color:#7a5600;}
+      .kpi-aviso.cerrada{background:#f3f3f3;border-color:#d6d6d6;color:#555;}
+      .kpi-progreso{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin-bottom:12px;}
+      .kpi-progreso .kpi-barra{flex:1;margin-top:0;max-width:320px;}
+      .kpi-area{border:1px solid var(--gris-borde);border-radius:10px;margin-bottom:12px;background:#fff;overflow:hidden;}
+      .kpi-area h3{margin:0;padding:10px 14px;font-size:14px;background:var(--verde-suave);color:var(--verde-oscuro);display:flex;justify-content:space-between;gap:8px;}
+      .kpi-area h3 small{font-weight:600;color:#5c6b63;}
+      .kpi-filas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:2px 16px;padding:10px 14px;}
+      .kpi-fila{padding:6px 0;border-bottom:1px dashed #edf1ef;}
+      .kpi-fila label{display:block;font-size:13px;font-weight:600;margin-bottom:3px;}
+      .kpi-fila input{width:100%;font-variant-numeric:tabular-nums;}
+      .kpi-fila input:disabled{background:#f1f4f2;color:#4a5a52;border-color:#e1e7e4;}
+      .kpi-fila input.kpi-vacio{border-color:#e0a100;background:#fffbf0;}
+      .kpi-fila .h{font-size:11px;color:#7a8a82;margin-top:2px;min-height:14px;}
+      .kpi-fila .h.warn{color:#b3261e;font-weight:600;}
+      .kpi-nota textarea{width:100%;min-height:60px;}
+      .kpi-acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px;}
+      .kpi-tabla-wrap{overflow-x:auto;}
+      .kpi-tabla{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums;}
+      .kpi-tabla th,.kpi-tabla td{padding:6px 8px;border-bottom:1px solid #edf1ef;text-align:right;white-space:nowrap;}
+      .kpi-tabla th:first-child,.kpi-tabla td:first-child{text-align:left;}
+      .kpi-tabla th{font-size:12px;color:#5c6b63;}
+      .kpi-mini{display:inline-block;width:80px;height:8px;border-radius:4px;background:#e8eeeb;vertical-align:middle;margin-left:6px;overflow:hidden;}
+      .kpi-mini > span{display:block;height:100%;}
+    </style>
+    <div class="kpi-wrap">
+      <div class="panel" id="kpiPanelAvance">
+        <h2 style="margin-top:0;">Mi avance del mes</h2>
+        <div id="kpiAvance"><div class="empty-msg">Cargando...</div></div>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin-top:0;">Captura semanal de KPIs</h2>
+        <div class="kpi-semana-bar" id="kpiSemanaBar"></div>
+        <div id="kpiAvisoSemana"></div>
+        <div class="kpi-progreso" id="kpiProgreso"></div>
+        <div id="kpiFormulario"><div class="empty-msg">Cargando...</div></div>
+        <div id="kpiValidaciones"></div>
+        <div class="kpi-acciones">
+          <button type="button" class="btn" id="btnKpiGuardar">Guardar semana</button>
+          <span id="kpiEstadoGuardado" style="font-size:13px;color:#5c6b63;"></span>
+        </div>
+      </div>
+
+      <div class="panel hidden" id="kpiPanelDueno">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
+          <h2 style="margin:0;">Tablero anual (solo dueño)</h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="kpiAnio"></select>
+            <button type="button" class="btn secondary small" id="btnKpiExportar">Exportar a Excel (CSV)</button>
+          </div>
+        </div>
+        <div class="kpi-tabla-wrap" style="margin-top:12px;"><table class="kpi-tabla" id="kpiTablaMeses"></table></div>
+        <h3 style="margin:18px 0 6px;font-size:15px;">Últimos cambios</h3>
+        <div class="kpi-tabla-wrap"><table class="kpi-tabla" id="kpiBitacora"></table></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 </div><!-- /#appRoot -->
@@ -4773,6 +4853,11 @@
       usuarioActual.rol !== 'dueño');
     document.getElementById('tabBtnHoteles').classList.toggle('hidden',
       !['dueño', 'asistente', 'tecnico'].includes(usuarioActual.rol));
+    // KPIs ISO: capturan ventas y la administradora; el dueño ve todo.
+    // Los candados reales (semanas, indicadores) estan en la RLS de Supabase.
+    const veeKpis = ['dueño', 'vendedor', 'asistente'].includes(usuarioActual.rol);
+    document.getElementById('tabBtnKpis').classList.toggle('hidden', !veeKpis);
+    if(veeKpis && typeof refrescarContadorKpis === 'function') refrescarContadorKpis();
 
     // Rol tecnico: acceso restringido a solo su Calendario (y, desde ahi,
     // sus reportes de visita), Vehiculos (para elegir cualquier vehiculo
@@ -5623,6 +5708,7 @@
     accesos: document.getElementById('tab-accesos'),
     dispositivos: document.getElementById('tab-dispositivos'),
     hoteles: document.getElementById('tab-hoteles'),
+    kpis: document.getElementById('tab-kpis'),
   };
   // ---------- Prospectos del sitio web ----------
   // Vienen de la tabla prospectos_web, que llena el formulario de la home.
@@ -5804,6 +5890,7 @@
     if(nombre === 'resumen') cargarYRenderResumenDia();
     if(nombre === 'dispositivos') cargarYRenderDispositivos();
     if(nombre === 'hoteles') cargarHotelesModulo();
+    if(nombre === 'kpis') cargarKpis();
   }
   tabButtons.forEach(btn=>{
     btn.addEventListener('click', ()=> activarTab(btn.dataset.tab));
@@ -5814,6 +5901,7 @@
   // con los botones de pestana que su rol dejo visibles, asi los permisos
   // siguen viviendo en un solo lugar (cargarPerfilUsuario).
   const INI_APPS = {
+    kpis:           { n: 'KPIs', c: '#016937', d: '<rect x="6" y="6" width="36" height="36" rx="7" fill="#016937"/><rect x="12" y="26" width="5" height="10" rx="1.5" fill="#73BF44"/><rect x="21.5" y="19" width="5" height="17" rx="1.5" fill="#73BF44"/><rect x="31" y="12" width="5" height="24" rx="1.5" fill="#fff"/>' },
     nueva:          { n: 'Nueva cotización', c: '#3CB54A', d: '<rect x="11" y="6" width="26" height="36" rx="4" fill="#3CB54A"/><rect x="16" y="14" width="16" height="3" rx="1.5" fill="#fff"/><rect x="16" y="21" width="12" height="3" rx="1.5" fill="#fff"/><circle cx="35" cy="35" r="9" fill="#016937"/><path d="M35 30v10M30 35h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>' },
     lista:          { n: 'Cotizaciones', c: '#2E86DE', d: '<rect x="8" y="9" width="24" height="31" rx="4" fill="#9cc7f0"/><rect x="15" y="6" width="25" height="33" rx="4" fill="#2E86DE"/><rect x="20" y="14" width="15" height="3" rx="1.5" fill="#fff"/><rect x="20" y="21" width="15" height="3" rx="1.5" fill="#fff"/><rect x="20" y="28" width="10" height="3" rx="1.5" fill="#fff"/>' },
     seguimiento:    { n: 'Seguimiento', c: '#F39C12', d: '<rect x="6" y="28" width="8" height="13" rx="2" fill="#f7c66b"/><rect x="18" y="20" width="8" height="21" rx="2" fill="#F39C12"/><rect x="30" y="11" width="8" height="30" rx="2" fill="#d35400"/><path d="M8 20 20 12l8 4 12-9" stroke="#016937" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
@@ -19525,6 +19613,546 @@
       sessionStorage.removeItem(MENSAJE_LOGIN_STORAGE_KEY);
     }
   }catch(e){ /* sessionStorage no disponible: sin mensaje, no es critico */ }
+
+  // =====================================================================
+  // KPIs ISO (nov 2026)
+  // Tablas: kpi_indicadores, kpi_valores, kpi_bitacora (kpis_setup.sql).
+  // La seguridad vive en la base (RLS): quien no es dueño solo ve y
+  // captura la semana actual y la anterior (hasta el martes 12:00), y el
+  // avance del mes le llega ya sumado por la funcion kpi_avance_ventas().
+  // =====================================================================
+  const KPI_TZ = 'America/Monterrey';
+  const KPI_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const KPI_AREAS = ['Ventas','Cobranza','Calidad','Técnico','Gastos','Personal','Marketing','Notas'];
+  const kpiEstado = {
+    indicadores: null, semana: null, valores: {}, previos: {}, avance: null, forzar: false,
+  };
+
+  function kpiAhoraMty(){
+    const p = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: KPI_TZ, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' })
+      .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+    return { fecha: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour) + Number(p.minute) / 60 };
+  }
+  function kpiSumarDias(iso, n){
+    const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function kpiLunesDe(iso){
+    const d = new Date(iso + 'T12:00:00Z'); const dow = (d.getUTCDay() + 6) % 7; // 0 = lunes
+    return kpiSumarDias(iso, -dow);
+  }
+  function kpiLunesActual(){ return kpiLunesDe(kpiAhoraMty().fecha); }
+  function kpiMesDeSemana(lunes){ return kpiSumarDias(lunes, 3).slice(0, 7); } // mes del jueves
+  // La semana pasada se cierra el martes a las 12:00 (hora de Monterrey)
+  function kpiCierreDe(lunes){ return { fecha: kpiSumarDias(lunes, 8), hora: 12 }; }
+  function kpiSemanaAbierta(lunes){
+    if(kpiEsDueno()) return true;
+    const hoy = kpiLunesActual();
+    if(lunes === hoy) return true;
+    if(lunes !== kpiSumarDias(hoy, -7)) return false;
+    const a = kpiAhoraMty(); const c = kpiCierreDe(lunes);
+    return a.fecha < c.fecha || (a.fecha === c.fecha && a.hora < c.hora);
+  }
+  function kpiEsDueno(){ return !!usuarioActual && usuarioActual.rol === 'dueño'; }
+  function kpiRol(){ return (usuarioActual && usuarioActual.rol) || ''; }
+  function kpiFechaCorta(iso){
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${d} ${KPI_MESES[m - 1].slice(0, 3)}`;
+  }
+  function kpiRangoSemana(lunes){
+    return `${kpiFechaCorta(lunes)} al ${kpiFechaCorta(kpiSumarDias(lunes, 6))}`;
+  }
+  function kpiNombreMes(ym){ const [y, m] = ym.split('-').map(Number); return KPI_MESES[m - 1] + ' ' + y; }
+  function kpiMxn(n){ return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+  function kpiNum(n){ return (Number(n) || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 }); }
+  function kpiPct(n){ return isFinite(n) ? Math.round(n * 100) + '%' : '—'; }
+  function kpiClaseRitmo(r){ return r >= 1 ? 'ok' : (r >= 0.85 ? 'medio' : 'mal'); }
+
+  function kpiPuedeVer(ind){ return kpiEsDueno() || (ind.ver_roles || []).includes(kpiRol()); }
+  function kpiPuedeCapturar(ind){ return kpiEsDueno() || (ind.captura_roles || []).includes(kpiRol()); }
+
+  async function kpiCargarIndicadores(){
+    if(kpiEstado.indicadores) return kpiEstado.indicadores;
+    const { data, error } = await supabaseClient.from('kpi_indicadores')
+      .select('*').eq('activo', true).order('orden');
+    if(error){ console.error('kpi_indicadores', error); return null; }
+    kpiEstado.indicadores = data || [];
+    return kpiEstado.indicadores;
+  }
+
+  async function kpiLeerSemana(lunes){
+    const { data, error } = await supabaseClient.from('kpi_valores')
+      .select('clave, valor, nota').eq('semana_inicio', lunes);
+    if(error){ console.error('kpi_valores', error); return null; }
+    const m = {};
+    (data || []).forEach(r => { m[r.clave] = r; });
+    return m;
+  }
+
+  async function cargarKpis(){
+    const form = document.getElementById('kpiFormulario');
+    const inds = await kpiCargarIndicadores();
+    if(!inds){
+      form.innerHTML = '<div class="empty-msg">No se pudo leer el catálogo de KPIs. Revisa tu conexión.</div>';
+      return;
+    }
+    if(!kpiEstado.semana){
+      // Lunes y martes antes del cierre, lo primero es completar la semana pasada.
+      const ant = kpiSumarDias(kpiLunesActual(), -7);
+      kpiEstado.semana = (!kpiEsDueno() && kpiSemanaAbierta(ant)) ? ant : kpiLunesActual();
+    }
+    document.getElementById('kpiPanelAvance').classList.toggle('hidden', !['dueño','vendedor','asistente'].includes(kpiRol()));
+    document.getElementById('kpiPanelDueno').classList.toggle('hidden', !kpiEsDueno());
+    kpiPintarBarraSemana();
+    await Promise.all([kpiCargarFormulario(), kpiCargarAvance()]);
+    if(kpiEsDueno()) kpiCargarTablero();
+  }
+
+  function kpiPintarBarraSemana(){
+    const bar = document.getElementById('kpiSemanaBar');
+    const hoy = kpiLunesActual();
+    const ant = kpiSumarDias(hoy, -7);
+    const sel = kpiEstado.semana;
+    let html = `<button type="button" class="btn secondary small ${sel === hoy ? 'activo' : ''}" data-kpi-semana="${hoy}">Esta semana · ${kpiRangoSemana(hoy)}</button>
+      <button type="button" class="btn secondary small ${sel === ant ? 'activo' : ''}" data-kpi-semana="${ant}">Semana pasada · ${kpiRangoSemana(ant)}</button>`;
+    if(kpiEsDueno()){
+      html += `<label style="font-size:13px;display:flex;align-items:center;gap:6px;margin:0;">Otra semana
+        <input type="date" id="kpiSemanaOtra" value="${sel}" style="width:auto;"></label>`;
+    }
+    bar.innerHTML = html;
+  }
+
+  async function kpiCargarFormulario(){
+    const form = document.getElementById('kpiFormulario');
+    form.innerHTML = '<div class="empty-msg">Cargando...</div>';
+    document.getElementById('kpiValidaciones').innerHTML = '';
+    document.getElementById('kpiEstadoGuardado').textContent = '';
+    kpiEstado.forzar = false;
+    const lunes = kpiEstado.semana;
+    const [act, prev] = await Promise.all([kpiLeerSemana(lunes), kpiLeerSemana(kpiSumarDias(lunes, -7))]);
+    if(!act){ form.innerHTML = '<div class="empty-msg">No se pudo leer la semana.</div>'; return; }
+    kpiEstado.valores = act; kpiEstado.previos = prev || {};
+    kpiPintarFormulario();
+  }
+
+  function kpiPintarFormulario(){
+    const form = document.getElementById('kpiFormulario');
+    const lunes = kpiEstado.semana;
+    const abierta = kpiSemanaAbierta(lunes);
+    const visibles = kpiEstado.indicadores.filter(kpiPuedeVer);
+
+    // Aviso de cierre
+    const aviso = document.getElementById('kpiAvisoSemana');
+    const hoy = kpiLunesActual();
+    if(!abierta){
+      aviso.innerHTML = `<div class="kpi-aviso cerrada">La semana del ${kpiRangoSemana(lunes)} ya está cerrada. Solo el dueño puede corregirla.</div>`;
+    }else if(lunes !== hoy && !kpiEsDueno()){
+      const c = kpiCierreDe(lunes);
+      aviso.innerHTML = `<div class="kpi-aviso alerta">Esta semana se cierra el martes ${kpiFechaCorta(c.fecha)} a las 12:00. Después ya no se podrá corregir. Si algo no pasó en la semana, escribe 0.</div>`;
+    }else if(lunes === hoy && !kpiEsDueno()){
+      const c = kpiCierreDe(lunes);
+      aviso.innerHTML = `<div class="kpi-aviso info">Captura durante la semana. Tienes hasta el martes ${kpiFechaCorta(c.fecha)} a las 12:00 para dejarla completa. Si algo no pasó en la semana, escribe 0.</div>`;
+    }else aviso.innerHTML = '';
+
+    if(!visibles.length){
+      form.innerHTML = '<div class="empty-msg">Tu usuario no tiene indicadores asignados.</div>';
+      kpiActualizarProgreso();
+      return;
+    }
+
+    let html = '';
+    KPI_AREAS.forEach(area => {
+      const lista = visibles.filter(i => i.area === area);
+      if(!lista.length) return;
+      if(area === 'Notas'){
+        const i = lista[0]; const v = kpiEstado.valores[i.clave];
+        const edit = abierta && kpiPuedeCapturar(i);
+        html += `<div class="kpi-area"><h3>Nota de la semana <small>opcional</small></h3>
+          <div class="kpi-nota" style="padding:10px 14px;">
+            <textarea data-kpi-clave="${i.clave}" data-kpi-tipo="texto" ${edit ? '' : 'disabled'}
+              placeholder="Explica aquí cualquier número fuera de lo normal (semana corta, cliente que pausó, etc.)">${escapeHtml((v && v.nota) || '')}</textarea>
+          </div></div>`;
+        return;
+      }
+      html += `<div class="kpi-area"><h3>${escapeHtml(area)} <small data-kpi-area-cont="${escapeHtml(area)}"></small></h3><div class="kpi-filas">`;
+      lista.forEach(i => {
+        const v = kpiEstado.valores[i.clave];
+        const p = kpiEstado.previos[i.clave];
+        const val = v && v.valor !== null && v.valor !== undefined ? v.valor : '';
+        const edit = abierta && kpiPuedeCapturar(i);
+        const prevTxt = p && p.valor !== null && p.valor !== undefined
+          ? 'Semana pasada: ' + (i.unidad === 'mxn' ? kpiMxn(p.valor) : kpiNum(p.valor)) : '';
+        html += `<div class="kpi-fila">
+          <label for="kpi_${i.clave}">${escapeHtml(i.nombre)}${i.unidad === 'mxn' ? ' ($)' : ''}${i.unidad === 'odometro' ? ' (km del tablero)' : ''}</label>
+          <input type="number" inputmode="decimal" min="0" step="any" id="kpi_${i.clave}" data-kpi-clave="${i.clave}" data-kpi-tipo="${i.unidad}"
+            value="${val}" ${edit ? '' : 'disabled'} ${edit ? '' : 'title="Solo lectura"'}>
+          <div class="h" data-kpi-hint="${i.clave}">${escapeHtml(prevTxt)}</div>
+        </div>`;
+      });
+      html += '</div></div>';
+    });
+    form.innerHTML = html;
+    const algunoEditable = !!form.querySelector('[data-kpi-clave]:not([disabled])');
+    document.getElementById('btnKpiGuardar').classList.toggle('hidden', !algunoEditable);
+    kpiRevisarFormulario();
+  }
+
+  function kpiLeerInput(el){
+    if(el.dataset.kpiTipo === 'texto') return el.value.trim();
+    const t = el.value.trim();
+    return t === '' ? null : Number(t);
+  }
+
+  // Marca vacíos, recalcula km recorridos y arma la lista de advertencias.
+  function kpiRevisarFormulario(){
+    const form = document.getElementById('kpiFormulario');
+    const avisos = [];
+    const val = clave => { const el = form.querySelector(`[data-kpi-clave="${clave}"]`); return el ? kpiLeerInput(el) : null; };
+    form.querySelectorAll('input[data-kpi-clave]').forEach(el => {
+      const clave = el.dataset.kpiClave;
+      const v = kpiLeerInput(el);
+      el.classList.toggle('kpi-vacio', !el.disabled && v === null);
+      if(v !== null && v < 0) avisos.push(`"${el.previousElementSibling.textContent}" no puede ser negativo.`);
+      if(el.dataset.kpiTipo === 'odometro'){
+        const hint = form.querySelector(`[data-kpi-hint="${clave}"]`);
+        const p = kpiEstado.previos[clave];
+        const pv = p && p.valor !== null && p.valor !== undefined ? Number(p.valor) : null;
+        hint.classList.remove('warn');
+        if(v !== null && pv !== null){
+          const rec = v - pv;
+          if(rec < 0){
+            hint.textContent = `Es menor que la semana pasada (${kpiNum(pv)} km)`; hint.classList.add('warn');
+            avisos.push(`${el.previousElementSibling.textContent.replace(' (km del tablero)', '')}: el kilometraje es menor que el de la semana pasada.`);
+          }else{
+            hint.textContent = `Recorrido: ${kpiNum(rec)} km (semana pasada ${kpiNum(pv)})`;
+            if(rec > 2500){ hint.classList.add('warn'); avisos.push(`${el.previousElementSibling.textContent.replace(' (km del tablero)', '')}: ${kpiNum(rec)} km en una semana, revisa que esté bien.`); }
+          }
+        }else if(pv !== null) hint.textContent = `Semana pasada: ${kpiNum(pv)} km`;
+      }
+    });
+    const ag = val('serv_agendados'), re = val('serv_reales');
+    if(ag !== null && re !== null && re > ag) avisos.push('Hay más servicios realizados que agendados.');
+    kpiEstado.avisos = avisos;
+    const cont = document.getElementById('kpiValidaciones');
+    cont.innerHTML = avisos.length
+      ? `<div class="kpi-aviso alerta"><strong>Revisa antes de guardar:</strong><ul style="margin:6px 0 0 18px;padding:0;">${avisos.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></div>` : '';
+    kpiActualizarProgreso();
+  }
+
+  function kpiActualizarProgreso(){
+    const form = document.getElementById('kpiFormulario');
+    const inputs = Array.from(form.querySelectorAll('input[data-kpi-clave]:not([disabled])'));
+    const prog = document.getElementById('kpiProgreso');
+    if(!inputs.length){ prog.innerHTML = ''; return; }
+    const llenos = inputs.filter(el => kpiLeerInput(el) !== null).length;
+    const r = llenos / inputs.length;
+    const cls = r >= 1 ? 'ok' : (r >= 0.6 ? 'medio' : 'mal');
+    prog.innerHTML = `<span>${llenos} de ${inputs.length} capturados</span>
+      <div class="kpi-barra"><span class="kpi-${cls}" style="width:${Math.round(r * 100)}%"></span></div>
+      <span class="kpi-txt-${cls}">${r >= 1 ? 'Semana completa' : 'Faltan ' + (inputs.length - llenos)}</span>`;
+    form.querySelectorAll('[data-kpi-area-cont]').forEach(sm => {
+      const area = sm.closest('.kpi-area');
+      const ins = Array.from(area.querySelectorAll('input[data-kpi-clave]:not([disabled])'));
+      if(!ins.length){ sm.textContent = 'solo lectura'; return; }
+      const ll = ins.filter(el => kpiLeerInput(el) !== null).length;
+      sm.textContent = `${ll}/${ins.length}`;
+    });
+  }
+
+  async function kpiGuardar(){
+    const form = document.getElementById('kpiFormulario');
+    const estado = document.getElementById('kpiEstadoGuardado');
+    kpiRevisarFormulario();
+    if(kpiEstado.avisos && kpiEstado.avisos.length && !kpiEstado.forzar){
+      kpiEstado.forzar = true;
+      estado.innerHTML = '<span class="kpi-txt-mal">Hay advertencias arriba. Corrígelas, o vuelve a dar Guardar para guardar así.</span>';
+      return;
+    }
+    if(kpiEstado.avisos && kpiEstado.avisos.some(a => a.includes('negativo'))){
+      estado.innerHTML = '<span class="kpi-txt-mal">No se pueden guardar números negativos.</span>';
+      kpiEstado.forzar = false;
+      return;
+    }
+    const lunes = kpiEstado.semana;
+    const filas = [];
+    form.querySelectorAll('[data-kpi-clave]:not([disabled])').forEach(el => {
+      const clave = el.dataset.kpiClave;
+      const antes = kpiEstado.valores[clave];
+      const nuevo = kpiLeerInput(el);
+      if(el.dataset.kpiTipo === 'texto'){
+        const prevNota = (antes && antes.nota) || '';
+        if(nuevo !== prevNota) filas.push({ semana_inicio: lunes, clave, valor: null, nota: nuevo || null });
+      }else{
+        const prevVal = antes && antes.valor !== null && antes.valor !== undefined ? Number(antes.valor) : null;
+        if(nuevo !== prevVal && !(nuevo === null && !antes)) filas.push({ semana_inicio: lunes, clave, valor: nuevo, nota: antes ? antes.nota : null });
+      }
+    });
+    if(!filas.length){ estado.textContent = 'No hay cambios por guardar.'; kpiEstado.forzar = false; return; }
+    const btn = document.getElementById('btnKpiGuardar');
+    btn.disabled = true; estado.textContent = 'Guardando...';
+    const { error } = await supabaseClient.from('kpi_valores').upsert(filas, { onConflict: 'semana_inicio,clave' });
+    btn.disabled = false; kpiEstado.forzar = false;
+    if(error){
+      console.error('kpi guardar', error);
+      estado.innerHTML = `<span class="kpi-txt-mal">No se guardó: ${escapeHtml(error.message.includes('row-level security') ? 'la semana está cerrada o no tienes permiso para algún dato.' : error.message)}</span>`;
+      return;
+    }
+    filas.forEach(f => { kpiEstado.valores[f.clave] = { clave: f.clave, valor: f.valor, nota: f.nota }; });
+    estado.innerHTML = `<span class="kpi-txt-ok">Guardado (${filas.length} ${filas.length === 1 ? 'dato' : 'datos'}).</span>`;
+    if(typeof mostrarToast === 'function') mostrarToast('KPIs guardados');
+    kpiCargarAvance();
+    refrescarContadorKpis();
+    if(kpiEsDueno()) kpiCargarTablero();
+  }
+
+  // ---------- Mi avance del mes ----------
+  async function kpiCargarAvance(){
+    const cont = document.getElementById('kpiAvance');
+    if(!['dueño','vendedor','asistente'].includes(kpiRol())) return;
+    const [{ data, error }, hist] = await Promise.all([
+      supabaseClient.rpc('kpi_avance_ventas'),
+      supabaseClient.rpc('kpi_ventas_por_mes'),
+    ]);
+    const meses24 = (hist && !hist.error && hist.data) || [];
+    if(error || !data){ console.error('kpi avance', error); cont.innerHTML = '<div class="empty-msg">No se pudo calcular el avance.</div>'; return; }
+    kpiEstado.avance = data;
+    const sem = data.semanas || [];
+    const hoy = data.hoy_lunes;
+    const vendido = sem.reduce((s, w) => s + Number(w.venta || 0), 0);
+    const meta = sem.reduce((s, w) => s + Number(w.meta || 0), 0);
+    // Meta que ya debería llevar a hoy: semanas pasadas completas + la parte transcurrida de esta.
+    const diaSemana = (new Date(kpiAhoraMty().fecha + 'T12:00:00Z').getUTCDay() + 6) % 7 + 1; // 1 = lunes
+    const metaFecha = sem.reduce((s, w) => s + (w.lunes < hoy ? Number(w.meta || 0) : (w.lunes === hoy ? Number(w.meta || 0) * diaSemana / 7 : 0)), 0);
+    const restantes = sem.filter(w => w.lunes >= hoy).length;
+    const falta = Math.max(0, meta - vendido);
+    const necesitaSemana = restantes ? falta / restantes : falta;
+    const ritmo = metaFecha ? vendido / metaFecha : 0;
+    const cls = kpiClaseRitmo(ritmo);
+    const actual = sem.find(w => w.lunes === hoy) || { venta: 0, meta: 0 };
+    const pctMes = meta ? vendido / meta : 0;
+    const marcaFecha = meta ? Math.min(100, metaFecha / meta * 100) : 0;
+    const prev = (data.meses_previos || []).slice(-3);
+    const promSem = prev.length
+      ? prev.reduce((s, m) => s + Number(m.venta || 0), 0) / Math.max(1, prev.reduce((s, m) => s + Number(m.semanas || 0), 0)) : 0;
+    const clientesMes = sem.reduce((s, w) => s + Number(w.clientes_nuevos || 0), 0);
+    const visitasMes = sem.reduce((s, w) => s + Number(w.visitas || 0), 0);
+    const promClientes = prev.length ? prev.reduce((s, m) => s + Number(m.clientes_nuevos || 0), 0) / prev.length : 0;
+    const mensaje = !meta ? 'Todavía no hay meta cargada para este mes.'
+      : vendido >= meta ? '¡Meta del mes alcanzada! Todo lo que siga suma extra.'
+      : ritmo >= 1 ? 'Vas arriba del ritmo de la meta. Sigue así.'
+      : ritmo >= 0.85 ? 'Vas un poco abajo del ritmo. Con un empujón esta semana te pones al día.'
+      : 'Vas abajo del ritmo. Hay que subir el promedio semanal para alcanzar la meta.';
+
+    // Mismo mes del año pasado
+    const [ya, ma] = data.mes.split('-').map(Number);
+    const mesAnt = `${ya - 1}-${String(ma).padStart(2, '0')}`;
+    const fAnt = meses24.find(x => x.mes === mesAnt);
+    const ventaAnt = fAnt && fAnt.venta !== null ? Number(fAnt.venta) : null;
+    const lineaAnio = ventaAnt === null
+      ? ''
+      : `<div class="s" style="margin-top:6px;">${escapeHtml(kpiNombreMes(mesAnt))}: <strong>${kpiMxn(ventaAnt)}</strong> · ${vendido >= ventaAnt
+          ? `<span class="kpi-txt-ok">ya lo superaste por ${kpiMxn(vendido - ventaAnt)}</span>`
+          : `te faltan <strong>${kpiMxn(ventaAnt - vendido)}</strong> para superarlo`}</div>`;
+    cont.innerHTML = `
+      <div class="kpi-avance">
+        <div class="kpi-tile">
+          <div class="t">Vendido en ${escapeHtml(kpiNombreMes(data.mes))}</div>
+          <div class="v">${kpiMxn(vendido)}</div>
+          <div class="s">de ${kpiMxn(meta)} de meta · <strong class="kpi-txt-${cls}">${kpiPct(pctMes)}</strong></div>
+          <div class="kpi-barra" title="La raya marca dónde deberías ir a esta fecha"><span class="kpi-${cls}" style="width:${Math.min(100, pctMes * 100)}%"></span><i style="left:${marcaFecha}%"></i></div>
+          <div class="s kpi-txt-${cls}" style="margin-top:8px;">${escapeHtml(mensaje)}</div>
+          ${lineaAnio}
+        </div>
+        <div class="kpi-tile">
+          <div class="t">Te falta para la meta</div>
+          <div class="v">${kpiMxn(falta)}</div>
+          <div class="s">${restantes ? `Necesitas <strong>${kpiMxn(necesitaSemana)}</strong> por semana en las ${restantes} ${restantes === 1 ? 'semana que queda' : 'semanas que quedan'} (contando esta).` : 'Ya no quedan semanas en el mes.'}</div>
+          <div class="s">Tu promedio de los últimos 3 meses: <strong>${kpiMxn(promSem)}</strong> por semana${promSem && necesitaSemana ? ` (${necesitaSemana > promSem ? 'necesitas ' + kpiPct(necesitaSemana / promSem - 1) + ' más' : 'vas bien con tu promedio'})` : ''}.</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="t">Esta semana · ${kpiRangoSemana(hoy)}</div>
+          <div class="v">${kpiMxn(actual.venta)}</div>
+          <div class="s">Meta de la semana ${kpiMxn(actual.meta)}${actual.meta ? ` · <strong class="kpi-txt-${kpiClaseRitmo(actual.venta / actual.meta)}">${kpiPct(actual.venta / actual.meta)}</strong>` : ''}</div>
+          <div class="kpi-barra"><span class="kpi-${kpiClaseRitmo(actual.meta ? actual.venta / actual.meta : 0)}" style="width:${actual.meta ? Math.min(100, actual.venta / actual.meta * 100) : 0}%"></span></div>
+          <div class="s" style="margin-top:8px;">Clientes nuevos del mes: <strong>${kpiNum(clientesMes)}</strong> (promedio ${kpiNum(promClientes)} al mes) · Visitas: <strong>${kpiNum(visitasMes)}</strong></div>
+        </div>
+      </div>
+      ${prev.length ? `<div class="kpi-chips">${prev.map(m => {
+        const r = m.meta ? m.venta / m.meta : 0;
+        return `<span class="kpi-chip">${escapeHtml(kpiNombreMes(m.mes))}: <strong class="kpi-txt-${kpiClaseRitmo(r)}">${kpiPct(r)}</strong> de la meta</span>`;
+      }).join('')}</div>` : ''}
+      ${kpiGraficaAnios(meses24, data.mes)}`;
+  }
+
+  // Barras por mes: año en curso contra el año pasado (solo totales).
+  function kpiGraficaAnios(meses24, mesActual){
+    const anio = Number(mesActual.slice(0, 4));
+    const val = ym => { const f = meses24.find(x => x.mes === ym); return f && f.venta !== null ? Number(f.venta) : null; };
+    const filas = [];
+    for(let i = 1; i <= 12; i++){
+      const mm = String(i).padStart(2, '0');
+      filas.push({ i, act: `${anio}-${mm}` <= mesActual ? val(`${anio}-${mm}`) : null, ant: val(`${anio - 1}-${mm}`) });
+    }
+    const max = Math.max(1, ...filas.map(f => Math.max(f.act || 0, f.ant || 0)));
+    const hayAnt = filas.some(f => f.ant !== null);
+    const totAct = filas.reduce((s, f) => s + (f.act !== null && f.ant !== null ? f.act : 0), 0);
+    const totAntMismo = filas.reduce((s, f) => s + (f.act !== null && f.ant !== null ? f.ant : 0), 0);
+    const W = 720, H = 190, base = 160, ancho = W / 12;
+    let barras = '';
+    filas.forEach((f, k) => {
+      const x = k * ancho;
+      const h = v => Math.max(v ? 2 : 0, (v || 0) / max * 140);
+      if(f.ant !== null) barras += `<rect x="${x + ancho * 0.18}" y="${base - h(f.ant)}" width="${ancho * 0.3}" height="${h(f.ant)}" rx="2" fill="#c3ccc7"><title>${KPI_MESES[k]} ${anio - 1}: ${kpiMxn(f.ant)}</title></rect>`;
+      if(f.act !== null) barras += `<rect x="${x + ancho * 0.52}" y="${base - h(f.act)}" width="${ancho * 0.3}" height="${h(f.act)}" rx="2" fill="#2e9e4f"><title>${KPI_MESES[k]} ${anio}: ${kpiMxn(f.act)}</title></rect>`;
+      barras += `<text x="${x + ancho / 2}" y="${base + 16}" text-anchor="middle" font-size="12" fill="#5c6b63">${KPI_MESES[k].slice(0, 3)}</text>`;
+    });
+    const comp = hayAnt && totAntMismo
+      ? ` · En los meses que se pueden comparar vas <strong class="kpi-txt-${totAct >= totAntMismo ? 'ok' : 'mal'}">${totAct >= totAntMismo ? '+' : ''}${kpiPct(totAct / totAntMismo - 1)}</strong> contra ${anio - 1}`
+      : (hayAnt ? '' : ` · Todavía no hay ventas de ${anio - 1} cargadas para comparar`);
+    return `<div style="margin-top:16px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Ventas por mes: ${anio} contra ${anio - 1}</div>
+      <div style="font-size:12px;color:#5c6b63;margin-bottom:6px;">
+        <span style="display:inline-block;width:10px;height:10px;background:#2e9e4f;border-radius:2px;"></span> ${anio}
+        &nbsp; <span style="display:inline-block;width:10px;height:10px;background:#c3ccc7;border-radius:2px;"></span> ${anio - 1}${comp}
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;" role="img" aria-label="Ventas por mes ${anio} contra ${anio - 1}">
+        <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dbe2df"/>${barras}
+      </svg>
+    </div>`;
+  }
+
+  // ---------- Tablero del dueño ----------
+  async function kpiLeerAnio(anio){
+    const filas = []; let desde = 0; const paso = 1000;
+    for(;;){
+      const { data, error } = await supabaseClient.from('kpi_valores')
+        .select('semana_inicio, clave, valor, nota')
+        .gte('semana_inicio', `${anio - 1}-12-25`).lte('semana_inicio', `${anio}-12-31`)
+        .order('semana_inicio').range(desde, desde + paso - 1);
+      if(error){ console.error('kpi anio', error); return null; }
+      filas.push(...(data || []));
+      if(!data || data.length < paso) break;
+      desde += paso;
+    }
+    return filas.filter(f => kpiMesDeSemana(f.semana_inicio).startsWith(String(anio)));
+  }
+
+  async function kpiCargarTablero(){
+    const sel = document.getElementById('kpiAnio');
+    const anioHoy = Number(kpiLunesActual().slice(0, 4));
+    if(!sel.options.length){
+      for(let a = anioHoy; a >= 2026; a--) sel.add(new Option(String(a), String(a)));
+    }
+    const anio = Number(sel.value || anioHoy);
+    const tabla = document.getElementById('kpiTablaMeses');
+    tabla.innerHTML = '<tr><td class="empty-msg">Cargando...</td></tr>';
+    const filas = await kpiLeerAnio(anio);
+    if(!filas){ tabla.innerHTML = '<tr><td>No se pudo leer el año.</td></tr>'; return; }
+    kpiEstado.anioFilas = filas; kpiEstado.anio = anio;
+    const meses = {};
+    filas.forEach(f => {
+      const m = kpiMesDeSemana(f.semana_inicio);
+      const o = meses[m] || (meses[m] = { venta: 0, meta: 0, serv: 0, agend: 0, nuevos: 0, bajas: 0, quejas: 0, nc: 0, cxc30: {}, semanas: new Set() });
+      const v = Number(f.valor || 0);
+      if(f.clave === 'venta_empresarial' || f.clave === 'venta_residencial'){ o.venta += v; o.semanas.add(f.semana_inicio); }
+      if(f.clave === 'meta_semana') o.meta += v;
+      if(f.clave === 'serv_reales') o.serv += v;
+      if(f.clave === 'serv_agendados') o.agend += v;
+      if(f.clave === 'clientes_nuevos') o.nuevos += v;
+      if(f.clave === 'bajas_clientes') o.bajas += v;
+      if(f.clave === 'quejas') o.quejas += v;
+      if(f.clave === 'nc') o.nc += v;
+      if(f.clave === 'cxc_mas_30') o.cxc30[f.semana_inicio] = v;
+    });
+    let tot = { venta: 0, meta: 0, serv: 0, nuevos: 0, bajas: 0 };
+    let html = `<tr><th>Mes</th><th>Vendido</th><th>Meta</th><th>Cumplimiento</th><th>Serv. realizados / agendados</th><th>Clientes nuevos</th><th>Bajas</th><th>Quejas</th><th>NC</th><th>Por cobrar &gt;30 días (última semana)</th></tr>`;
+    for(let i = 1; i <= 12; i++){
+      const k = `${anio}-${String(i).padStart(2, '0')}`; const o = meses[k];
+      if(!o){ html += `<tr><td>${KPI_MESES[i - 1]}</td><td colspan="9" style="text-align:left;color:#999;">sin datos</td></tr>`; continue; }
+      const r = o.meta ? o.venta / o.meta : 0;
+      const ult = Object.keys(o.cxc30).sort().pop();
+      tot.venta += o.venta; tot.meta += o.semanas.size ? o.meta : 0; tot.serv += o.serv; tot.nuevos += o.nuevos; tot.bajas += o.bajas;
+      html += `<tr><td>${KPI_MESES[i - 1]}${o.semanas.size ? '' : ' <small style="color:#999">(solo meta)</small>'}</td>
+        <td>${kpiMxn(o.venta)}</td><td>${kpiMxn(o.meta)}</td>
+        <td><strong class="kpi-txt-${kpiClaseRitmo(r)}">${o.meta ? kpiPct(r) : '—'}</strong><span class="kpi-mini"><span class="kpi-${kpiClaseRitmo(r)}" style="width:${Math.min(100, r * 100)}%"></span></span></td>
+        <td>${kpiNum(o.serv)} / ${kpiNum(o.agend)}</td><td>${kpiNum(o.nuevos)}</td><td>${kpiNum(o.bajas)}</td><td>${kpiNum(o.quejas)}</td><td>${kpiNum(o.nc)}</td>
+        <td>${ult ? kpiMxn(o.cxc30[ult]) : '—'}</td></tr>`;
+    }
+    const rt = tot.meta ? tot.venta / tot.meta : 0;
+    html += `<tr style="font-weight:700;"><td>Total con ventas capturadas</td><td>${kpiMxn(tot.venta)}</td><td>${kpiMxn(tot.meta)}</td>
+      <td class="kpi-txt-${kpiClaseRitmo(rt)}">${kpiPct(rt)}</td><td>${kpiNum(tot.serv)}</td><td>${kpiNum(tot.nuevos)}</td><td>${kpiNum(tot.bajas)}</td><td></td><td></td><td></td></tr>`;
+    tabla.innerHTML = html;
+    kpiCargarBitacora();
+  }
+
+  async function kpiCargarBitacora(){
+    const tabla = document.getElementById('kpiBitacora');
+    const { data, error } = await supabaseClient.from('kpi_bitacora')
+      .select('*').order('cambiado_en', { ascending: false }).limit(30);
+    if(error){ tabla.innerHTML = '<tr><td>No se pudo leer la bitácora.</td></tr>'; return; }
+    if(!data.length){ tabla.innerHTML = '<tr><td class="empty-msg">Todavía no hay cambios registrados.</td></tr>'; return; }
+    const nombres = {}; (kpiEstado.indicadores || []).forEach(i => { nombres[i.clave] = i.nombre; });
+    tabla.innerHTML = `<tr><th>Cuándo</th><th>Quién</th><th>Semana</th><th>Indicador</th><th>Antes</th><th>Después</th></tr>` +
+      data.map(b => `<tr><td>${escapeHtml(new Date(b.cambiado_en).toLocaleString('es-MX', { timeZone: KPI_TZ, dateStyle: 'short', timeStyle: 'short' }))}</td>
+        <td>${escapeHtml(b.usuario_nombre || '—')}</td><td>${escapeHtml(kpiRangoSemana(b.semana_inicio))}</td>
+        <td>${escapeHtml(nombres[b.clave] || b.clave)}</td>
+        <td>${b.valor_anterior === null ? '—' : kpiNum(b.valor_anterior)}</td><td>${b.valor_nuevo === null ? '—' : kpiNum(b.valor_nuevo)}</td></tr>`).join('');
+  }
+
+  function kpiExportarCsv(){
+    if(!kpiEsDueno() || !kpiEstado.anioFilas) return;
+    const inds = kpiEstado.indicadores;
+    const semanas = Array.from(new Set(kpiEstado.anioFilas.map(f => f.semana_inicio))).sort();
+    const m = {}; kpiEstado.anioFilas.forEach(f => { m[f.semana_inicio + '|' + f.clave] = f; });
+    const esc = s => `"${String(s === null || s === undefined ? '' : s).replace(/"/g, '""')}"`;
+    const lineas = [['Área', 'Indicador', ...semanas.map(s => `${s} (${kpiRangoSemana(s)})`)].map(esc).join(',')];
+    inds.forEach(i => {
+      lineas.push([i.area, i.nombre, ...semanas.map(s => { const f = m[s + '|' + i.clave]; return f ? (i.unidad === 'texto' ? f.nota : f.valor) : ''; })].map(esc).join(','));
+    });
+    const blob = new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `KPIs_AECO_${kpiEstado.anio}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // Contador rojo en la pestaña: lo que falta de la semana, desde el viernes
+  // (o lo que falta de la semana pasada mientras siga abierta).
+  async function refrescarContadorKpis(){
+    const badge = document.getElementById('tabKpisContador');
+    if(!badge || !usuarioActual || kpiEsDueno()){ if(badge) badge.classList.add('hidden'); return; }
+    const inds = await kpiCargarIndicadores();
+    if(!inds){ badge.classList.add('hidden'); return; }
+    const capt = inds.filter(i => i.unidad !== 'texto' && kpiPuedeCapturar(i));
+    if(!capt.length){ badge.classList.add('hidden'); return; }
+    const hoy = kpiLunesActual(); const ant = kpiSumarDias(hoy, -7);
+    const dow = (new Date(kpiAhoraMty().fecha + 'T12:00:00Z').getUTCDay() + 6) % 7; // 0 = lunes
+    let lunes = null;
+    if(kpiSemanaAbierta(ant)) lunes = ant; else if(dow >= 4) lunes = hoy;
+    if(!lunes){ badge.classList.add('hidden'); return; }
+    const vals = await kpiLeerSemana(lunes);
+    if(!vals){ badge.classList.add('hidden'); return; }
+    const faltan = capt.filter(i => !vals[i.clave] || vals[i.clave].valor === null).length;
+    badge.textContent = String(faltan);
+    badge.classList.toggle('hidden', faltan === 0);
+  }
+
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-kpi-semana]');
+    if(b){ kpiEstado.semana = b.dataset.kpiSemana; kpiPintarBarraSemana(); kpiCargarFormulario(); return; }
+    if(ev.target.id === 'btnKpiGuardar') kpiGuardar();
+    if(ev.target.id === 'btnKpiExportar') kpiExportarCsv();
+  });
+  document.addEventListener('input', ev => {
+    if(ev.target.closest && ev.target.closest('#kpiFormulario')){ kpiEstado.forzar = false; kpiRevisarFormulario(); }
+  });
+  document.addEventListener('change', ev => {
+    if(ev.target.id === 'kpiSemanaOtra' && ev.target.value){
+      kpiEstado.semana = kpiLunesDe(ev.target.value); kpiPintarBarraSemana(); kpiCargarFormulario();
+    }
+    if(ev.target.id === 'kpiAnio') kpiCargarTablero();
+  });
 
   verificarSesionExistente();
 
