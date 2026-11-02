@@ -19949,11 +19949,50 @@
     const mesAnt = `${ya - 1}-${String(ma).padStart(2, '0')}`;
     const fAnt = meses24.find(x => x.mes === mesAnt);
     const ventaAnt = fAnt && fAnt.venta !== null ? Number(fAnt.venta) : null;
-    const lineaAnio = ventaAnt === null
+    // Los chavos solo ven porcentajes; las cantidades son solo para el dueño.
+    const soloPct = !kpiEsDueno();
+    const signo = n => (n >= 0 ? '+' : '') + kpiPct(n);
+    const lineaAnio = ventaAnt === null || (soloPct && !ventaAnt)
       ? ''
+      : soloPct
+      ? `<div class="s" style="margin-top:6px;">Contra ${escapeHtml(kpiNombreMes(mesAnt))}: llevas <strong class="kpi-txt-${vendido >= ventaAnt ? 'ok' : 'medio'}">${kpiPct(vendido / ventaAnt)}</strong> de lo que se vendió ese mes${vendido >= ventaAnt ? ' · <span class="kpi-txt-ok">ya lo superaste</span>' : ''}</div>`
       : `<div class="s" style="margin-top:6px;">${escapeHtml(kpiNombreMes(mesAnt))}: <strong>${kpiMxn(ventaAnt)}</strong> · ${vendido >= ventaAnt
           ? `<span class="kpi-txt-ok">ya lo superaste por ${kpiMxn(vendido - ventaAnt)}</span>`
           : `te faltan <strong>${kpiMxn(ventaAnt - vendido)}</strong> para superarlo`}</div>`;
+    if(soloPct){
+      const pctSem = actual.meta ? actual.venta / actual.meta : 0;
+      cont.innerHTML = `
+      <div class="kpi-avance">
+        <div class="kpi-tile">
+          <div class="t">Avance de ${escapeHtml(kpiNombreMes(data.mes))}</div>
+          <div class="v kpi-txt-${cls}">${meta ? kpiPct(pctMes) : '—'}</div>
+          <div class="s">de la meta del mes</div>
+          <div class="kpi-barra" title="La raya marca dónde deberías ir a esta fecha"><span class="kpi-${cls}" style="width:${Math.min(100, pctMes * 100)}%"></span><i style="left:${marcaFecha}%"></i></div>
+          <div class="s kpi-txt-${cls}" style="margin-top:8px;">${escapeHtml(mensaje)}</div>
+          ${lineaAnio}
+        </div>
+        <div class="kpi-tile">
+          <div class="t">Te falta para la meta</div>
+          <div class="v">${meta ? kpiPct(Math.max(0, 1 - pctMes)) : '—'}</div>
+          <div class="s">${restantes ? `Quedan ${restantes} ${restantes === 1 ? 'semana' : 'semanas'} (contando esta).` : 'Ya no quedan semanas en el mes.'}</div>
+          <div class="s">${promSem && necesitaSemana ? (necesitaSemana > promSem ? `Para llegar necesitas vender <strong class="kpi-txt-mal">${kpiPct(necesitaSemana / promSem - 1)} más</strong> por semana que tu promedio de los últimos 3 meses.` : 'Con tu promedio de los últimos 3 meses <strong class="kpi-txt-ok">llegas a la meta</strong>.') : ''}</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="t">Esta semana · ${kpiRangoSemana(hoy)}</div>
+          <div class="v kpi-txt-${kpiClaseRitmo(pctSem)}">${actual.meta ? kpiPct(pctSem) : '—'}</div>
+          <div class="s">de la meta de la semana</div>
+          <div class="kpi-barra"><span class="kpi-${kpiClaseRitmo(pctSem)}" style="width:${Math.min(100, pctSem * 100)}%"></span></div>
+          ${promClientes ? `<div class="s" style="margin-top:8px;">Clientes nuevos del mes: <strong>${kpiPct(clientesMes / promClientes)}</strong> de tu promedio mensual</div>` : ''}
+        </div>
+      </div>
+      ${prev.length ? `<div class="kpi-chips">${prev.map(m => {
+        const r = m.meta ? m.venta / m.meta : 0;
+        return `<span class="kpi-chip">${escapeHtml(kpiNombreMes(m.mes))}: <strong class="kpi-txt-${kpiClaseRitmo(r)}">${kpiPct(r)}</strong> de la meta</span>`;
+      }).join('')}</div>` : ''}
+      ${kpiGraficaAnios(meses24, data.mes, true)}
+      ${kpiTablaCrecimiento(meses24, data.mes, true)}`;
+      return;
+    }
     cont.innerHTML = `
       <div class="kpi-avance">
         <div class="kpi-tile">
@@ -19988,7 +20027,7 @@
   }
 
   // Crecimiento mes por mes contra el mismo mes del año pasado: ventas en % y clientes en número y %.
-  function kpiTablaCrecimiento(meses24, mesActual){
+  function kpiTablaCrecimiento(meses24, mesActual, soloPct){
     const anio = Number(mesActual.slice(0, 4));
     const get = (ym, k) => { const f = meses24.find(x => x.mes === ym); return f && f[k] !== null && f[k] !== undefined ? Number(f[k]) : null; };
     const pct = (a, b) => {
@@ -20007,6 +20046,10 @@
       const dif = cA !== null && cB !== null ? cA - cB : null;
       const difTxt = dif === null ? '<span style="color:#9aa8a1;">–</span>' : `<strong class="kpi-txt-${dif >= 0 ? 'ok' : 'mal'}">${dif >= 0 ? '+' : ''}${dif}</strong>`;
       const curso = ym === mesActual ? ' <span style="font-size:11px;color:#9a6b00;">(en curso)</span>' : '';
+      if(soloPct){
+        filas += `<tr><td>${KPI_MESES[i - 1]}${curso}</td><td>${pct(vA, vB)}</td><td>${pct(cA, cB)}</td></tr>`;
+        continue;
+      }
       filas += `<tr><td>${KPI_MESES[i - 1]}${curso}</td>
         <td>${vA === null ? num(null) : kpiMxn(vA)}</td><td>${vB === null ? num(null) : kpiMxn(vB)}</td><td>${pct(vA, vB)}</td>
         <td>${num(cA)}</td><td>${num(cB)}</td><td>${difTxt}</td><td>${pct(cA, cB)}</td></tr>`;
@@ -20014,14 +20057,14 @@
     if(!filas) return '';
     return `<div style="margin-top:18px;">
       <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Crecimiento por mes contra ${anio - 1}</div>
-      <div class="kpi-tabla-wrap"><table class="kpi-tabla">
-        <thead>
+      <div class="kpi-tabla-wrap"><table class="kpi-tabla"${soloPct ? ' style="max-width:420px;"' : ''}>
+        ${soloPct ? `<thead><tr><th>Mes</th><th>Ventas</th><th>Clientes</th></tr></thead>` : `<thead>
           <tr><th></th><th colspan="3" style="text-align:center;">Ventas</th><th colspan="4" style="text-align:center;">Clientes</th></tr>
           <tr><th>Mes</th><th>${anio}</th><th>${anio - 1}</th><th>Crec. %</th><th>${anio}</th><th>${anio - 1}</th><th>Crec.</th><th>Crec. %</th></tr>
-        </thead>
+        </thead>`}
         <tbody>${filas}</tbody>
       </table></div>
-      <div style="font-size:11px;color:#7a8a82;margin-top:4px;">Clientes es el número al cierre de cada mes. Un guion quiere decir que no hay dato para comparar.</div>
+      <div style="font-size:11px;color:#7a8a82;margin-top:4px;">${soloPct ? 'Crecimiento contra el mismo mes del año pasado. ' : ''}Clientes es el número al cierre de cada mes. Un guion quiere decir que no hay dato para comparar.</div>
     </div>`;
   }
 
@@ -20076,7 +20119,7 @@
   }
 
   // Barras por mes: año en curso contra el año pasado (solo totales).
-  function kpiGraficaAnios(meses24, mesActual){
+  function kpiGraficaAnios(meses24, mesActual, soloPct){
     const anio = Number(mesActual.slice(0, 4));
     const val = ym => { const f = meses24.find(x => x.mes === ym); return f && f.venta !== null ? Number(f.venta) : null; };
     const filas = [];
@@ -20093,8 +20136,8 @@
     filas.forEach((f, k) => {
       const x = k * ancho;
       const h = v => Math.max(v ? 2 : 0, (v || 0) / max * 140);
-      if(f.ant !== null) barras += `<rect x="${x + ancho * 0.18}" y="${base - h(f.ant)}" width="${ancho * 0.3}" height="${h(f.ant)}" rx="2" fill="#c3ccc7"><title>${KPI_MESES[k]} ${anio - 1}: ${kpiMxn(f.ant)}</title></rect>`;
-      if(f.act !== null) barras += `<rect x="${x + ancho * 0.52}" y="${base - h(f.act)}" width="${ancho * 0.3}" height="${h(f.act)}" rx="2" fill="#2e9e4f"><title>${KPI_MESES[k]} ${anio}: ${kpiMxn(f.act)}</title></rect>`;
+      if(f.ant !== null) barras += `<rect x="${x + ancho * 0.18}" y="${base - h(f.ant)}" width="${ancho * 0.3}" height="${h(f.ant)}" rx="2" fill="#c3ccc7"><title>${KPI_MESES[k]} ${anio - 1}${soloPct ? '' : ': ' + kpiMxn(f.ant)}</title></rect>`;
+      if(f.act !== null) barras += `<rect x="${x + ancho * 0.52}" y="${base - h(f.act)}" width="${ancho * 0.3}" height="${h(f.act)}" rx="2" fill="#2e9e4f"><title>${KPI_MESES[k]} ${anio}${soloPct ? (f.ant ? ': ' + (f.act >= f.ant ? '+' : '') + kpiPct(f.act / f.ant - 1) + ' contra ' + (anio - 1) : '') : ': ' + kpiMxn(f.act)}</title></rect>`;
       barras += `<text x="${x + ancho / 2}" y="${base + 16}" text-anchor="middle" font-size="12" fill="#5c6b63">${KPI_MESES[k].slice(0, 3)}</text>`;
     });
     const comp = hayAnt && totAntMismo
