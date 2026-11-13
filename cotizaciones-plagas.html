@@ -3387,6 +3387,7 @@
           <input type="text" id="vehiculosBuscador" placeholder="Buscar por alias, placas o marca...">
           <button type="button" id="btnLimpiarVehiculosBuscador" class="hidden" aria-label="Limpiar búsqueda">✕</button>
         </div>
+        <button class="btn secondary hidden" id="btnReporteMantVehiculos">Reporte de mantenimiento (PDF)</button>
         <button class="btn" id="btnAgregarVehiculo">Agregar vehículo</button>
       </div>
       <div id="vehiculosFiltroAviso" class="hint hidden" style="margin-bottom:8px;"></div>
@@ -4740,6 +4741,88 @@
     </div>
   </div>
 </div>
+
+<!-- ================= OVERLAY: REPORTE DE MANTENIMIENTO PARA CLIENTE ================= -->
+<div id="mvrOverlay" class="hidden">
+  <div id="mvrPanel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+      <div>
+        <h3 style="margin:0;">Reporte de mantenimiento vehicular</h3>
+        <p class="hint" style="margin:4px 0 0 0;">Para entregar a la empresa cliente que lo pide (auditorías, alta de proveedor). No incluye gasolina ni multas.</p>
+      </div>
+      <button type="button" class="btn secondary small" id="btnCerrarMvr">Cerrar</button>
+    </div>
+
+    <div class="grid" style="margin-top:14px;align-items:end;">
+      <div class="field" style="min-width:240px;flex:2;">
+        <label for="mvrEmpresa">Empresa que lo solicita *</label>
+        <input type="text" id="mvrEmpresa" list="mvrEmpresasLista" placeholder="Ej. Helados Regia">
+        <datalist id="mvrEmpresasLista"></datalist>
+      </div>
+      <div class="field" style="min-width:200px;flex:1;">
+        <label for="mvrAtencion">Atención a (opcional)</label>
+        <input type="text" id="mvrAtencion" placeholder="Ej. Ing. Laura Garza, Calidad">
+      </div>
+    </div>
+    <div class="grid" style="align-items:end;">
+      <div class="field" style="max-width:180px;"><label for="mvrDesde">Desde</label><input type="date" id="mvrDesde"></div>
+      <div class="field" style="max-width:180px;"><label for="mvrHasta">Hasta</label><input type="date" id="mvrHasta"></div>
+      <div class="field" style="flex:1;min-width:220px;">
+        <label>Opciones</label>
+        <label class="mvr-op"><input type="checkbox" id="mvrDocs" checked> Incluir seguro, verificación y tarjeta de circulación</label>
+        <label class="mvr-op"><input type="checkbox" id="mvrCostos"> Incluir costos (normalmente NO se le muestran al cliente)</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Vehículos que van en el reporte</label>
+      <div id="mvrVehiculos" class="mvr-vehs"></div>
+    </div>
+    <div class="actions-row" style="justify-content:flex-end;margin-top:8px;">
+      <button type="button" class="btn secondary small" id="btnMvrPrevia">Ver reporte</button>
+      <button type="button" class="btn" id="btnMvrPdf">Descargar PDF</button>
+    </div>
+    <div id="mvrAviso" class="hint" style="margin-top:6px;"></div>
+
+    <div id="mvrHoja" class="hidden"><div id="mvrDoc"></div></div>
+  </div>
+</div>
+<style>
+  #mvrOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:30px 15px;overflow:auto;z-index:999;}
+  #mvrPanel{background:var(--blanco);width:100%;max-width:860px;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.3);padding:20px;}
+  .mvr-op{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:400;margin:3px 0;color:#333;}
+  .mvr-op input{width:auto;margin:0;}
+  .mvr-vehs{display:flex;flex-wrap:wrap;gap:8px;}
+  .mvr-vehs label{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:500;border:1px solid var(--gris-borde);border-radius:18px;padding:6px 12px;margin:0;cursor:pointer;}
+  .mvr-vehs input{width:auto;margin:0;}
+  #mvrHoja{margin-top:16px;border:1px solid var(--gris-borde);border-radius:6px;padding:18px;background:#fff;overflow:auto;}
+  #mvrDoc{width:720px;max-width:100%;margin:0 auto;color:#222;font-size:12px;font-family:Arial,Helvetica,sans-serif;}
+  #mvrDoc.mvr-pdf{max-width:none;}
+  .mvr-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #016937;padding-bottom:10px;margin-bottom:12px;gap:16px;}
+  .mvr-head img{max-height:70px;max-width:170px;}
+  .mvr-head .emp{text-align:right;font-size:11px;color:#444;line-height:1.45;}
+  .mvr-head .emp b{font-size:14px;color:#016937;}
+  .mvr-title{text-align:center;margin:6px 0 12px;}
+  .mvr-title h1{font-size:18px;letter-spacing:1px;color:#016937;margin:0;text-transform:uppercase;}
+  .mvr-title div{font-size:11px;color:#555;margin-top:3px;}
+  .mvr-datos{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;background:#f2f8f4;border-radius:6px;padding:10px 12px;margin-bottom:14px;}
+  .mvr-datos span{color:#666;}
+  .mvr-h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#016937;border-bottom:1px solid #cfd8d2;padding-bottom:3px;margin:14px 0 6px;}
+  .mvr-tabla{width:100%;border-collapse:collapse;font-size:11px;}
+  .mvr-tabla th{background:#016937;color:#fff;text-align:left;padding:5px 6px;font-weight:600;}
+  .mvr-tabla td{border-bottom:1px solid #e1e7e3;padding:5px 6px;vertical-align:top;}
+  .mvr-tabla tr:nth-child(even) td{background:#f7faf8;}
+  .mvr-ok{color:#016937;font-weight:700;}
+  .mvr-warn{color:#a66b00;font-weight:700;}
+  .mvr-bad{color:#b3261e;font-weight:700;}
+  .mvr-bloque{page-break-inside:avoid;break-inside:avoid;margin-bottom:14px;border:1px solid #dfe6e0;border-radius:6px;padding:10px 12px;}
+  .mvr-bloque .ficha{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 16px;margin-bottom:6px;}
+  .mvr-bloque .ficha span{color:#666;}
+  .mvr-bloque h4{margin:0 0 6px;font-size:14px;color:#016937;}
+  .mvr-nota{font-size:11px;color:#444;line-height:1.5;margin-top:14px;}
+  .mvr-firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;page-break-inside:avoid;break-inside:avoid;}
+  .mvr-firmas div{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:11px;}
+  .mvr-pie{font-size:9px;color:#888;text-align:center;margin-top:16px;}
+</style>
 
 <!-- ================= OVERLAY: VER IMAGEN (ticket / factura) ================= -->
 <div id="vehiculoImagenOverlay" class="hidden">
@@ -17703,8 +17786,177 @@
     document.getElementById('vehiculoAsignado').innerHTML = '<option value="">Sin asignar</option>' + opciones;
   }
 
+  // ---------- Reporte de mantenimiento vehicular para clientes (nov 2026) ----------
+  // Oficina (dueño / asistente: Nora y Jordan) arma un PDF con la ficha,
+  // la vigencia de documentos y el historial de mantenimientos de los
+  // vehículos, para la empresa cliente que lo pide. Sin gasolina ni multas,
+  // y sin costos salvo que se marque la opción.
+  const mvrOverlay = document.getElementById('mvrOverlay');
+  let mvrDatos = null;
+
+  function mvrFecha(iso){ return iso ? formatDate(String(iso).slice(0, 10)) : '—'; }
+  function mvrKm(n){ return (n == null || n === '') ? '—' : Number(n).toLocaleString('es-MX') + ' km'; }
+  function mvrVigencia(iso){
+    if(!iso) return '<span>—</span>';
+    const e = estadoVencimiento(iso);
+    const txt = e === 'vencido' ? 'Vencido' : (e === 'por_vencer' ? 'Por vencer' : 'Vigente');
+    const cls = e === 'vencido' ? 'mvr-bad' : (e === 'por_vencer' ? 'mvr-warn' : 'mvr-ok');
+    return `<span class="${cls}">${txt}</span> · ${mvrFecha(iso)}`;
+  }
+
+  async function abrirReporteMantenimiento(){
+    if(!esOficinaActual()) return;
+    const hoy = new Date();
+    const hace = new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate());
+    document.getElementById('mvrDesde').value = fechaALocalISO(hace);
+    document.getElementById('mvrHasta').value = fechaALocalISO(hoy);
+    document.getElementById('mvrEmpresa').value = '';
+    document.getElementById('mvrAtencion').value = '';
+    document.getElementById('mvrCostos').checked = false;
+    document.getElementById('mvrDocs').checked = true;
+    document.getElementById('mvrAviso').textContent = '';
+    document.getElementById('mvrHoja').classList.add('hidden');
+    const activos = (vehiculosCache || []).filter(v => v.activo);
+    document.getElementById('mvrVehiculos').innerHTML = activos.length
+      ? activos.map(v => `<label><input type="checkbox" value="${v.id}" checked> ${escapeHtml(v.alias || 'Vehículo')}${v.placas ? ' · ' + escapeHtml(v.placas) : ''}</label>`).join('')
+      : '<span class="hint">No hay vehículos activos.</span>';
+    mvrOverlay.classList.remove('hidden');
+    const { data } = await supabaseClient.from('empresas').select('nombre').order('nombre');
+    document.getElementById('mvrEmpresasLista').innerHTML = (data || []).map(e => `<option value="${escapeHtml(e.nombre || '')}"></option>`).join('');
+  }
+
+  async function mvrArmar(){
+    const empresaCliente = document.getElementById('mvrEmpresa').value.trim();
+    const desde = document.getElementById('mvrDesde').value;
+    const hasta = document.getElementById('mvrHasta').value;
+    const ids = [...document.querySelectorAll('#mvrVehiculos input:checked')].map(i => i.value);
+    const aviso = document.getElementById('mvrAviso');
+    if(!empresaCliente){ aviso.textContent = 'Escribe el nombre de la empresa que lo solicita.'; return null; }
+    if(!desde || !hasta || desde > hasta){ aviso.textContent = 'Revisa el periodo (desde / hasta).'; return null; }
+    if(!ids.length){ aviso.textContent = 'Marca al menos un vehículo.'; return null; }
+    aviso.textContent = 'Armando reporte...';
+    const { data: mant, error } = await supabaseClient.from('vehiculo_mantenimientos')
+      .select('vehiculo_id, fecha, tipo, descripcion, costo, odometro, hecho_por, proximo_km, proxima_fecha')
+      .in('vehiculo_id', ids).order('fecha', { ascending: false });
+    if(error){ aviso.textContent = 'No se pudieron leer los mantenimientos: ' + error.message; return null; }
+    const vehs = (vehiculosCache || []).filter(v => ids.includes(v.id));
+    const todos = (mant || []).slice().sort((x, y) => String(y.fecha).localeCompare(String(x.fecha)));
+    aviso.textContent = '';
+    return {
+      empresaCliente, atencion: document.getElementById('mvrAtencion').value.trim(), desde, hasta,
+      costos: document.getElementById('mvrCostos').checked, docs: document.getElementById('mvrDocs').checked,
+      vehs, todos, enPeriodo: todos.filter(m => m.fecha >= desde && m.fecha <= hasta).reverse(),
+    };
+  }
+
+  function mvrRender(d){
+    const emp = getEmpresa();
+    const hoyIso = fechaALocalISO(new Date());
+    const folio = 'MV-' + hoyIso.replace(/-/g, '') + '-' + String(d.vehs.length).padStart(2, '0');
+    const tipo = t => MANTENIMIENTO_TIPO_LABEL[t] || t || '—';
+    const resumen = d.vehs.map(v => {
+      const deV = d.todos.filter(m => m.vehiculo_id === v.id);
+      const ult = deV[0];
+      const prox = v.proximo_servicio_fecha || (ult && ult.proxima_fecha) || null;
+      const proxKm = v.proximo_servicio_km || (ult && ult.proximo_km) || null;
+      const est = estadoServicio(v);
+      const estTxt = est === 'vencido' ? '<span class="mvr-bad">Servicio vencido</span>' : (est === 'por_vencer' ? '<span class="mvr-warn">Servicio próximo</span>' : '<span class="mvr-ok">Al corriente</span>');
+      return `<tr><td><b>${escapeHtml(v.alias || '')}</b></td>
+        <td>${escapeHtml([v.marca, v.modelo, v.anio].filter(Boolean).join(' ') || '—')}</td>
+        <td>${escapeHtml(v.placas || '—')}</td>
+        <td>${mvrKm(v.km_actual)}</td>
+        <td>${ult ? mvrFecha(ult.fecha) + '<br>' + escapeHtml(tipo(ult.tipo)) : '—'}</td>
+        <td>${prox ? mvrFecha(prox) : ''}${prox && proxKm ? '<br>' : ''}${proxKm ? mvrKm(proxKm) : ''}${!prox && !proxKm ? '—' : ''}</td>
+        <td>${estTxt}</td></tr>`;
+    }).join('');
+
+    const bloques = d.vehs.map(v => {
+      const filas = d.enPeriodo.filter(m => m.vehiculo_id === v.id);
+      const total = filas.reduce((s, m) => s + Number(m.costo || 0), 0);
+      const tabla = filas.length ? `<table class="mvr-tabla"><thead><tr><th style="width:74px;">Fecha</th><th style="width:96px;">Tipo</th><th>Trabajo realizado</th><th style="width:74px;">Km</th><th style="width:110px;">Realizado por</th>${d.costos ? '<th style="width:70px;">Costo</th>' : ''}</tr></thead><tbody>
+        ${filas.map(m => `<tr><td>${mvrFecha(m.fecha)}</td><td>${escapeHtml(tipo(m.tipo))}</td><td>${escapeHtml(m.descripcion || '—')}</td><td>${mvrKm(m.odometro)}</td><td>${escapeHtml(m.hecho_por || '—')}</td>${d.costos ? `<td>${m.costo != null ? formatMoney(m.costo) : '—'}</td>` : ''}</tr>`).join('')}
+        ${d.costos ? `<tr><td colspan="5" style="text-align:right;"><b>Total del periodo</b></td><td><b>${formatMoney(total)}</b></td></tr>` : ''}
+        </tbody></table>` : '<p style="margin:4px 0;color:#666;">Sin mantenimientos registrados en este periodo.</p>';
+      const docs = d.docs ? `<div class="ficha" style="margin-top:4px;">
+          <div><span>Seguro:</span> ${escapeHtml(v.aseguradora || '—')}<br>${mvrVigencia(v.seguro_vence)}</div>
+          <div><span>Verificación:</span><br>${mvrVigencia(v.verificacion_vence)}</div>
+          <div><span>Tarjeta de circulación:</span><br>${mvrVigencia(v.tarjeta_circulacion_vence)}</div>
+        </div>` : '';
+      return `<div class="mvr-bloque">
+        <h4>${escapeHtml(v.alias || 'Vehículo')}${v.placas ? ' · Placas ' + escapeHtml(v.placas) : ''}</h4>
+        <div class="ficha">
+          <div><span>Marca / modelo:</span> ${escapeHtml([v.marca, v.modelo].filter(Boolean).join(' ') || '—')}</div>
+          <div><span>Año:</span> ${escapeHtml(String(v.anio || '—'))} · <span>Color:</span> ${escapeHtml(v.color || '—')}</div>
+          <div><span>Kilometraje actual:</span> ${mvrKm(v.km_actual)}</div>
+        </div>
+        ${docs}
+        <div style="margin-top:6px;font-weight:700;color:#333;">Mantenimientos del periodo (${filas.length})</div>
+        ${tabla}
+      </div>`;
+    }).join('');
+
+    const quien = (usuarioActual && usuarioActual.nombre && !/@|^info$|^juan\.ariasv96$/i.test(usuarioActual.nombre)) ? usuarioActual.nombre : '';
+    document.getElementById('mvrDoc').innerHTML = `
+      <div class="mvr-head">
+        <div>${emp.logo ? `<img src="${emp.logo}" alt="Logo">` : `<b style="font-size:20px;color:#016937;">${escapeHtml(emp.nombre)}</b>`}</div>
+        <div class="emp"><b>${escapeHtml(emp.nombre)}</b><br>${escapeHtml(emp.direccion || '')}<br>${escapeHtml(emp.telefono || '')} · ${escapeHtml(emp.email || '')}<br>${escapeHtml(emp.licenciaSanitaria || '')}</div>
+      </div>
+      <div class="mvr-title"><h1>Reporte de mantenimiento vehicular</h1><div>Folio ${folio} · Emitido el ${mvrFecha(hoyIso)}</div></div>
+      <div class="mvr-datos">
+        <div><span>Solicitado por:</span> <b>${escapeHtml(d.empresaCliente)}</b></div>
+        <div><span>Periodo:</span> ${mvrFecha(d.desde)} al ${mvrFecha(d.hasta)}</div>
+        <div><span>Atención:</span> ${escapeHtml(d.atencion || '—')}</div>
+        <div><span>Unidades incluidas:</span> ${d.vehs.length} · <span>Servicios en el periodo:</span> ${d.enPeriodo.length}</div>
+      </div>
+      <div class="mvr-h3">Resumen de la flotilla</div>
+      <table class="mvr-tabla"><thead><tr><th>Unidad</th><th>Marca / modelo / año</th><th>Placas</th><th>Km actual</th><th>Último servicio</th><th>Próximo servicio</th><th>Estado</th></tr></thead><tbody>${resumen}</tbody></table>
+      <div class="mvr-h3">Detalle por unidad</div>
+      ${bloques}
+      <p class="mvr-nota">${escapeHtml(emp.nombre)} hace constar que las unidades utilizadas para la prestación de sus servicios de control de plagas reciben mantenimiento preventivo y correctivo, y que la información de este reporte corresponde a los registros de su bitácora de flotilla.</p>
+      <div class="mvr-firmas"><div>${escapeHtml(quien || 'Nombre y firma')}<br>Responsable de flotilla · ${escapeHtml(emp.nombre)}</div><div>Recibido por<br>${escapeHtml(d.empresaCliente)}</div></div>
+      <div class="mvr-pie">Documento generado desde el sistema de ${escapeHtml(emp.nombre)} el ${mvrFecha(hoyIso)}.</div>`;
+    document.getElementById('mvrHoja').classList.remove('hidden');
+    return folio;
+  }
+
+  document.getElementById('btnReporteMantVehiculos').addEventListener('click', abrirReporteMantenimiento);
+  document.getElementById('btnCerrarMvr').addEventListener('click', () => mvrOverlay.classList.add('hidden'));
+  document.getElementById('btnMvrPrevia').addEventListener('click', async () => {
+    const d = await mvrArmar(); if(!d) return;
+    mvrDatos = d; mvrRender(d);
+    document.getElementById('mvrHoja').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('btnMvrPdf').addEventListener('click', async () => {
+    const btn = document.getElementById('btnMvrPdf');
+    const d = await mvrArmar(); if(!d) return;
+    mvrDatos = d; const folio = mvrRender(d);
+    btn.disabled = true; btn.textContent = 'Generando PDF...';
+    const doc = document.getElementById('mvrDoc');
+    doc.classList.add('mvr-pdf');
+    try{
+      await Promise.all([...doc.querySelectorAll('img')].map(img => img.decode ? img.decode().catch(() => {}) : null));
+      const limpio = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '-');
+      await html2pdf().set({
+        filename: `Mantenimiento-vehicular-${limpio(d.empresaCliente)}-${folio}.pdf`,
+        margin: 12,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.mvr-bloque', '.mvr-firmas', 'tr'] },
+      }).from(doc).save();
+      mostrarToast('PDF descargado.');
+    }catch(e){
+      console.error('Reporte de mantenimiento:', e);
+      alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
+    }finally{
+      doc.classList.remove('mvr-pdf');
+      btn.disabled = false; btn.textContent = 'Descargar PDF';
+    }
+  });
+
   async function cargarYRenderVehiculos(){
     document.getElementById('btnAgregarVehiculo').classList.toggle('hidden', !esOficinaActual());
+    document.getElementById('btnReporteMantVehiculos').classList.toggle('hidden', !esOficinaActual());
     document.getElementById('vehiculosReporteMensualSeccion').classList.toggle('hidden', !esOficinaActual());
 
     const { data, error } = await supabaseClient.from('vehiculos').select('*').order('alias');
